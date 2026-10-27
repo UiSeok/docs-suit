@@ -1,0 +1,11 @@
+class:
+  order: 5
+  label: 기획자·PM
+  desc: 기획서와 회의록, 진행 보고로 사람들을 한 방향으로 모으는 사람
+  kinds: [spec, minutes, work-report, slides]
+
+defaults:
+  voice: bullet
+  register: polite
+  terms: explained
+  diagram: table

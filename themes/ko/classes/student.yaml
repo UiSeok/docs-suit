@@ -1,0 +1,11 @@
+class:
+  order: 1
+  label: 대학생
+  desc: 수업 과제와 팀 프로젝트, 교수님께 보내는 메일을 쓰는 학부생
+  kinds: [report, slides, minutes, email]
+
+defaults:
+  visual-deck: paper
+  register: plain
+  terms: explained
+  ai-disclosure: footnote

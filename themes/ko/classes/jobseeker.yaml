@@ -1,0 +1,11 @@
+class:
+  order: 2
+  label: 취업 준비생
+  desc: 이력서와 자기소개서, 포트폴리오로 문을 두드리는 사람
+  kinds: [resume, cover-letter, portfolio, interview]
+
+defaults:
+  register: polite
+  voice: bullet
+  terms: explained
+  exposure: submit

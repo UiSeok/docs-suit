@@ -3,12 +3,12 @@
 // 개인 기본값은 이 브라우저의 localStorage 에만 남는다.
 (function () {
   "use strict";
-  const KEY = "geulot.personal";
+  const KEY = "docs-suit.personal";
   const $ = (id) => document.getElementById(id);
   // 화면에 보이는 축 순서. 글에 바로 드러나는 축을 앞에 둔다.
   const SHOW = ["voice", "register", "skeleton", "terms", "length", "sources", "exposure", "ai-disclosure",
     "diagram", "emphasis", "visual-deck", "visual-doc"];
-  const state = { kind: "report", aud: null, sets: {} };
+  const state = { cls: null, kind: null, aud: null, sets: {} };
   let T = null, C = null;
 
   function loadPersonal() {
@@ -95,10 +95,26 @@
   }
 
   function buildChips() {
+    const c = $("classes");
+    c.textContent = "";
+    chip(c, "고르지 않음", state.cls === null, () => { state.cls = null; render(); });
+    for (const [key, v] of Object.entries(T.classes)) {
+      chip(c, v.label, state.cls === key, () => {
+        state.cls = key;
+        if (!state.kind || v.kinds.indexOf(state.kind) < 0) state.kind = v.kinds[0];
+        render();
+      });
+    }
+    $("classDesc").textContent = state.cls ? T.classes[state.cls].desc : "클래스를 고르면 그 직업의 기본 말투와 주력 문서가 정해집니다.";
     const k = $("kinds");
     k.textContent = "";
     chip(k, "일반 글", state.kind === null, () => { state.kind = null; render(); });
-    for (const [key, v] of Object.entries(T.kinds)) chip(k, v.label, state.kind === key, () => { state.kind = key; render(); });
+    const main = state.cls ? T.classes[state.cls].kinds : [];
+    const order = main.concat(Object.keys(T.kinds).filter((x) => main.indexOf(x) < 0));
+    for (const key of order) {
+      const lab = T.kinds[key].label + (main.indexOf(key) >= 0 ? " ★" : "");
+      chip(k, lab, state.kind === key, () => { state.kind = key; render(); });
+    }
     const a = $("auds");
     a.textContent = "";
     const def = state.kind && T.kinds[state.kind].audience
@@ -161,13 +177,13 @@
 
   function render() {
     const auds = state.aud ? [state.aud] : [];
-    const r = C.resolve(state.kind, auds, state.sets, loadPersonal());
+    const r = C.resolve(state.kind, auds, state.sets, loadPersonal(), state.cls);
     buildChips();
     buildGallery(r.vals);
     $("warns").textContent = r.warns.join(" ");
     const chars = parseInt($("chars").value, 10) || null;
     const fmt = document.querySelector("input[name=fmt]:checked").value;
-    $("out").value = C.compose(state.kind, r.auds, r.vals, chars, fmt, $("html").checked);
+    $("out").value = C.compose(state.kind, r.auds, r.vals, chars, fmt, $("html").checked, r.cls, null);
   }
 
   function wire() {
@@ -185,7 +201,7 @@
       const blob = new Blob([$("out").value], { type: "text/markdown" });
       const a = document.createElement("a");
       a.href = URL.createObjectURL(blob);
-      a.download = `geulot-${state.kind || "general"}.md`;
+      a.download = `docs-suit-${state.kind || "general"}.md`;
       a.click();
       URL.revokeObjectURL(a.href);
     });

@@ -1,0 +1,12 @@
+class:
+  order: 6
+  label: 직장인
+  desc: 업무 보고와 메일, 회의록을 매일 쓰는 사람
+  kinds: [work-report, email, minutes, slides]
+
+defaults:
+  voice: bullet
+  register: polite
+  terms: everyday
+  length: brief
+  exposure: team

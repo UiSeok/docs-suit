@@ -1,0 +1,11 @@
+class:
+  order: 7
+  label: 크리에이터
+  desc: 블로그와 뉴스레터, SNS 로 독자를 만나는 사람
+  kinds: [blog, newsletter, sns]
+
+defaults:
+  voice: prose
+  register: haeyo
+  terms: everyday
+  sources: link

@@ -1,0 +1,12 @@
+class:
+  order: 3
+  label: 대학원생·연구자
+  desc: 논문과 연구계획서, 학회 발표를 쓰는 사람
+  kinds: [abstract, proposal, report, slides]
+
+defaults:
+  visual-deck: paper
+  terms: major
+  sources: apa
+  length: full
+  ai-disclosure: footnote

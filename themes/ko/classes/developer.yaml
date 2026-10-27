@@ -1,0 +1,11 @@
+class:
+  order: 4
+  label: 개발자
+  desc: 설계 문서와 PR, 장애 회고, 기술 글을 쓰는 사람
+  kinds: [design-doc, pr, postmortem, blog]
+
+defaults:
+  visual-deck: contrast
+  voice: bullet
+  terms: major
+  diagram: mermaid

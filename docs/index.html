@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>글옷 · AI 글쓰기 테마</title>
+<title>docs-suit · AI 글쓰기 테마</title>
 <style>
 :root {
   --bg: #f6f5f2; --surface: #ffffff; --line: #e4e1db; --ink: #1c1917; --muted: #6b6560;
@@ -81,13 +81,18 @@ button.primary { background: var(--accent); border-color: var(--accent); color: 
 <body>
 <main>
   <header>
-    <h1>글옷</h1>
-    <p>AI 에게 줄 글쓰기 지침을 고릅니다. 같은 예문을 값마다 다르게 써 본 카드를 보고 마음에 드는 쪽을 누르세요. 기본 프리셋은 대학생 문서입니다.</p>
+    <h1>docs-suit</h1>
+    <p>문서에 입힐 옷을 고릅니다. 클래스와 문서 종류를 정하고, 같은 예문을 값마다 다르게 써 본 카드를 보며 마음에 드는 쪽을 누르세요.</p>
   </header>
   <div class="layout">
     <div>
       <section class="step">
-        <h2>무엇을 쓰나요</h2>
+        <h2>클래스</h2>
+        <p class="note" id="classDesc"></p>
+        <div class="chips" id="classes"></div>
+      </section>
+      <section class="step">
+        <h2>무엇을 쓰나요 <span class="now">★ 는 클래스의 주력 문서</span></h2>
         <div class="chips" id="kinds"></div>
       </section>
       <section class="step">

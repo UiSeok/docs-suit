@@ -11,5 +11,5 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
-      - run: python3 theme.py selftest
+      - run: python3 suit.py selftest
       - run: node tests/parity.js
