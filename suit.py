@@ -1728,24 +1728,133 @@ def widget_watch(cwd):
     return tuple(f.stat().st_mtime if f.exists() else 0 for f in files)
 
 
+def mux_anchor():
+    """(멀티플렉서, 지금 칸). herdr 나 tmux 안이 아니면 (None, None). 둘이 겹쳐 있으면 가장 안쪽이 정한
+    TERM_PROGRAM 으로 고른다. herdr 칸 안에서 tmux 를 돌리면 tmux 칸을 나눠야 한다."""
+    herdr = os.environ.get("HERDR_PANE_ID") if os.environ.get("HERDR_ENV") == "1" else None
+    tmux = os.environ.get("TMUX_PANE") if os.environ.get("TMUX") else None
+    if herdr and tmux:
+        return ("tmux", tmux) if os.environ.get("TERM_PROGRAM") == "tmux" else ("herdr", herdr)
+    if tmux:
+        return "tmux", tmux
+    if herdr:
+        return "herdr", herdr
+    return None, None
+
+
+def pane_alive(mux, pane):
+    if mux == "herdr":
+        return subprocess.run(["herdr", "pane", "get", pane], capture_output=True).returncode == 0
+    # tmux 는 없는 칸을 물어도 빈 줄과 0 을 돌려줄 때가 있어, 돌려받은 칸 번호까지 견준다
+    out = subprocess.run(["tmux", "display-message", "-p", "-t", pane, "#{pane_id}"], capture_output=True, text=True)
+    return out.returncode == 0 and out.stdout.strip() == pane
+
+
+def close_pane(mux, pane):
+    cmd = ["herdr", "pane", "close", pane] if mux == "herdr" else ["tmux", "kill-pane", "-t", pane]
+    subprocess.run(cmd, capture_output=True)
+
+
+def split_pane(mux, anchor, cwd, cmd, width):
+    """anchor 칸 오른쪽에 칸을 나눠 cmd 를 돌리고 새 칸 번호를 돌려준다. 포커스는 옮기지 않는다."""
+    if mux == "tmux":
+        out = subprocess.run(["tmux", "split-window", "-h", "-d", "-t", anchor, "-l", str(width), "-c", cwd,
+                              "-P", "-F", "#{pane_id}", cmd], capture_output=True, text=True, check=True)
+        return out.stdout.strip()
+    # herdr 의 --ratio 는 원래 칸이 차지할 비율이다. 새 칸이 width 칸쯤 되게 맞춘다.
+    ratio = 0.65
+    layout = subprocess.run(["herdr", "pane", "layout"], capture_output=True, text=True)
+    try:
+        panes = json.loads(layout.stdout)["result"]["layout"]["panes"]
+        total = next(p["rect"]["width"] for p in panes if p["pane_id"] == anchor)
+        ratio = min(0.85, max(0.4, 1 - width / total))
+    except (ValueError, KeyError, StopIteration):
+        pass
+    out = subprocess.run(["herdr", "pane", "split", anchor, "--direction", "right", "--ratio", f"{ratio:.2f}", "--cwd", cwd],
+                         capture_output=True, text=True, check=True)
+    pane = json.loads(out.stdout)["result"]["pane"]["pane_id"]
+    # exec 로 셸을 바꿔 끼워, 창이 끝나면 칸의 셸도 함께 끝나게 한다
+    subprocess.run(["herdr", "pane", "run", pane, "exec " + cmd], capture_output=True, check=True)
+    return pane
+
+
+def agent_pid(names=("codex",)):
+    """훅을 부른 에이전트 프로세스. 부모를 거슬러 올라가며 이름에 codex 가 든 것을 찾는다. 없으면 None."""
+    pid = os.getppid()
+    for _ in range(8):
+        out = subprocess.run(["ps", "-o", "ppid=,comm=", "-p", str(pid)], capture_output=True, text=True).stdout.split(None, 1)
+        if len(out) < 2:
+            return None
+        if any(n in os.path.basename(out[1].strip()) for n in names):
+            return pid
+        pid = int(out[0])
+        if pid <= 1:
+            return None
+    return None
+
+
+def widget_registry():
+    return config_dir() / "widgets.json"
+
+
+def read_widgets():
+    try:
+        return json.loads(widget_registry().read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+
+
+def write_widgets(data):
+    widget_registry().parent.mkdir(parents=True, exist_ok=True)
+    widget_registry().write_text(json.dumps(data, ensure_ascii=False, indent=1), encoding="utf-8")
+
+
 def cmd_widget(a, th):
-    """터미널 옆 칸에 캐릭터 창을 띄운다. 기록이 바뀌면 다시 그린다. Codex 처럼 상태 줄이 없는 에이전트 옆에 둔다."""
-    cwd = os.path.abspath(os.path.expanduser(a.cwd or os.getcwd()))
+    """터미널 옆 칸에 캐릭터 창을 띄운다. 기록이 바뀌면 다시 그린다. Codex 처럼 상태 줄이 없는 에이전트 옆에 둔다.
+    --auto 는 Codex 훅이 부른다. 아무것도 출력하지 않고, 조건이 안 맞으면 조용히 끝난다."""
+    piped = "" if (not a.auto or sys.stdin.isatty()) else sys.stdin.read()
+    cwd = os.path.abspath(os.path.expanduser(a.cwd or status_cwd(piped) or os.getcwd()))
+    mux, anchor = mux_anchor()
+    key = f"{mux}:{anchor}"
+    if a.close:
+        widgets = read_widgets()
+        held = widgets.pop(key, None)
+        if held and mux:
+            close_pane(mux, held["pane"])
+            write_widgets(widgets)
+        return 0
     if a.split:
-        cmd = shlex.join([sys.executable, str(HERE / "suit.py"), "widget", "--cwd", cwd])
-        if os.environ.get("HERDR_ENV") == "1" and os.environ.get("HERDR_PANE_ID"):
-            # herdr 는 칸을 나누고 새 칸 번호를 JSON 으로 돌려준 뒤, 그 칸에 명령을 넣고 Enter 를 누른다
-            out = subprocess.run(["herdr", "pane", "split", "--current", "--direction", "right", "--cwd", cwd],
-                                 capture_output=True, text=True, check=True).stdout
-            pane = json.loads(out)["result"]["pane"]["pane_id"]
-            subprocess.run(["herdr", "pane", "run", pane, cmd], capture_output=True, check=True)
-        elif os.environ.get("TMUX"):
-            subprocess.run(["tmux", "split-window", "-h", "-d", "-l", str(a.width), cmd], check=True)
-        else:
-            print("herdr 나 tmux 안에서 돌릴 때만 칸을 나눈다. 터미널 앱의 창 나누기로 옆 칸을 열고 "
-                  f"`python3 {HERE / 'suit.py'} widget` 을 돌려도 된다", file=sys.stderr)
-            return 1
-        print("오른쪽 칸에 캐릭터 창을 띄웠다. 닫으려면 그 칸에서 Ctrl+C")
+        if not mux:
+            if not a.auto:
+                print("herdr 나 tmux 안에서 돌릴 때만 칸을 나눈다. 터미널 앱의 창 나누기로 옆 칸을 열고 "
+                      f"`python3 {HERE / 'suit.py'} widget` 을 돌려도 된다", file=sys.stderr)
+            return 0 if a.auto else 1
+        if a.auto:
+            # 상관없는 프로젝트에서 칸이 열리지 않게, 폴더 파일이 있고 캐릭터 키우기가 켜진 곳에서만 띄운다
+            if not find_folder_files(cwd) or not growth_on(read_slot(profile_source(None, start=cwd)[0])):
+                return 0
+        widgets = read_widgets()
+        held = widgets.get(key)
+        if held and pane_alive(mux, held["pane"]):
+            if not a.auto:
+                print("이 칸 옆에 캐릭터 창이 이미 떠 있다")
+            return 0
+        follow = a.follow_pid or (agent_pid() if a.auto else None)
+        # 새 칸은 새 셸에서 시작해 이 프로세스의 환경을 물려받지 못한다. docs-suit 설정 변수는 명령 앞에 붙여 넘긴다
+        env = [f"{k}={v}" for k, v in sorted(os.environ.items()) if k in ("DOCS_SUIT_HOME", "DOCS_SUIT_PROFILE", "DOCS_SUIT_THEMES")]
+        args = (["env", *env] if env else []) + [sys.executable, str(HERE / "suit.py"), "widget", "--cwd", cwd]
+        if follow:
+            args += ["--follow-pid", str(follow)]
+        try:
+            pane = split_pane(mux, anchor, cwd, shlex.join(args), a.width)
+        except (OSError, subprocess.CalledProcessError, ValueError, KeyError) as e:
+            if not a.auto:
+                print(f"칸을 나누지 못했다: {e}", file=sys.stderr)
+            return 0 if a.auto else 1
+        widgets[key] = {"pane": pane, "cwd": cwd}
+        write_widgets(widgets)
+        if not a.auto:
+            print("오른쪽 칸에 캐릭터 창을 띄웠다. 닫으려면 그 칸에서 Ctrl+C")
         return 0
     depth = color_depth("never" if os.environ.get("NO_COLOR") else "always")
     if a.once:
@@ -1760,8 +1869,17 @@ def cmd_widget(a, th):
     signal.signal(signal.SIGTERM, stop)
     signal.signal(signal.SIGHUP, stop)
     sys.stdout.write("\033[?25l")
+    followed_out = False
     try:
         while True:
+            if a.follow_pid:
+                try:
+                    os.kill(a.follow_pid, 0)
+                except ProcessLookupError:
+                    followed_out = True
+                    break
+                except PermissionError:
+                    pass
             now = (widget_watch(cwd), shutil.get_terminal_size())
             if now != last:
                 entries = read_growth(growth_path(start=cwd))
@@ -1783,6 +1901,12 @@ def cmd_widget(a, th):
         pass
     finally:
         sys.stdout.write("\033[?25h\033[0m\n")
+        sys.stdout.flush()
+    if followed_out:
+        # 따라가던 에이전트가 끝났으면 이 창이 든 칸도 닫는다. tmux 는 명령이 끝나면 칸이 저절로 닫힌다
+        mux, own = mux_anchor()
+        if mux == "herdr":
+            close_pane(mux, own)
     return 0
 
 
@@ -2130,6 +2254,22 @@ def selftest(th):
             check(len(wide) == 12 and len(narrow) > 12 and narrow[13].startswith("["),
                   "캐릭터 창이 넓은 칸에서 옆으로, 좁은 칸에서 아래로 놓이지 않는다")
             check(display_width("가a\033[1m나\033[0m") == 5, "한글 칸 수를 두 칸으로 세지 않는다")
+            keep = {k: os.environ.pop(k, None) for k in ("HERDR_ENV", "HERDR_PANE_ID", "TMUX", "TMUX_PANE", "TERM_PROGRAM")}
+            try:
+                got = [mux_anchor()]
+                os.environ.update(HERDR_ENV="1", HERDR_PANE_ID="w1:p1")
+                got.append(mux_anchor())
+                os.environ.update(TMUX="/tmp/t,1,0", TMUX_PANE="%3", TERM_PROGRAM="tmux")
+                got.append(mux_anchor())
+                os.environ["TERM_PROGRAM"] = "herdr"
+                got.append(mux_anchor())
+                check(got == [(None, None), ("herdr", "w1:p1"), ("tmux", "%3"), ("herdr", "w1:p1")],
+                      f"herdr 와 tmux 가운데 가장 안쪽 칸을 고르지 못한다: {got}")
+            finally:
+                for k, v in keep.items():
+                    os.environ.pop(k, None)
+                    if v is not None:
+                        os.environ[k] = v
             out = Path(td) / "mine.yaml"
             ns = argparse.Namespace(action="export", name="mine", by="@someone", label="내 조합", desc="시험", output=str(out),
                                     cls=None, here=False, profile="work")
@@ -2291,7 +2431,10 @@ def main(argv=None):
     wd = sub.add_parser("widget")
     wd.add_argument("--cwd", help="이 폴더의 슬롯을 그린다. 주지 않으면 지금 폴더")
     wd.add_argument("--split", action="store_true", help="herdr 나 tmux 의 지금 칸 오른쪽에 칸을 나눠 띄운다")
-    wd.add_argument("--width", type=int, default=44, help="tmux 로 나눌 칸의 너비")
+    wd.add_argument("--width", type=int, default=44, help="나눌 칸의 너비")
+    wd.add_argument("--auto", action="store_true", help="Codex 훅이 부를 때. 출력하지 않고 폴더 파일이 있는 곳에서만 띄운다")
+    wd.add_argument("--close", action="store_true", help="이 칸 옆에 띄운 캐릭터 창을 닫는다")
+    wd.add_argument("--follow-pid", type=int, help="이 프로세스가 끝나면 창도 끝내고 칸을 닫는다")
     wd.add_argument("--once", action="store_true", help="한 번만 그리고 끝낸다")
     st = sub.add_parser("status", parents=[slot])
     st.add_argument("--size", choices=("face", "full", "line"), default="face", help="face 는 얼굴, full 은 온몸, line 은 한 줄")

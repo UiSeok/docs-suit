@@ -144,6 +144,21 @@ python3 <docs-suit 경로>/suit.py widget                    # 터미널 앱의 
 
 칸이 좁으면 그림 아래로 글을 내립니다. 창은 그 칸에서 Ctrl+C 로 닫습니다.
 
+Codex 를 열 때마다 저절로 띄우려면 `~/.codex/hooks.json` 에 훅 두 개를 겁니다. 처음 한 번은 Codex 안에서 `/hooks` 로 이 훅을 신뢰한다고 승인해야 돌기 시작합니다.
+
+```json
+{
+  "hooks": {
+    "SessionStart": [{"matcher": "startup|resume", "hooks": [
+      {"type": "command", "command": "python3 <docs-suit 경로>/suit.py widget --split --auto", "timeout": 10}]}],
+    "SessionEnd": [{"hooks": [
+      {"type": "command", "command": "python3 <docs-suit 경로>/suit.py widget --close --auto", "timeout": 3}]}]
+  }
+}
+```
+
+자동으로 띄우는 창은 `.docs-suit.yaml` 이 있는 폴더에서만 열리므로, 상관없는 프로젝트에서 Codex 를 열면 칸이 생기지 않습니다. 같은 칸 옆에 창이 이미 떠 있으면 다시 나누지 않고, Codex 가 끝나면 창이 든 칸도 닫힙니다. 훅은 아무것도 출력하지 않아 Codex 가 받는 맥락을 어지럽히지 않습니다. herdr 칸 안에서 tmux 를 돌리면 가장 안쪽인 tmux 칸을 나눕니다.
+
 ## 테마 조합과 승급 키
 
 테마 조합은 축 기본값과 독자별 값을 한 묶음으로 남긴 것입니다. 게임의 스킬 조합처럼 다른 사람이 기여한 조합을 내 슬롯에 입힐 수 있고, 처음 캐릭터를 만들 때 추천 조합으로 시작할 수도 있습니다. 조합은 `themes/ko/presets/` 에 있습니다.
