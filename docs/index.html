@@ -4,84 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>docs-suit · AI 글쓰기 테마</title>
-<style>
-:root {
-  --bg: #f6f5f2; --surface: #ffffff; --line: #e4e1db; --ink: #1c1917; --muted: #6b6560;
-  --accent: #0f766e; --accent-tint: #e6f4f1; --warn: #9f1239; --chosen: #0f766e;
-  color-scheme: light;
-}
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #131312; --surface: #1c1b19; --line: #34312d; --ink: #ecebe8; --muted: #a8a29e;
-    --accent: #5eead4; --accent-tint: #13302b; --warn: #fda4af; --chosen: #5eead4;
-    color-scheme: dark;
-  }
-}
-* { box-sizing: border-box; }
-body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.6 Pretendard, "Apple SD Gothic Neo", "Noto Sans KR", system-ui, sans-serif; word-break: keep-all; overflow-wrap: anywhere; }
-main { max-width: 1320px; margin: 0 auto; padding: 24px 16px 48px; }
-header h1 { font-size: 28px; margin: 0; letter-spacing: -0.01em; }
-header p { color: var(--muted); margin: 4px 0 20px; }
-.layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 420px); gap: 24px; align-items: start; }
-.step { margin-bottom: 22px; }
-.step > h2 { font-size: 14px; margin: 0 0 8px; display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
-.step > h2 .now { font-weight: 500; font-size: 13px; color: var(--muted); }
-.step > h2 .now b { color: var(--accent); }
-.note { font-size: 12px; color: var(--muted); margin: -4px 0 8px; }
-.chips { display: flex; flex-wrap: wrap; gap: 8px; }
-.chip { font: inherit; font-size: 14px; padding: 8px 14px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); cursor: pointer; }
-.chip[aria-pressed="true"] { border-color: var(--chosen); box-shadow: inset 0 0 0 1px var(--chosen); font-weight: 700; }
-.cards { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 6px; scroll-snap-type: x proximity; }
-.card { flex: 0 0 236px; scroll-snap-align: start; text-align: left; font: inherit; color: inherit; background: var(--surface); border: 1px solid var(--line); padding: 0; cursor: pointer; display: flex; flex-direction: column; position: relative; }
-.card:disabled { cursor: not-allowed; opacity: .45; }
-.card .cl { display: flex; justify-content: space-between; gap: 6px; padding: 8px 10px; font-size: 13px; font-weight: 700; border-bottom: 1px solid var(--line); }
-.card .badge { font-size: 11px; font-weight: 700; color: var(--accent); }
-.card .pv { display: block; padding: 10px; font-size: 12.5px; line-height: 1.55; height: 168px; overflow: hidden; position: relative; }
-.card .pv::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 24px; background: linear-gradient(transparent, var(--surface)); }
-.card .pv.frame::after, .card .pv.slide::after { display: none; }
-.card.active { border-color: var(--accent); }
-.card.active .cl { background: var(--accent-tint); }
-.card.chosen { box-shadow: inset 0 0 0 2px var(--chosen); border-color: var(--chosen); }
-.card:focus-visible, .chip:focus-visible, button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.pv p { margin: 0 0 6px; }
-.pv ul { margin: 0 0 6px; padding-left: 1.1em; }
-.pv h4 { margin: 4px 0 2px; font-size: 12.5px; }
-.pv table { border-collapse: collapse; font-size: 11.5px; }
-.pv td { border: 1px solid var(--line); padding: 2px 5px; }
-.pv code { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 11.5px; background: var(--bg); padding: 0 3px; }
-.pv pre { margin: 0; font: 11px/1.45 "SF Mono", Menlo, Consolas, monospace; background: var(--bg); padding: 6px; white-space: pre-wrap; }
-.pv a { color: var(--accent); }
-.pv.slide { padding: 0; }
-.deck { height: 100%; padding: 14px; display: flex; flex-direction: column; gap: 8px; }
-.deck .t { font-size: 15px; font-weight: 800; line-height: 1.3; }
-.deck .bar { width: 36px; height: 3px; }
-.deck .n { font-size: 26px; font-weight: 800; line-height: 1; }
-.deck .s { font-size: 11px; }
-.pv.frame { padding: 0; }
-.pv iframe { width: 100%; height: 100%; border: 0; background: #fff; pointer-events: none; }
-aside.out { position: sticky; top: 12px; background: var(--surface); border: 1px solid var(--line); padding: 14px; }
-aside.out h2 { font-size: 14px; margin: 0 0 8px; }
-.row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; font-size: 13px; margin-bottom: 8px; }
-.row input[type=number] { width: 140px; font: inherit; padding: 5px 8px; background: var(--bg); color: var(--ink); border: 1px solid var(--line); }
-textarea { width: 100%; height: 46vh; min-height: 260px; font: 12.5px/1.55 "SF Mono", Menlo, Consolas, "D2Coding", monospace; padding: 10px; background: var(--bg); color: var(--ink); border: 1px solid var(--line); resize: vertical; }
-.actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
-button.btn { font: inherit; font-size: 13px; padding: 7px 12px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); cursor: pointer; }
-button.primary { background: var(--accent); border-color: var(--accent); color: var(--bg); font-weight: 700; }
-.status { font-size: 12.5px; color: var(--accent); min-height: 1.3em; margin-top: 6px; }
-.warn { font-size: 12.5px; color: var(--warn); }
-.where { font-size: 12.5px; color: var(--muted); margin-top: 10px; border-top: 1px solid var(--line); padding-top: 8px; }
-.where ul { margin: 4px 0 0; padding-left: 1.1em; }
-@media (max-width: 900px) {
-  .layout { grid-template-columns: 1fr; }
-  aside.out { position: static; }
-  .card { flex-basis: 210px; }
-}
-</style>
+<link rel="stylesheet" href="style.css">
 </head>
 <body>
 <main>
   <header>
     <h1>docs-suit</h1>
+    <p class="nav"><b>테마 고르기</b> · <a href="create.html">캐릭터 만들기</a></p>
     <p>문서에 입힐 옷을 고릅니다. 클래스와 문서 종류를 정하고, 같은 예문을 값마다 다르게 써 본 카드를 보며 마음에 드는 쪽을 누르세요.</p>
   </header>
   <div class="layout">

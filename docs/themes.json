@@ -729,5 +729,1125 @@
  "css": {
   "sakura": "/* Sakura.css v1.5.0\n * ================\n * Minimal css theme.\n * Project: https://github.com/oxalorg/sakura/\n */\n/* Body */\nhtml {\n  font-size: 62.5%;\n  font-family: -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, \"Helvetica Neue\", Arial, \"Noto Sans\", sans-serif;\n}\n\nbody {\n  font-size: 1.8rem;\n  line-height: 1.618;\n  max-width: 38em;\n  margin: auto;\n  color: #4a4a4a;\n  background-color: #f9f9f9;\n  padding: 13px;\n}\n\n@media (max-width: 684px) {\n  body {\n    font-size: 1.53rem;\n  }\n}\n@media (max-width: 382px) {\n  body {\n    font-size: 1.35rem;\n  }\n}\nh1, h2, h3, h4, h5, h6 {\n  line-height: 1.1;\n  font-family: -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, \"Helvetica Neue\", Arial, \"Noto Sans\", sans-serif;\n  font-weight: 700;\n  margin-top: 3rem;\n  margin-bottom: 1.5rem;\n  overflow-wrap: break-word;\n  word-wrap: break-word;\n  -ms-word-break: break-all;\n  word-break: break-word;\n}\n\nh1 {\n  font-size: 2.35em;\n}\n\nh2 {\n  font-size: 2em;\n}\n\nh3 {\n  font-size: 1.75em;\n}\n\nh4 {\n  font-size: 1.5em;\n}\n\nh5 {\n  font-size: 1.25em;\n}\n\nh6 {\n  font-size: 1em;\n}\n\np {\n  margin-top: 0px;\n  margin-bottom: 2.5rem;\n}\n\nsmall, sub, sup {\n  font-size: 75%;\n}\n\nhr {\n  border-color: #1d7484;\n}\n\na {\n  text-decoration: none;\n  color: #1d7484;\n}\na:visited {\n  color: #144f5a;\n}\na:hover {\n  color: #982c61;\n  border-bottom: 2px solid #4a4a4a;\n}\n\nul {\n  padding-left: 1.4em;\n  margin-top: 0px;\n  margin-bottom: 2.5rem;\n}\n\nli {\n  margin-bottom: 0.4em;\n}\n\nblockquote {\n  margin-left: 0px;\n  margin-right: 0px;\n  padding-left: 1em;\n  padding-top: 0.8em;\n  padding-bottom: 0.8em;\n  padding-right: 0.8em;\n  border-left: 5px solid #1d7484;\n  margin-bottom: 2.5rem;\n  background-color: #f1f1f1;\n}\n\nblockquote p {\n  margin-bottom: 0;\n}\n\nimg, video {\n  height: auto;\n  max-width: 100%;\n  margin-top: 0px;\n  margin-bottom: 2.5rem;\n}\n\n/* Pre and Code */\npre {\n  background-color: #f1f1f1;\n  display: block;\n  padding: 1em;\n  overflow-x: auto;\n  margin-top: 0px;\n  margin-bottom: 2.5rem;\n  font-size: 0.9em;\n}\n\ncode, kbd, samp {\n  font-size: 0.9em;\n  padding: 0 0.5em;\n  background-color: #f1f1f1;\n  white-space: pre-wrap;\n}\n\npre > code {\n  padding: 0;\n  background-color: transparent;\n  white-space: pre;\n  font-size: 1em;\n}\n\n/* Tables */\ntable {\n  text-align: justify;\n  width: 100%;\n  border-collapse: collapse;\n  margin-bottom: 2rem;\n}\n\ntd, th {\n  padding: 0.5em;\n  border-bottom: 1px solid #f1f1f1;\n}\n\n/* Buttons, forms and input */\ninput, textarea {\n  border: 1px solid #4a4a4a;\n}\ninput:focus, textarea:focus {\n  border: 1px solid #1d7484;\n}\n\ntextarea {\n  width: 100%;\n}\n\n.button, button, input[type=submit], input[type=reset], input[type=button], input[type=file]::file-selector-button {\n  display: inline-block;\n  padding: 5px 10px;\n  text-align: center;\n  text-decoration: none;\n  white-space: nowrap;\n  background-color: #1d7484;\n  color: #f9f9f9;\n  border-radius: 1px;\n  border: 1px solid #1d7484;\n  cursor: pointer;\n  box-sizing: border-box;\n}\n.button[disabled], button[disabled], input[type=submit][disabled], input[type=reset][disabled], input[type=button][disabled], input[type=file]::file-selector-button[disabled] {\n  cursor: default;\n  opacity: 0.5;\n}\n.button:hover, button:hover, input[type=submit]:hover, input[type=reset]:hover, input[type=button]:hover, input[type=file]::file-selector-button:hover {\n  background-color: #982c61;\n  color: #f9f9f9;\n  outline: 0;\n}\n.button:focus-visible, button:focus-visible, input[type=submit]:focus-visible, input[type=reset]:focus-visible, input[type=button]:focus-visible, input[type=file]::file-selector-button:focus-visible {\n  outline-style: solid;\n  outline-width: 2px;\n}\n\ntextarea, select, input {\n  color: #4a4a4a;\n  padding: 6px 10px; /* The 6px vertically centers text on FF, ignored by Webkit */\n  margin-bottom: 10px;\n  background-color: #f1f1f1;\n  border: 1px solid #f1f1f1;\n  border-radius: 4px;\n  box-shadow: none;\n  box-sizing: border-box;\n}\ntextarea:focus, select:focus, input:focus {\n  border: 1px solid #1d7484;\n  outline: 0;\n}\n\ninput[type=checkbox]:focus {\n  outline: 1px dotted #1d7484;\n}\n\nlabel, legend, fieldset {\n  display: block;\n  margin-bottom: 0.5rem;\n  font-weight: 600;\n}\n",
   "newcss": ":root {\n\t--nc-font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif, \"Apple Color Emoji\", \"Segoe UI Emoji\", \"Segoe UI Symbol\";\n\t--nc-font-mono: Consolas, monaco, 'Ubuntu Mono', 'Liberation Mono', 'Courier New', Courier, monospace;\n\t--nc-tx-1: #000000;\n\t--nc-tx-2: #1A1A1A;\n\t--nc-bg-1: #FFFFFF;\n\t--nc-bg-2: #F6F8FA;\n\t--nc-bg-3: #E5E7EB;\n\t--nc-lk-1: #0070F3;\n\t--nc-lk-2: #0366D6;\n\t--nc-lk-tx: #FFFFFF;\n\t--nc-ac-1: #79FFE1;\n    --nc-ac-tx: #0C4047;\n}\n\n@media (prefers-color-scheme: dark) {\n\t:root {\n\t\t--nc-tx-1: #ffffff;\n\t\t--nc-tx-2: #eeeeee;\n\t\t--nc-bg-1: #000000;\n\t\t--nc-bg-2: #111111;\n\t\t--nc-bg-3: #222222;\n\t\t--nc-lk-1: #3291FF;\n\t\t--nc-lk-2: #0070F3;\n\t\t--nc-lk-tx: #FFFFFF;\n\t\t--nc-ac-1: #7928CA;\n\t\t--nc-ac-tx: #FFFFFF;\n\t}\n}\n\n* {\n\t/* Reset margins and padding */\n\tmargin: 0;\n\tpadding: 0;\n}\n\naddress,\narea,\narticle,\naside,\naudio,\nblockquote,\ndatalist,\ndetails,\ndl,\nfieldset,\nfigure,\nform,\ninput,\niframe,\nimg,\nmeter,\nnav,\nol,\noptgroup,\noption,\noutput,\np,\npre,\nprogress,\nruby,\nsection,\ntable,\ntextarea,\nul,\nvideo {\n\t/* Margins for most elements */\n\tmargin-bottom: 1rem;\n}\n\nhtml,input,select,button {\n\t/* Set body font family and some finicky elements */\n\tfont-family: var(--nc-font-sans);\n}\n\nbody {\n\t/* Center body in page */\n\tmargin: 0 auto;\n\tmax-width: 750px;\n\tpadding: 2rem;\n\tborder-radius: 6px;\n\toverflow-x: hidden;\n\tword-break: break-word;\n\toverflow-wrap: break-word;\n\tbackground: var(--nc-bg-1);\n\n\t/* Main body text */\n\tcolor: var(--nc-tx-2);\n\tfont-size: 1.03rem;\n\tline-height: 1.5;\n}\n\n::selection {\n\t/* Set background color for selected text */\n\tbackground: var(--nc-ac-1);\n\tcolor: var(--nc-ac-tx);\n}\n\nh1,h2,h3,h4,h5,h6 {\n\tline-height: 1;\n\tcolor: var(--nc-tx-1);\n\tpadding-top: .875rem;\n}\n\nh1,\nh2,\nh3 {\n\tcolor: var(--nc-tx-1);\n\tpadding-bottom: 2px;\n\tmargin-bottom: 8px;\n\tborder-bottom: 1px solid var(--nc-bg-2);\n}\n\nh4,\nh5,\nh6 {\n\tmargin-bottom: .3rem;\n}\n\nh1 {\n\tfont-size: 2.25rem;\n}\n\nh2 {\n\tfont-size: 1.85rem;\n}\n\nh3 {\n\tfont-size: 1.55rem;\n}\n\nh4 {\n\tfont-size: 1.25rem;\n}\n\nh5 {\n\tfont-size: 1rem;\n}\n\nh6 {\n\tfont-size: .875rem;\n}\n\na {\n\tcolor: var(--nc-lk-1);\n}\n\na:hover {\n\tcolor: var(--nc-lk-2);\n}\n\nabbr:hover {\n\t/* Set the '?' cursor while hovering an abbreviation */\n\tcursor: help;\n}\n\nblockquote {\n\tpadding: 1.5rem;\n\tbackground: var(--nc-bg-2);\n\tborder-left: 5px solid var(--nc-bg-3);\n}\n\nabbr {\n\tcursor: help;\n}\n\nblockquote *:last-child {\n\tpadding-bottom: 0;\n\tmargin-bottom: 0;\n}\n\nheader {\n\tbackground: var(--nc-bg-2);\n\tborder-bottom: 1px solid var(--nc-bg-3);\n\tpadding: 2rem 1.5rem;\n\t\n\t/* This sets the right and left margins to cancel out the body's margins. It's width is still the same, but the background stretches across the page's width. */\n\n\tmargin: -2rem calc(0px - (50vw - 50%)) 2rem;\n\n\t/* Shorthand for:\n\n\tmargin-top: -2rem;\n\tmargin-bottom: 2rem;\n\n\tmargin-left: calc(0px - (50vw - 50%));\n\tmargin-right: calc(0px - (50vw - 50%)); */\n\t\n\tpadding-left: calc(50vw - 50%);\n\tpadding-right: calc(50vw - 50%);\n}\n\nheader h1,\nheader h2,\nheader h3 {\n\tpadding-bottom: 0;\n\tborder-bottom: 0;\n}\n\nheader > *:first-child {\n\tmargin-top: 0;\n\tpadding-top: 0;\n}\n\nheader > *:last-child {\n\tmargin-bottom: 0;\n}\n\na button,\nbutton,\ninput[type=\"submit\"],\ninput[type=\"reset\"],\ninput[type=\"button\"] {\n\tfont-size: 1rem;\n\tdisplay: inline-block;\n\tpadding: 6px 12px;\n\ttext-align: center;\n\ttext-decoration: none;\n\twhite-space: nowrap;\n\tbackground: var(--nc-lk-1);\n\tcolor: var(--nc-lk-tx);\n\tborder: 0;\n\tborder-radius: 4px;\n\tbox-sizing: border-box;\n\tcursor: pointer;\n\tcolor: var(--nc-lk-tx);\n}\n\na button[disabled],\nbutton[disabled],\ninput[type=\"submit\"][disabled],\ninput[type=\"reset\"][disabled],\ninput[type=\"button\"][disabled] {\n\tcursor: default;\n\topacity: .5;\n\n\t/* Set the [X] cursor while hovering a disabled link */\n\tcursor: not-allowed;\n}\n\n.button:focus,\n.button:hover,\nbutton:focus,\nbutton:hover,\ninput[type=\"submit\"]:focus,\ninput[type=\"submit\"]:hover,\ninput[type=\"reset\"]:focus,\ninput[type=\"reset\"]:hover,\ninput[type=\"button\"]:focus,\ninput[type=\"button\"]:hover {\n\tbackground: var(--nc-lk-2);\n}\n\ncode,\npre,\nkbd,\nsamp {\n\t/* Set the font family for monospaced elements */\n\tfont-family: var(--nc-font-mono);\n}\n\ncode,\nsamp,\nkbd,\npre {\n\t/* The main preformatted style. This is changed slightly across different cases. */\n\tbackground: var(--nc-bg-2);\n\tborder: 1px solid var(--nc-bg-3);\n\tborder-radius: 4px;\n\tpadding: 3px 6px;\n\tfont-size: 0.9rem;\n}\n\nkbd {\n\t/* Makes the kbd element look like a keyboard key */\n\tborder-bottom: 3px solid var(--nc-bg-3);\n}\n\npre {\n\tpadding: 1rem 1.4rem;\n\tmax-width: 100%;\n\toverflow: auto;\n}\n\npre code {\n\t/* When <code> is in a <pre>, reset it's formatting to blend in */\n\tbackground: inherit;\n\tfont-size: inherit;\n\tcolor: inherit;\n\tborder: 0;\n\tpadding: 0;\n\tmargin: 0;\n}\n\ncode pre {\n\t/* When <pre> is in a <code>, reset it's formatting to blend in */\n\tdisplay: inline;\n\tbackground: inherit;\n\tfont-size: inherit;\n\tcolor: inherit;\n\tborder: 0;\n\tpadding: 0;\n\tmargin: 0;\n}\n\ndetails {\n\t/* Make the <details> look more \"clickable\" */\n\tpadding: .6rem 1rem;\n\tbackground: var(--nc-bg-2);\n\tborder: 1px solid var(--nc-bg-3);\n\tborder-radius: 4px;\n}\n\nsummary {\n\t/* Makes the <summary> look more like a \"clickable\" link with the pointer cursor */\n\tcursor: pointer;\n\tfont-weight: bold;\n}\n\ndetails[open] {\n\t/* Adjust the <details> padding while open */\n\tpadding-bottom: .75rem;\n}\n\ndetails[open] summary {\n\t/* Adjust the <details> padding while open */\n\tmargin-bottom: 6px;\n}\n\ndetails[open]>*:last-child {\n\t/* Resets the bottom margin of the last element in the <details> while <details> is opened. This prevents double margins/paddings. */\n\tmargin-bottom: 0;\n}\n\ndt {\n\tfont-weight: bold;\n}\n\ndd::before {\n\t/* Add an arrow to data table definitions */\n\tcontent: '→ ';\n}\n\nhr {\n\t/* Reset the border of the <hr> separator, then set a better line */\n\tborder: 0;\n\tborder-bottom: 1px solid var(--nc-bg-3);\n\tmargin: 1rem auto;\n}\n\nfieldset {\n\tmargin-top: 1rem;\n\tpadding: 2rem;\n\tborder: 1px solid var(--nc-bg-3);\n\tborder-radius: 4px;\n}\n\nlegend {\n\tpadding: auto .5rem;\n}\n\ntable {\n\t/* border-collapse sets the table's elements to share borders, rather than floating as separate \"boxes\". */\n\tborder-collapse: collapse;\n\twidth: 100%\n}\n\ntd,\nth {\n\tborder: 1px solid var(--nc-bg-3);\n\ttext-align: left;\n\tpadding: .5rem;\n}\n\nth {\n\tbackground: var(--nc-bg-2);\n}\n\ntr:nth-child(even) {\n\t/* Set every other cell slightly darker. Improves readability. */\n\tbackground: var(--nc-bg-2);\n}\n\ntable caption {\n\tfont-weight: bold;\n\tmargin-bottom: .5rem;\n}\n\ntextarea {\n\t/* Don't let the <textarea> extend off the screen naturally or when dragged by the user */\n\tmax-width: 100%;\n}\n\nol,\nul {\n\t/* Replace the browser default padding */\n\tpadding-left: 2rem;\n}\n\nli {\n\tmargin-top: .4rem;\n}\n\nul ul,\nol ul,\nul ol,\nol ol {\n\tmargin-bottom: 0;\n}\n\nmark {\n\tpadding: 3px 6px;\n\tbackground: var(--nc-ac-1);\n\tcolor: var(--nc-ac-tx);\n}\n\ntextarea,\nselect,\ninput {\n\tpadding: 6px 12px;\n\tmargin-bottom: .5rem;\n\tbackground: var(--nc-bg-2);\n\tcolor: var(--nc-tx-2);\n\tborder: 1px solid var(--nc-bg-3);\n\tborder-radius: 4px;\n\tbox-shadow: none;\n\tbox-sizing: border-box;\n}\n\nimg {\n\tmax-width: 100%;\n}"
- }
+ },
+ "sprites": {
+  "base/a": {
+   "palette": {
+    "k": {
+     "color": "#2b1d16",
+     "label": "윤곽",
+     "custom": false
+    },
+    "s": {
+     "color": "#f3c9a0",
+     "label": "피부",
+     "custom": false
+    },
+    "c": {
+     "color": "#ef9f86",
+     "label": "볼",
+     "custom": false
+    },
+    "e": {
+     "color": "#fdf8ef",
+     "label": "눈 반짝임",
+     "custom": false
+    },
+    "m": {
+     "color": "#a2463c",
+     "label": "입",
+     "custom": false
+    },
+    "p": {
+     "color": "#2c303b",
+     "label": "바지",
+     "custom": false
+    },
+    "f": {
+     "color": "#3d2a20",
+     "label": "구두",
+     "custom": false
+    }
+   },
+   "rows": [
+    "................",
+    "....kkkkkkkk....",
+    "...kssssssssk...",
+    "..kssssssssssk..",
+    "..kssssssssssk..",
+    ".kssssssssssssk.",
+    ".kssssssssssssk.",
+    ".kssssssssssssk.",
+    ".kssskesseksssk.",
+    ".kssskksskksssk.",
+    ".kscsssssssscsk.",
+    "..kssssmmssssk..",
+    "...kkkkkkkkkk...",
+    "..kssssssssssk..",
+    ".kssssssssssssk.",
+    "kssssssssssssssk",
+    "kssssssssssssssk",
+    "kssssssssssssssk",
+    "kssksssssssskssk",
+    ".kkkppppppppkkk.",
+    "...kpppkkpppk...",
+    "...kpppkkpppk...",
+    "...kfffkkfffk...",
+    "...kkkk..kkkk..."
+   ]
+  },
+  "base/b": {
+   "palette": {
+    "k": {
+     "color": "#2b1d16",
+     "label": "윤곽",
+     "custom": false
+    },
+    "s": {
+     "color": "#f3c9a0",
+     "label": "피부",
+     "custom": false
+    },
+    "c": {
+     "color": "#ef9f86",
+     "label": "볼",
+     "custom": false
+    },
+    "e": {
+     "color": "#fdf8ef",
+     "label": "눈 반짝임",
+     "custom": false
+    },
+    "m": {
+     "color": "#c0505a",
+     "label": "입",
+     "custom": false
+    },
+    "p": {
+     "color": "#2c303b",
+     "label": "바지",
+     "custom": false
+    },
+    "f": {
+     "color": "#3d2a20",
+     "label": "구두",
+     "custom": false
+    }
+   },
+   "rows": [
+    "................",
+    "....kkkkkkkk....",
+    "...kssssssssk...",
+    "..kssssssssssk..",
+    "..kssssssssssk..",
+    ".kssssssssssssk.",
+    ".kssssssssssssk.",
+    ".kssssssssssssk.",
+    ".kssskesseksssk.",
+    ".kssskksskksssk.",
+    ".kscskksskkscsk.",
+    "..kssssmmssssk..",
+    "...kkkkkkkkkk...",
+    "..kssssssssssk..",
+    ".kssssssssssssk.",
+    "kssssssssssssssk",
+    "kssssssssssssssk",
+    "kssssssssssssssk",
+    "kssksssssssskssk",
+    ".kkkppppppppkkk.",
+    "...kpppkkpppk...",
+    "...kpppkkpppk...",
+    "...kfffkkfffk...",
+    "...kkkk..kkkk..."
+   ]
+  },
+  "hair/bangs": {
+   "palette": {
+    "k": {
+     "color": "#2b1d16",
+     "label": "윤곽",
+     "custom": false
+    },
+    "h": {
+     "color": "#4a3022",
+     "label": "머리",
+     "custom": false
+    },
+    "g": {
+     "color": "#6e4a35",
+     "label": "머리 윤기",
+     "custom": false
+    }
+   },
+   "rows": [
+    "................",
+    "....kkkkkkkk....",
+    "...khhhhhhhhk...",
+    "..khgghhhhhhhk..",
+    "..khghhhhhhhhk..",
+    ".khhhhhhhhhhhhk.",
+    ".khh.hhhhhh.hhk.",
+    "..h..........h..",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................"
+   ]
+  },
+  "hair/bob": {
+   "palette": {
+    "k": {
+     "color": "#2b1d16",
+     "label": "윤곽",
+     "custom": false
+    },
+    "h": {
+     "color": "#4a3022",
+     "label": "머리",
+     "custom": false
+    },
+    "g": {
+     "color": "#6e4a35",
+     "label": "머리 윤기",
+     "custom": false
+    }
+   },
+   "rows": [
+    "................",
+    "....kkkkkkkk....",
+    "...khhhhhhhhk...",
+    "..khgghhhhhhhk..",
+    "..khghhhhhhhhk..",
+    ".khhhhhhhhhhhhk.",
+    ".khhh......hhhk.",
+    "..h..........h..",
+    "..h..........h..",
+    "..h..........h..",
+    "..h..........h..",
+    ".hh..........hh.",
+    ".hh..........hh.",
+    "..h..........h..",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................"
+   ]
+  },
+  "hair/messy": {
+   "palette": {
+    "k": {
+     "color": "#2b1d16",
+     "label": "윤곽",
+     "custom": false
+    },
+    "h": {
+     "color": "#4a3022",
+     "label": "머리",
+     "custom": false
+    },
+    "g": {
+     "color": "#6e4a35",
+     "label": "머리 윤기",
+     "custom": false
+    }
+   },
+   "rows": [
+    "....k...k..k....",
+    "...kkkkkkkkkk...",
+    "..khhhhhhhhhhk..",
+    ".khhgghhhhhhhhk.",
+    ".khhghhhhhhhhhk.",
+    ".khhhhhhhhhhhhk.",
+    ".khhh......hhhk.",
+    "..h..........h..",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................"
+   ]
+  },
+  "hair/short": {
+   "palette": {
+    "k": {
+     "color": "#2b1d16",
+     "label": "윤곽",
+     "custom": false
+    },
+    "h": {
+     "color": "#4a3022",
+     "label": "머리",
+     "custom": false
+    },
+    "g": {
+     "color": "#6e4a35",
+     "label": "머리 윤기",
+     "custom": false
+    }
+   },
+   "rows": [
+    "................",
+    "....kkkkkkkk....",
+    "...khhhhhhhhk...",
+    "..khggghhhhhhk..",
+    "..khghhhhhhhhk..",
+    ".khhhhhhhhhhhhk.",
+    ".khhh......hhhk.",
+    "..h..........h..",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................"
+   ]
+  },
+  "hair/side": {
+   "palette": {
+    "k": {
+     "color": "#2b1d16",
+     "label": "윤곽",
+     "custom": false
+    },
+    "h": {
+     "color": "#4a3022",
+     "label": "머리",
+     "custom": false
+    },
+    "g": {
+     "color": "#6e4a35",
+     "label": "머리 윤기",
+     "custom": false
+    }
+   },
+   "rows": [
+    "................",
+    "....kkkkkkkk....",
+    "...khhhhhhhhk...",
+    "..khhhhhhggghk..",
+    "..khhhhhhhhghk..",
+    ".khhhhhhhhhhhhk.",
+    ".kh......hhhhhk.",
+    "..h..........h..",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................"
+   ]
+  },
+  "prop/backpack": {
+   "palette": {
+    "b": {
+     "color": "#5a3e2b",
+     "label": "가방끈",
+     "custom": false
+    }
+   },
+   "rows": [
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "....b......b....",
+    "....b......b....",
+    "....b......b....",
+    "....b......b....",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................"
+   ]
+  },
+  "prop/beret": {
+   "palette": {
+    "k": {
+     "color": "#2b1d16",
+     "label": "윤곽",
+     "custom": false
+    },
+    "v": {
+     "color": "#b23a48",
+     "label": "베레모",
+     "custom": false
+    }
+   },
+   "rows": [
+    "........kk......",
+    ".....kkkkvkk....",
+    "...kkvvvvvvvkk..",
+    "..kvvvvvvvvvvvk.",
+    "..kkkkkkkkkkkkk.",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................"
+   ]
+  },
+  "prop/glasses": {
+   "palette": {
+    "q": {
+     "color": "#6b7280",
+     "label": "안경",
+     "custom": false
+    }
+   },
+   "rows": [
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "....q..qq..q....",
+    "....q..qq..q....",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................"
+   ]
+  },
+  "prop/headphones": {
+   "palette": {
+    "a": {
+     "color": "#2f333b",
+     "label": "헤드폰",
+     "custom": false
+    },
+    "x": {
+     "color": "#5ec2b7",
+     "label": "헤드폰 불빛",
+     "custom": false
+    }
+   },
+   "rows": [
+    "....aaaaaaaa....",
+    "...a........a...",
+    "..a..........a..",
+    "..a..........a..",
+    ".xa..........ax.",
+    "ax............xa",
+    "ax............xa",
+    "ax............xa",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................"
+   ]
+  },
+  "prop/lanyard": {
+   "palette": {
+    "l": {
+     "color": "#2f4a7a",
+     "label": "목걸이줄",
+     "custom": false
+    },
+    "i": {
+     "color": "#f5f3ee",
+     "label": "사원증",
+     "custom": false
+    },
+    "q": {
+     "color": "#7b8494",
+     "label": "사원증 글씨",
+     "custom": false
+    }
+   },
+   "rows": [
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "......l..l......",
+    "......l..l......",
+    ".......ll.......",
+    "......iiii......",
+    "......iqqi......",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................"
+   ]
+  },
+  "prop/tie": {
+   "palette": {
+    "r": {
+     "color": "#b8383a",
+     "label": "넥타이",
+     "custom": false
+    }
+   },
+   "rows": [
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    ".......rr.......",
+    ".......rr.......",
+    ".......rr.......",
+    ".......rr.......",
+    ".......rr.......",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................"
+   ]
+  },
+  "top/blazer": {
+   "palette": {
+    "k": {
+     "color": "#1f1a17",
+     "label": "윤곽",
+     "custom": false
+    },
+    "o": {
+     "color": "#30323d",
+     "label": "옷",
+     "custom": true
+    },
+    "w": {
+     "color": "#f5f3ee",
+     "label": "셔츠",
+     "custom": false
+    }
+   },
+   "rows": [
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "..koowwwwwwook..",
+    ".koooowwwwooook.",
+    "kooookowwokooook",
+    "kooookooookooook",
+    "kooookokkokooook",
+    "....oooooooo....",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................"
+   ]
+  },
+  "top/coat": {
+   "palette": {
+    "k": {
+     "color": "#2b1d16",
+     "label": "윤곽",
+     "custom": false
+    },
+    "t": {
+     "color": "#3f8f8a",
+     "label": "옷",
+     "custom": true
+    },
+    "o": {
+     "color": "#eef0f2",
+     "label": "가운",
+     "custom": false
+    },
+    "y": {
+     "color": "#b9bfc8",
+     "label": "가운 그림자",
+     "custom": false
+    }
+   },
+   "rows": [
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "..kooottttoook..",
+    ".koooottttooook.",
+    "koooyktootkyoook",
+    "koooyktootkyoook",
+    "koooykooookyoook",
+    "....yooooooy....",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................"
+   ]
+  },
+  "top/hoodie": {
+   "palette": {
+    "k": {
+     "color": "#2b1d16",
+     "label": "윤곽",
+     "custom": false
+    },
+    "o": {
+     "color": "#4f8a5b",
+     "label": "옷",
+     "custom": true
+    },
+    "u": {
+     "color": "#6fae7b",
+     "label": "모자 테",
+     "custom": false
+    },
+    "w": {
+     "color": "#f2efe7",
+     "label": "끈",
+     "custom": false
+    },
+    "y": {
+     "color": "#3f6f49",
+     "label": "주머니",
+     "custom": false
+    }
+   },
+   "rows": [
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "..kuuuuuuuuuuk..",
+    ".kuoooowwoooouk.",
+    "kooooooooooooook",
+    "kooooooooooooook",
+    "kooooooyyooooook",
+    "....oooooooo....",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................"
+   ]
+  },
+  "top/shirt": {
+   "palette": {
+    "k": {
+     "color": "#2b1d16",
+     "label": "윤곽",
+     "custom": false
+    },
+    "o": {
+     "color": "#f2efe7",
+     "label": "옷",
+     "custom": true
+    },
+    "y": {
+     "color": "#c9c2b6",
+     "label": "단추",
+     "custom": false
+    }
+   },
+   "rows": [
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "..kooookkooook..",
+    ".kooooooooooook.",
+    "kooookooookooook",
+    "kooookooookooook",
+    "kooookooookooook",
+    "....oooooooo....",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................"
+   ]
+  },
+  "top/stripe": {
+   "palette": {
+    "k": {
+     "color": "#2b1d16",
+     "label": "윤곽",
+     "custom": false
+    },
+    "o": {
+     "color": "#2f4a7a",
+     "label": "옷",
+     "custom": true
+    },
+    "w": {
+     "color": "#f2efe7",
+     "label": "줄무늬 바탕",
+     "custom": false
+    }
+   },
+   "rows": [
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "..kooooooooook..",
+    ".kowwwwwwwwwwok.",
+    "kooooooooooooook",
+    "kwwwwwwwwwwwwwwk",
+    "kooooooooooooook",
+    "....wwwwwwww....",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................"
+   ]
+  },
+  "top/suit": {
+   "palette": {
+    "k": {
+     "color": "#2b1d16",
+     "label": "윤곽",
+     "custom": false
+    },
+    "o": {
+     "color": "#34507f",
+     "label": "옷",
+     "custom": true
+    },
+    "w": {
+     "color": "#f2efe7",
+     "label": "셔츠",
+     "custom": false
+    }
+   },
+   "rows": [
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "..kooowwwwoook..",
+    ".koooowwwwooook.",
+    "kooookwwwwkooook",
+    "kooookwwwwkooook",
+    "kooookowwokooook",
+    "....oooooooo....",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................"
+   ]
+  },
+  "top/turtleneck": {
+   "palette": {
+    "k": {
+     "color": "#2b1d16",
+     "label": "윤곽",
+     "custom": false
+    },
+    "o": {
+     "color": "#c8962e",
+     "label": "옷",
+     "custom": true
+    },
+    "y": {
+     "color": "#a87a1f",
+     "label": "목 주름",
+     "custom": false
+    }
+   },
+   "rows": [
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "..kooyyyyyyook..",
+    ".kooooooooooook.",
+    "kooookooookooook",
+    "kooookooookooook",
+    "kooookooookooook",
+    "....oooooooo....",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................"
+   ]
+  },
+  "top/zip-hoodie": {
+   "palette": {
+    "k": {
+     "color": "#2b1d16",
+     "label": "윤곽",
+     "custom": false
+    },
+    "o": {
+     "color": "#3c4150",
+     "label": "옷",
+     "custom": true
+    },
+    "d": {
+     "color": "#2a2e38",
+     "label": "후드 안감",
+     "custom": false
+    },
+    "t": {
+     "color": "#e2b33c",
+     "label": "티셔츠",
+     "custom": false
+    }
+   },
+   "rows": [
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "..kooooooooook..",
+    ".koooodttdooook.",
+    "kooookdttdkooook",
+    "kooookdttdkooook",
+    "kooookdttdkooook",
+    "....oodoodoo....",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................"
+   ]
+  }
+ },
+ "look": {
+  "base": {
+   "a": {
+    "label": "캐릭터 A",
+    "hair": "short"
+   },
+   "b": {
+    "label": "캐릭터 B",
+    "hair": "bob"
+   }
+  },
+  "unlock": {
+   "color": {
+    "at": "1",
+    "label": "옷 색"
+   },
+   "hair": {
+    "at": "2",
+    "label": "머리 모양"
+   },
+   "prop": {
+    "at": "3",
+    "label": "소품"
+   },
+   "top": {
+    "at": "4",
+    "label": "옷 모양"
+   }
+  },
+  "top": {
+   "shirt": "흰 셔츠",
+   "suit": "정장",
+   "blazer": "검은 정장",
+   "hoodie": "후드티",
+   "zip-hoodie": "지퍼 후드",
+   "coat": "흰 가운",
+   "turtleneck": "터틀넥",
+   "stripe": "줄무늬 티"
+  },
+  "hair": {
+   "short": "짧은 머리",
+   "bob": "단발",
+   "bangs": "앞머리",
+   "side": "가르마",
+   "messy": "부스스한 머리"
+  },
+  "prop": {
+   "tie": "넥타이",
+   "glasses": "안경",
+   "headphones": "헤드폰",
+   "lanyard": "사원증",
+   "backpack": "가방끈",
+   "beret": "베레모"
+  },
+  "colors": {
+   "navy": {
+    "label": "남색",
+    "color": "#34507f"
+   },
+   "green": {
+    "label": "초록",
+    "color": "#4f8a5b"
+   },
+   "charcoal": {
+    "label": "먹색",
+    "color": "#3c4150"
+   },
+   "mustard": {
+    "label": "겨자색",
+    "color": "#c8962e"
+   },
+   "wine": {
+    "label": "와인색",
+    "color": "#8e3b46"
+   },
+   "sky": {
+    "label": "하늘색",
+    "color": "#6f9fd1"
+   },
+   "pink": {
+    "label": "분홍",
+    "color": "#d98ca0"
+   },
+   "ivory": {
+    "label": "아이보리",
+    "color": "#f2efe7"
+   }
+  }
+ },
+ "presets": {
+  "plain-doc": {
+   "label": "평어체 설명 문서",
+   "desc": "위키와 설계 문서를 평어체 줄글로, 결론 먼저 한 쪽 안에 쓴다",
+   "by": "dodokim-lab",
+   "class": "developer",
+   "featured": "true",
+   "defaults": {
+    "skeleton": "bluf",
+    "voice": "prose",
+    "register": "plain",
+    "terms": "explained",
+    "length": "page",
+    "emphasis": "none",
+    "diagram": "table"
+   },
+   "audiences": {}
+  },
+  "weekly-brief": {
+   "label": "짧은 주간 보고",
+   "desc": "팀장님께 매주 올리는 보고를 결론 먼저, 개조식으로 짧게 쓴다",
+   "by": "dodokim-lab",
+   "class": "office",
+   "featured": "true",
+   "defaults": {
+    "skeleton": "bluf",
+    "voice": "bullet",
+    "register": "polite",
+    "length": "brief",
+    "emphasis": "none"
+   },
+   "audiences": {}
+  }
+ },
+ "level": {
+  "1": "50",
+  "10": "65",
+  "20": "80",
+  "30": "100",
+  "50": "120"
+ },
+ "promote": [
+  {
+   "tier": 1,
+   "level": 10,
+   "key": false
+  },
+  {
+   "tier": 2,
+   "level": 20,
+   "key": false
+  },
+  {
+   "tier": 3,
+   "level": 30,
+   "key": true
+  },
+  {
+   "tier": 4,
+   "level": 50,
+   "key": true
+  }
+ ],
+ "profileHead": "# docs-suit 프로필. suit.py bootstrap 과 set 이 쓴다. 손으로 고쳐도 된다."
 }

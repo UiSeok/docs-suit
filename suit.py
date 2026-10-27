@@ -1109,6 +1109,14 @@ def bundle_data(th):
         "rules": rules,
         "samples": samples,
         "css": css,
+        # 웹 캐릭터 만들기가 쓴다. 그림 부품, 꾸미기, 테마 조합, 전직 문턱, 슬롯 파일 머리
+        "sprites": {f"{f.parent.name}/{f.stem}": dict(zip(("palette", "rows"), read_sprite(f)))
+                    for f in sorted((th.root / "sprites").glob("*/*.txt"))},
+        "look": th.look,
+        "presets": {k: th.presets[k] for k in preset_order(th)},
+        "level": th.growth.get("level", {}),
+        "promote": [{"tier": t, "level": lv, "key": keyed} for t, lv, keyed in promote_rules(th)] if th.growth else [],
+        "profileHead": PROFILE_HEAD,
     }
 
 

@@ -5,7 +5,8 @@ const root = path.join(__dirname, "..");
 const T = require(path.join(root, "docs", "themes.json"));
 const C = require(path.join(root, "docs", "core.js"))(T);
 
-const cases = JSON.parse(execFileSync("python3", [path.join(__dirname, "parity_cases.py")], { maxBuffer: 1 << 28 }).toString());
+const all = JSON.parse(execFileSync("python3", [path.join(__dirname, "parity_cases.py")], { maxBuffer: 1 << 28 }).toString());
+const cases = all.compose;
 let bad = 0;
 for (const c of cases) {
   const r = C.resolve(c.kind, c.auds, c.sets, c.profile, c.cls);
@@ -15,5 +16,20 @@ for (const c of cases) {
     if (bad <= 3) console.log(`다름: class=${c.cls} kind=${c.kind} audience=${c.auds} fmt=${c.fmt}`);
   }
 }
-console.log(bad ? `parity 실패 ${bad}/${cases.length}` : `parity 통과 ${cases.length}건`);
+// 웹 캐릭터 만들기의 슬롯 파일과 캐릭터 그림
+for (const c of all.slots) {
+  if (C.dumpYaml(c.data) !== c.expected) {
+    bad++;
+    console.log("슬롯 파일이 다름:\n" + C.dumpYaml(c.data) + "\n--- 기대\n" + c.expected);
+  }
+}
+for (const c of all.looks) {
+  const look = C.lookOf(c.slot, c.tier);
+  if (JSON.stringify(look) !== JSON.stringify(c.look) || JSON.stringify(C.lookGrid(look)) !== JSON.stringify(c.expected)) {
+    bad++;
+    console.log(`캐릭터 그림이 다름: ${JSON.stringify(c.slot)} 차수 ${c.tier} → ${JSON.stringify(look)} / 기대 ${JSON.stringify(c.look)}`);
+  }
+}
+const total = cases.length + all.slots.length + all.looks.length;
+console.log(bad ? `parity 실패 ${bad}/${total}` : `parity 통과 ${total}건`);
 process.exit(bad ? 1 : 0);

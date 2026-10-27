@@ -105,7 +105,91 @@
       }
       return text;
     }
-    return { resolve, compose, label, SRC };
+    // ---------------------------------------------------------------- 캐릭터와 슬롯 파일
+    // suit.py 의 look_of, look_grid, title_of, level_of, dump_yaml, clean_text 와 같은 규칙이다. tests/parity.js 가 견준다.
+    const LAYERS = ["top", "hair", "prop"];
+
+    function spriteGrid(name, custom) {
+      const sp = T.sprites[name];
+      const colors = {};
+      for (const [ch, p] of Object.entries(sp.palette)) colors[ch] = custom && p.custom ? custom : p.color;
+      return sp.rows.map((row) => Array.from(row).map((ch) => colors[ch] || null));
+    }
+
+    // 슬롯의 look 에 기본값을 채운다. tier 를 주면 그 차수까지 열린 부위만 입힌다.
+    function lookOf(slot, tier) {
+      const have = (slot && slot.look) || {};
+      const bases = T.look.base || {};
+      const base = have.base in bases ? have.base : Object.keys(bases)[0];
+      const look = { base, top: "shirt", hair: (bases[base] || {}).hair, prop: null, color: null };
+      const tables = { top: T.look.top, hair: T.look.hair, prop: T.look.prop, color: T.look.colors };
+      for (const part of ["top", "hair", "prop", "color"]) {
+        const val = have[part];
+        const at = parseInt(((T.look.unlock || {})[part] || {}).at || "0", 10);
+        const locked = tier !== undefined && tier !== null && tier < at;
+        if (val && tables[part] && val in tables[part] && !locked) look[part] = val;
+      }
+      return look;
+    }
+
+    function lookGrid(look) {
+      const grid = spriteGrid(`base/${look.base}`);
+      const color = look.color ? T.look.colors[look.color].color : null;
+      for (const part of LAYERS) {
+        if (!look[part]) continue;
+        spriteGrid(`${part}/${look[part]}`, part === "top" ? color : null).forEach((row, y) => row.forEach((c, x) => {
+          if (c) grid[y][x] = c;
+        }));
+      }
+      return grid;
+    }
+
+    function titleOf(cls, tier) {
+      const titles = (T.classes[cls] || {}).titles || [];
+      return titles.length ? titles[Math.min(tier, titles.length - 1)] : null;
+    }
+
+    function levelCost(level) {
+      let cost = 0;
+      for (const [start, pts] of Object.entries(T.level).map(([k, v]) => [parseInt(k, 10), parseInt(v, 10)]).sort((a, b) => a[0] - b[0])) {
+        if (level >= start) cost = pts;
+      }
+      return cost;
+    }
+
+    function cleanText(s) {
+      return String(s).replace(/"/g, "”").split(/\s+/).filter(Boolean).join(" ");
+    }
+
+    function quote(v) {
+      v = String(v);
+      if (v === "" || v !== v.trim() || /[,:#[\]{}'"]/.test(v)) return '"' + v.replace(/"/g, "”") + '"';
+      return v;
+    }
+
+    function one(v) {
+      if (Array.isArray(v)) return "[" + v.map(quote).join(", ") + "]";
+      if (v && typeof v === "object") return "{" + Object.entries(v).map(([k, x]) => `${k}: ${one(x)}`).join(", ") + "}";
+      return quote(v);
+    }
+
+    // suit.py dump_yaml 과 같은 꼴. 빈 절은 건너뛴다.
+    function dumpYaml(data, head) {
+      const lines = [head === undefined ? T.profileHead : head, ""];
+      for (const [section, body] of Object.entries(data)) {
+        if (!body || (typeof body === "object" && !Object.keys(body).length)) continue;
+        if (typeof body !== "object" || Array.isArray(body)) {
+          lines.push(`${section}: ${one(body)}`, "");
+          continue;
+        }
+        lines.push(`${section}:`);
+        for (const [k, v] of Object.entries(body)) lines.push(`  ${k}: ${one(v)}`);
+        lines.push("");
+      }
+      return lines.join("\n");
+    }
+
+    return { resolve, compose, label, SRC, lookOf, lookGrid, titleOf, levelCost, cleanText, dumpYaml };
   }
   if (typeof module !== "undefined" && module.exports) module.exports = make;
   else root.ThemeCore = make;

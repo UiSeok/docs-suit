@@ -15,7 +15,7 @@ docs-suit 를 고치는 사람과 AI 에이전트가 읽는 작업 규칙이다.
 | `themes/ko/presets/<이름>.yaml` | 기여받은 테마 조합. 축 기본값과 독자별 값, 소개, 만든 사람 |
 | `themes/ko/sprites/<부위>/<값>.txt` | 도트 그림 부품. 기본 몸(`base`) 위에 옷(`top`), 머리(`hair`), 소품(`prop`) 순으로 겹친다. 모두 같은 크기다 |
 | `tools/issue-key.py` | 관리자가 승급 키를 만드는 도구. 개인 키는 저장소 밖 `~/.config/docs-suit-admin/` 에 둔다 |
-| `docs/` | 웹 고르개. `core.js` 가 조립하고 `themes.json` 은 `suit.py bundle` 이 만든다 |
+| `docs/` | 웹 화면. 테마 고르기(`index.html`, `app.js`)와 캐릭터 만들기(`create.html`, `create.js`)가 `style.css` 를 함께 쓴다. `core.js` 가 조립과 캐릭터 그림, 슬롯 파일 쓰기를 하고 `themes.json` 은 `suit.py bundle` 이 만든다 |
 | `tests/parity.js` | 웹과 엔진의 조립 결과를 견준다 |
 | `tests/agent/` | 실제 에이전트에 요청을 넣는 동작 테스트. 케이스는 `cases.py`, 에이전트별 결과는 `results/` |
 
@@ -58,7 +58,7 @@ Antigravity CLI 는 한 번 실행 모드에서 확인 창을 띄우지 못해 �
 
 ## 지킬 것
 
-- `suit.py` 의 `resolve` 나 `compose` 를 고치면 `docs/core.js` 도 같은 커밋에서 고친다. 두 쪽의 출력은 글자 하나까지 같아야 하고, parity 가 그것을 잰다.
+- `suit.py` 의 `resolve` 나 `compose`, `look_of`, `look_grid`, `dump_yaml` 을 고치면 `docs/core.js` 도 같은 커밋에서 고친다. 두 쪽의 출력은 글자 하나까지 같아야 하고, parity 가 조립한 지침과 캐릭터 그림, 슬롯 파일을 잰다.
 - 표준 라이브러리만 쓰고 파이썬 3.9 문법 안에서 쓴다. 웹은 빌드 도구 없이 정적 파일로 둔다.
 - 규칙 문서는 평어체로 쓴다. 한 문장에 한 맥락을 담고, 대시로 문장을 잇지 않고, 개수는 "세 가지" 처럼 단위 명사로 센다.
 - 새 값의 `## 보기` 는 다른 값과 같은 예문인 정류장 대기 시간 조사로 쓴다. 같은 예문이어야 카드끼리 견줄 수 있다.
