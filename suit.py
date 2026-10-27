@@ -16,7 +16,7 @@
   8. 중립 기본값                    defaults.yaml 의 defaults
 클래스는 --class 인자가 있으면 그것을, 없으면 프로필의 클래스를 쓴다. 독자를 주지 않으면 문서 종류의 기본 독자를 쓴다.
 독자가 여럿이면 공개 범위는 가장 좁은 쪽, 용어 수준은 가장 풀어 쓴 쪽, 나머지 축은 값을 가진 첫 독자를 따른다.
-공개 범위(exposure)는 안전 축이다. 1, 6, 7, 8 단계가 정한 값이 출발점이고, 인자와 프로필은 더 좁힐 때만 이긴다.
+공개 범위(exposure)는 안전 축이다. 1, 6, 7, 8 단계가 정한 값이 출발점이고, 인자와 프로필은 더 조심하는 쪽으로 바꿀 때만 이긴다.
 값 template 은 문서 종류만 고정할 수 있다. 그 축은 themes/<언어>/kinds/<종류>.md 의 틀이 정한다.
 
 사용
@@ -53,7 +53,7 @@ AXES_ORDER = ("visual-doc", "visual-deck", "voice", "register", "terms", "skelet
 # compose 가 규칙을 싣는 순서. 앞에 나온 규칙이 이긴다고 지침 머리에 적는다.
 COMPOSE_ORDER = ("exposure", "skeleton", "voice", "register", "terms", "length", "sources",
                  "ai-disclosure", "diagram", "emphasis", "visual-deck", "visual-doc")
-EXPOSURE_STRICT = ("public", "submit", "team")   # 앞이 가장 좁다
+EXPOSURE_STRICT = ("public", "submit", "team")   # 앞이 가장 조심하는 쪽이다
 TERMS_PLAIN = ("everyday", "explained", "major")  # 앞이 가장 풀어 쓴다
 TEMPLATE = "template"
 PROFILE_DEFAULT = "~/.config/docs-suit/profile.yaml"
@@ -313,7 +313,8 @@ def resolve(th, kind=None, audiences=None, sets=None, profile=None, cls=None, wa
                 if EXPOSURE_STRICT.index(cand) < EXPOSURE_STRICT.index(base):
                     base, src = cand, s
                 elif cand != base:
-                    warn(f"공개 범위는 넓힐 수 없어 {s} 의 {cand} 를 버리고 {base} 를 쓴다")
+                    warn(f"공개 범위는 더 조심하는 쪽으로만 바뀌어 {s} 의 {cand} 대신 {base} 를 쓴다. "
+                         "팀 안에서만 볼 글이면 --audience 를 teammate 나 peer-dev 로 넘긴다")
             out[axis] = (base, src)
             continue
         if fixed:
@@ -845,9 +846,9 @@ def selftest(th):
         vals, _, _ = resolve(th, kind="resume", sets={"skeleton": "bluf"})
         check(vals["skeleton"] == ("template", "kind"), "인자가 종류가 고정한 축을 바꿨다")
         vals, _, _ = resolve(th, kind="minutes", sets={"exposure": "public"})
-        check(vals["exposure"] == ("public", "arg"), "공개 범위를 좁히는 인자가 졌다")
+        check(vals["exposure"] == ("public", "arg"), "더 조심하는 공개 범위 인자가 졌다")
         vals, _, _ = resolve(th, kind="report", sets={"exposure": "team"})
-        check(vals["exposure"][0] == "submit", "공개 범위를 넓히는 인자가 이겼다")
+        check(vals["exposure"][0] == "submit", "덜 조심하는 공개 범위 인자가 이겼다")
         vals, _, _ = resolve(th, kind="report", profile={"defaults": {"skeleton": "chrono"}})
         check(vals["skeleton"] == ("imrad", "prefer"), "프로필 기본값이 종류가 권하는 값을 이겼다")
         vals, _, _ = resolve(th, kind="report", profile={"audiences": {"professor": {"skeleton": "pcs"}}})

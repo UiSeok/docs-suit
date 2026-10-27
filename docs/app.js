@@ -141,7 +141,7 @@
       if (locked) note = "이 축은 문서 종류가 정합니다.";
       else if (axis === "visual-deck" && state.kind !== "slides") note = "발표 PPT 를 고를 때만 지침에 실립니다.";
       else if (axis === "visual-doc" && !$("html").checked) note = "오른쪽 '문서 디자인 규칙 포함' 을 켜면 지침에 실립니다.";
-      else if (axis === "exposure") note = "개인정보를 지키는 축이라 정해진 범위보다 넓힐 수는 없습니다.";
+      else if (axis === "exposure") note = "개인정보를 지키는 축이라 더 조심하는 쪽으로만 바꿀 수 있습니다. 팀 안에서만 볼 글이면 독자를 바꿉니다.";
       if (note) {
         const n = document.createElement("p");
         n.className = "note";

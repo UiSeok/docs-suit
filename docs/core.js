@@ -34,7 +34,7 @@
           for (const [c, s] of [[sets[axis], "arg"], [fromAudiences(axis, auds, pAud), "profile-audience"], [pDef[axis], "profile"]]) {
             if (!c || T.exposureStrict.indexOf(c) < 0) continue;
             if (T.exposureStrict.indexOf(c) < T.exposureStrict.indexOf(base)) { base = c; src = s; }
-            else if (c !== base) warns.push(`공개 범위는 넓힐 수 없어 ${c} 대신 ${base} 를 씁니다`);
+            else if (c !== base) warns.push(`공개 범위는 더 조심하는 쪽으로만 바뀌어 ${c} 대신 ${base} 를 씁니다. 팀 안에서만 볼 글이면 독자에서 팀원·동료나 동료 개발자를 고릅니다`);
           }
           out[axis] = [base, src];
           continue;

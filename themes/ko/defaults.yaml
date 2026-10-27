@@ -12,7 +12,7 @@
 #   6. 독자 프로필                audiences
 #   7. 클래스 기본값              classes/<id>.yaml 의 defaults
 #   8. 중립 기본값                defaults
-# 공개 범위(exposure)는 안전 축이다. 1, 6, 7, 8 단계가 정한 값이 출발점이고, 인자와 프로필은 더 좁힐 때만 이긴다.
+# 공개 범위(exposure)는 안전 축이다. 1, 6, 7, 8 단계가 정한 값이 출발점이고, 인자와 프로필은 더 조심하는 쪽으로 바꿀 때만 이긴다.
 # 좁은 순서는 public, submit, team 이다. 독자를 말하지 않으면 문서 종류의 audience 를 쓴다.
 
 defaults:
