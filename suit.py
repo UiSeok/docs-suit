@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """suit.py: docs-suit 글쓰기 테마 엔진. 문서에 입힐 옷(테마)을 골라 AI 에게 줄 지침 한 장으로 조립한다.
 
-글의 모양과 말투를 축 열두 가지로 나누고, 축마다 값을 하나 고른다. 값은 themes/<언어>/<축>/<값>.md 규칙 문서
+글의 모양과 말투를 축 열세 가지로 나누고, 축마다 값을 하나 고른다. 값은 themes/<언어>/<축>/<값>.md 규칙 문서
 하나를 가리킨다. 처음 받으면 bootstrap 으로 클래스(직업)와 페르소나를 정해 프로필을 만든다. 프로필은
 ~/.config/docs-suit/ 에 슬롯으로 두고 저장소 밖이라 커밋되지 않는다. 기본 슬롯은 profile.yaml, 이름 붙은 슬롯은
 profiles/<이름>.yaml 이다. 폴더의 .docs-suit.yaml 은 쓸 슬롯과 그 폴더의 축 값을 정하고, 위쪽 폴더부터 겹쳐 읽어
@@ -32,12 +32,16 @@ profiles/<이름>.yaml 이다. 폴더의 .docs-suit.yaml 은 쓸 슬롯과 그 �
   python3 suit.py list [--classes] [--json]
   python3 suit.py get     [--class C] [--kind K] [--audience A[,B]] [--set 축=값]... [--json]
   python3 suit.py compose [--class C] [--kind K] [--audience A[,B]] [--set 축=값]... [--chars N]
-                          [--format prompt|output-style] [--html] [-o 파일]
+                          [--format prompt|output-style] [--revise] [-o 파일]
+                                                    --revise 는 사용자가 준 원문을 다듬을 때 붙인다
   python3 suit.py set <축> <값> [--audience A] [--here]   프로필에 쓴다. --here 는 지금 폴더의 폴더 파일에 쓴다
   python3 suit.py set <축> --unset [--audience A] [--here]
   python3 suit.py export --agent claude,agents,antigravity,cursor,grok,web|all [--dest 폴더] [--dry-run]
   python3 suit.py check <파일|-> [--kind K] [--audience A] [--set 축=값]... [--chars N] [--no-record] [--json]
-                                                    다 쓴 본문을 조립한 값대로 재고 성장 기록에 남긴다
+                                                    다 쓴 본문을 조립한 값대로 재고 성장 기록에 남긴다.
+                                                    ✗ 는 고쳐 쓸 것, △ 는 제안이다
+  python3 suit.py review [<파일>|-] [--kind K] [--audience A] [--set 축=값]... [--source 원문] [-o 파일]
+                                                    같은 값으로 채점하는 검토 지침. 새 대화나 서브에이전트에 넘긴다
   python3 suit.py card [--json] [--color auto|always|never]   캐릭터 카드
   python3 suit.py look [<부위> <값>] [--json]        꾸미기. 부위는 base, color, hair, prop, top
   python3 suit.py promote [<키>]                    기여하고 받은 승급 키를 넣는다. 3차와 4차 전직에 쓴다
@@ -50,7 +54,7 @@ profiles/<이름>.yaml 이다. 폴더의 .docs-suit.yaml 은 쓸 슬롯과 그 �
   python3 suit.py selftest
 
 종료 코드: 0 성공, 3 모르는 클래스·종류·독자·축·값, 1 그 밖의 오류.
-bootstrap, profile, get, compose, set, export, check, card, look, preset, promote, growth, status 에는 --profile <슬롯> 을 붙일 수 있다.
+bootstrap, profile, get, compose, set, export, check, review, card, look, preset, promote, growth, status 에는 --profile <슬롯> 을 붙일 수 있다.
 캐릭터 성장 기록은 ~/.config/docs-suit/growth/<슬롯>.jsonl 에 남는다. 본문과 파일 경로는 남기지 않는다.
 환경 변수: DOCS_SUIT_THEMES 는 테마 폴더를, DOCS_SUIT_PROFILE 은 프로필 파일을, DOCS_SUIT_HOME 은 설정 폴더를 바꾼다.
 """
@@ -75,9 +79,10 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 DEFAULT_LANG = "ko"
 AXES_ORDER = ("visual-doc", "visual-deck", "voice", "register", "terms", "skeleton", "length",
-              "emphasis", "diagram", "sources", "exposure", "ai-disclosure")
+              "emphasis", "diagram", "sources", "exposure", "markup", "ai-disclosure")
 # compose 가 규칙을 싣는 순서. 앞에 나온 규칙이 이긴다고 지침 머리에 적는다.
-COMPOSE_ORDER = ("exposure", "skeleton", "voice", "register", "terms", "length", "sources",
+# 출력 형식은 그림과 강조보다 앞에 둔다. 서식 없음이면 표와 굵은 글씨를 쓰지 않는다는 규칙이 이겨야 한다.
+COMPOSE_ORDER = ("exposure", "markup", "skeleton", "voice", "register", "terms", "length", "sources",
                  "ai-disclosure", "diagram", "emphasis", "visual-deck", "visual-doc")
 EXPOSURE_STRICT = ("public", "submit", "team")   # 앞이 가장 조심하는 쪽이다
 TERMS_PLAIN = ("everyday", "explained", "major")  # 앞이 가장 풀어 쓴다
@@ -251,6 +256,9 @@ class Themes:
         self.audiences = conf.get("audiences", {})
         self.kinds = conf.get("kinds", {})
         self.prefer = conf.get("prefer", {})
+        self.must = conf.get("must", {})
+        tl = self.root / "tells.yaml"
+        self.tells = parse_yaml(tl.read_text(encoding="utf-8")).get("tells", {}) if tl.exists() else {}
         self.classes = {}
         found = []
         for f in (self.root / "classes").glob("*.yaml"):
@@ -546,39 +554,48 @@ def persona_section(th, cls, persona):
             "사용자가 넣으라고 하지 않는 한 본문에 옮겨 적지 않는다.\n\n" + "\n".join(rows))
 
 
-def compose(th, kind=None, audiences=None, sets=None, profile=None, cls=None, chars=None, fmt="prompt",
-            html=False, warn=lambda m: None):
-    profile = profile or {}
-    vals, auds, cls = resolve(th, kind, audiences, sets, profile, cls, warn)
-    kind_label = th.kinds[kind]["label"] if kind else "일반 글"
-    aud_label = ", ".join(th.audiences[a]["label"] for a in auds) or "정하지 않음"
-    parts = [
-        f"# 글쓰기 테마 · {kind_label} · 독자 {aud_label}",
-        "이 대화에서 쓰는 글에 아래 규칙을 적용한다. 규칙끼리 부딪치면 앞에 나온 규칙을 따른다. "
-        "이 지침은 docs-suit 로 조립했다.",
-        "## 공통 바닥\n\n" + _body(th.root / "base.md"),
-    ]
-    who = persona_section(th, cls, profile.get("persona"))
-    if who:
-        parts.append(who)
+def rule_sections(th, kind, vals, chars=None, revise=False):
+    """compose 와 review 가 같이 쓰는 규칙 절. [(제목, 본문)] 이고, 앞에 나온 절이 이긴다."""
+    out = [("공통 바닥", _body(th.root / "base.md"))]
+    if revise:
+        out.append(("다듬기", _body(th.root / "revise.md")))
     if kind:
-        parts.append(f"## 문서 종류 · {kind_label}\n\n" + _body(th.kind_path(kind)))
+        out.append((f"문서 종류 · {th.kinds[kind]['label']}", _body(th.kind_path(kind))))
     for axis in COMPOSE_ORDER:
         value, _ = vals[axis]
         if value == TEMPLATE:
             continue
         if axis == "visual-deck" and kind != "slides":
             continue
-        if axis == "visual-doc" and not html:
+        if axis == "visual-doc" and vals["markup"][0] != "html":
             continue
-        head = f"## {th.axes[axis]['label']} · {th.label(axis, value)}"
-        parts.append(head + "\n\n" + _body(th.rule_path(axis, value)))
+        out.append((f"{th.axes[axis]['label']} · {th.label(axis, value)}", _body(th.rule_path(axis, value))))
         if axis == "length" and chars:
-            parts.append(
-                f"## 글자수 · 공백 포함 {chars}자 이내\n\n"
-                f"- 본문은 공백 포함 {chars}자를 넘기지 않는다. 넘치면 근거가 약한 문장부터 뺀다.\n"
-                "- 다 쓴 뒤 끝에 `(공백 포함 n자)` 로 센 값을 적는다.\n"
-                "- AI 가 센 글자수는 틀리기 쉽다. 제출 전에 글자수 세기 도구로 다시 잰다.")
+            out.append((f"글자수 · 공백 포함 {chars}자 이내",
+                        f"- 본문은 공백 포함 {chars}자를 넘기지 않는다. 넘치면 근거가 약한 문장부터 뺀다.\n"
+                        "- 다 쓴 뒤 끝에 `(공백 포함 n자)` 로 센 값을 적는다.\n"
+                        "- AI 가 센 글자수는 틀리기 쉽다. 제출 전에 글자수 세기 도구로 다시 잰다."))
+    return out
+
+
+def _labels(th, kind, auds):
+    return (th.kinds[kind]["label"] if kind else "일반 글",
+            ", ".join(th.audiences[a]["label"] for a in auds) or "정하지 않음")
+
+
+def compose(th, kind=None, audiences=None, sets=None, profile=None, cls=None, chars=None, fmt="prompt",
+            revise=False, warn=lambda m: None):
+    profile = profile or {}
+    vals, auds, cls = resolve(th, kind, audiences, sets, profile, cls, warn)
+    kind_label, aud_label = _labels(th, kind, auds)
+    sections = [f"## {head}\n\n{body}" for head, body in rule_sections(th, kind, vals, chars, revise)]
+    who = persona_section(th, cls, profile.get("persona"))
+    parts = [
+        f"# 글쓰기 테마 · {kind_label} · 독자 {aud_label}",
+        "이 대화에서 쓰는 글에 아래 규칙을 적용한다. 규칙끼리 부딪치면 앞에 나온 규칙을 따른다. "
+        "이 지침은 docs-suit 로 조립했다.",
+        sections[0],
+    ] + ([who] if who else []) + sections[1:]
     text = "\n\n".join(parts) + "\n"
     if fmt == "output-style":
         text = ("---\n"
@@ -589,6 +606,22 @@ def compose(th, kind=None, audiences=None, sets=None, profile=None, cls=None, ch
     return text, vals
 
 
+# 검토 지침의 빈자리. 본문과 원문을 넘기면 그 자리에 넣는다.
+REVIEW_SOURCE = "(과제 안내문, 채용 공고, 요청 메일처럼 이 글이 따라야 할 원문 전체. 없으면 비워 둔다)"
+REVIEW_DOC = "(다 쓴 글 전체)"
+
+
+def review(th, kind=None, audiences=None, sets=None, profile=None, cls=None, chars=None, doc=None, source=None,
+           warn=lambda m: None):
+    """새 대화나 서브에이전트에 넘길 검토 지침. 쓴 사람과 같은 값으로 조립하되 페르소나는 싣지 않는다."""
+    vals, auds, _ = resolve(th, kind, audiences, sets, profile or {}, cls, warn)
+    kind_label, aud_label = _labels(th, kind, auds)
+    parts = [f"# 검토 지침 · {kind_label} · 독자 {aud_label}", _body(th.root / "review.md")]
+    parts += [f"## 채점 기준 · {head}\n\n{body}" for head, body in rule_sections(th, kind, vals, chars)]
+    parts.append("## 원문\n\n" + (source.strip() if source and source.strip() else REVIEW_SOURCE))
+    parts.append("## 검토할 글\n\n" + (doc.strip() if doc and doc.strip() else REVIEW_DOC))
+    return "\n\n".join(parts) + "\n"
+
 # ---------------------------------------------------------------- 본문 검사
 # 조립된 값대로 썼는지 어림 기준으로 잰다. 기준은 대략값이라 틀림이 나오면 본문을 직접 읽어 확인한다.
 LENGTH_LIMIT = {"brief": 1500, "page": 3500}
@@ -597,7 +630,8 @@ ENDING = (("polite", "합쇼체", ("니다", "니까", "십시오")), ("haeyo", 
 # 백틱 안의 `[확인 필요]` 는 표시 방식을 설명한 말일 수 있어 빼되, 내용이 든 `[확인 필요: 영향 범위]` 는 표시로 센다.
 UNRESOLVED = re.compile(r"(?<!`)\[확인 필요|`\[확인 필요:\s*[^\]`…\s][^\]`]*\]`")
 CHECK_HINT = {"register": "{want} 로 맞춘다", "voice": {"bullet": "줄글을 목록으로 나눈다", "prose": "목록을 줄글로 푼다"},
-              "length": "한도 안으로 줄인다", "emphasis": "굵은 글씨를 뺀다"}
+              "length": "한도 안으로 줄인다", "emphasis": "굵은 글씨를 뺀다",
+              "markup": "마크다운 기호를 빼고 줄바꿈과 짧은 소제목으로 나눈다", "kind": "틀이 정한 절을 더한다"}
 
 
 def body_lines(doc):
@@ -621,36 +655,122 @@ def endings(lines):
     return count
 
 
-def check_doc(doc, vals, chars, kind=None):
-    """[(축, 맞았나, 잰 값)]. 잴 거리가 모자라면 그 축은 빼고 낸다."""
+# 축이 아닌 검사의 이름. 문장 규칙에 걸린 패턴은 `tells:<이름>` 으로 남기고 이름은 tells.yaml 에서 읽는다.
+CHECK_LABEL = {"markup": "출력 형식", "kind": "문서 종류의 틀", "tells": "문장 규칙"}
+QUOTED = re.compile(r'"[^"\n]*"|“[^”\n]*”|「[^」\n]*」|‘[^’\n]*’|\'[^\'\n]*\'|`[^`\n]*`')
+CONNECTIVE_COMMA = re.compile(r"(?:지만|면서|며|는데|아서|어서|라서|니까|므로|[하되있없았었였겠]고),")
+CHOPPY_SKIP = ("slides", "sns", "resume", "interview", "script")  # 원래 짧게 끊어 쓰는 종류
+
+
+def plain_text(doc):
+    """코드 블록과 인용 블록, 따옴표와 백틱 안을 걷은 본문. 예문으로 든 말을 세지 않는다."""
+    doc = re.sub(r"```.*?```", "", doc, flags=re.S)
+    doc = "\n".join(ln for ln in doc.splitlines() if not ln.lstrip().startswith(">"))
+    return QUOTED.sub(" ", doc)
+
+
+def tells_found(th, doc, vals, kind=None):
+    """[(이름, 걸린 횟수, 첫 예)]. tells.yaml 의 패턴 가운데 min 을 넘게 걸린 것만 낸다."""
+    clean = plain_text(doc)
     out = []
-    lines = body_lines(doc)
-    count = endings(lines)
-    total = sum(count.values())
-    want = vals["register"][0]
-    if total >= 3:
-        out.append(("register", count[want] >= 0.6 * total,
-                    " · ".join(f"{label} {count[k]}" for k, label, _ in ENDING if count[k])))
-    # 틀이 정한 문서는 골격 규칙이 문체 규칙보다 앞서서 문체를 재지 않는다.
-    if len(lines) >= 4 and vals["skeleton"][0] != TEMPLATE:
-        ratio = sum(1 for ln in lines if re.match(r"([-*+]|\d+[.)])\s", ln)) / len(lines)
-        ok = ratio >= 0.3 if vals["voice"][0] == "bullet" else ratio <= 0.5
-        out.append(("voice", ok, f"목록 줄 {ratio:.0%}"))
-    size = len("\n".join(lines))
-    limit = int(chars * 1.1) if chars else None if kind == "slides" else LENGTH_LIMIT.get(vals["length"][0])
-    if limit:
-        out.append(("length", size <= limit, f"{size}자, 한도 {limit}자"))
-    if vals["emphasis"][0] == "none":
-        out.append(("emphasis", "**" not in doc, "굵은 글씨 있음" if "**" in doc else "없음"))
+    for name, t in th.tells.items():
+        if kind and kind in (t.get("skip") or []):
+            continue
+        if t.get("exposure") and (vals.get("exposure") or (None,))[0] != t["exposure"]:
+            continue
+        text = doc if str(t.get("raw")) == "true" else clean
+        rx = re.compile(t["re"], re.M)
+        scopes = re.split(r"\n\s*\n", text) if t.get("per") == "para" else [text]
+        hits = max((list(rx.finditer(s)) for s in scopes), key=len)
+        if hits and len(hits) >= int(t.get("min", 1)):
+            m = hits[0]
+            s = " ".join(m.string[max(0, m.start() - 8):m.end() + 8].split())
+            out.append((name, len(hits), f"「…{s}…」"))
     return out
 
 
+def sentences(doc):
+    """목록과 표, 제목을 뺀 줄글의 문장. 줄마다 [문장] 으로 낸다."""
+    rows = []
+    for ln in body_lines(plain_text(doc)):
+        if re.match(r"([-*+]|\d+[.)])\s", ln):
+            continue
+        ln = re.sub(r"\[\d+\]", "", ln)
+        rows.append([s.strip() for s in re.split(r"(?<=[.!?])\s+", ln) if s.strip()])
+    return rows
+
+
+def suggest_doc(th, doc, vals, kind=None):
+    """[(이름, 이름표, 잰 값, 고칠 방향)]. 보여 주기만 하고 성장 기록에는 넣지 않는다."""
+    out = [(f"tells:{n}", th.tells[n]["label"], f"{c}곳 {ex}", th.tells[n]["hint"])
+           for n, c, ex in tells_found(th, doc, vals, kind) if th.tells[n].get("layer") == "suggest"]
+    rows = sentences(doc)
+    flat = [s for r in rows for s in r]
+    if len(flat) >= 5:
+        k = sum(1 for s in flat if CONNECTIVE_COMMA.search(s))
+        if k / len(flat) >= 0.2:
+            out.append(("comma", "연결어미 뒤 쉼표", f"문장 {k}/{len(flat)}", "앞 절이 짧으면 쉼표를 뺀다"))
+        avg = sum(map(len, flat)) / len(flat)
+        over = sum(1 for s in flat if len(s) > 80)
+        if avg > 55 or over / len(flat) > 0.1:
+            out.append(("long", "긴 문장", f"평균 {avg:.0f}자, 80자 넘는 문장 {over}/{len(flat)}", "맥락이 바뀌는 곳에서 나눈다"))
+    if kind not in CHOPPY_SKIP and any(all(len(s) <= 20 for s in r[i:i + 3]) for r in rows for i in range(len(r) - 2)):
+        out.append(("choppy", "토막 문장", "20자 안쪽 문장이 세 개 이어짐", "같은 맥락은 연결어미로 잇는다"))
+    return out
+
+
+def check_doc(doc, vals, chars, kind=None, th=None):
+    """[(검사, 맞았나, 잰 값)]. 잴 거리가 모자라면 그 검사는 빼고 낸다. th 를 주면 출력 형식과 틀, 문장 규칙도 잰다."""
+    out = []
+    pick = lambda axis: (vals.get(axis) or (None,))[0]
+    lines = body_lines(doc)
+    count = endings(lines)
+    total = sum(count.values())
+    want = pick("register")
+    if total >= 3 and want:
+        out.append(("register", count[want] >= 0.6 * total,
+                    " · ".join(f"{label} {count[k]}" for k, label, _ in ENDING if count[k])))
+    # 틀이 정한 문서는 골격 규칙이 문체 규칙보다 앞서서 문체를 재지 않는다.
+    if len(lines) >= 4 and pick("skeleton") not in (TEMPLATE, None):
+        ratio = sum(1 for ln in lines if re.match(r"([-*+]|\d+[.)])\s", ln)) / len(lines)
+        ok = ratio >= 0.3 if pick("voice") == "bullet" else ratio <= 0.5
+        out.append(("voice", ok, f"목록 줄 {ratio:.0%}"))
+    size = len("\n".join(lines))
+    limit = int(chars * 1.1) if chars else None if kind == "slides" else LENGTH_LIMIT.get(pick("length"))
+    if limit:
+        out.append(("length", size <= limit, f"{size}자, 한도 {limit}자"))
+    if pick("emphasis") == "none":
+        out.append(("emphasis", "**" not in doc, "굵은 글씨 있음" if "**" in doc else "없음"))
+    if th is None:
+        return out
+    if pick("markup") == "plain":
+        raw = [ln.lstrip() for ln in doc.splitlines()]
+        marks = [name for name, hit in (("굵은 글씨", "**" in doc), ("제목 기호", any(ln.startswith("#") for ln in raw)),
+                                        ("표", any(ln.startswith("|") for ln in raw)), ("코드 블록", "```" in doc)) if hit]
+        out.append(("markup", not marks, ", ".join(marks) + " 있음" if marks else "마크다운 기호 없음"))
+    if kind in th.must:
+        missing = [w for w in th.must[kind] if w not in doc]
+        out.append(("kind", not missing, "빠짐: " + ", ".join(missing) if missing else "다 있음"))
+    errors = [(n, c, ex) for n, c, ex in tells_found(th, doc, vals, kind) if th.tells[n].get("layer") == "error"]
+    out += [(f"tells:{n}", False, f"{c}곳 {ex}") for n, c, ex in errors] or [("tells", True, "걸린 것 없음")]
+    return out
+
+
+def check_label(th, key):
+    if key in th.axes:
+        return th.axes[key]["label"]
+    if key.startswith("tells:"):
+        return th.tells.get(key[6:], {}).get("label", key)
+    return CHECK_LABEL.get(key, key)
+
+
 def check_hint(th, axis, vals):
+    if axis.startswith("tells:"):
+        return th.tells.get(axis[6:], {}).get("hint", "")
     hint = CHECK_HINT[axis]
     if isinstance(hint, dict):
         return hint[vals[axis][0]]
     return hint.format(want=th.label(axis, vals[axis][0]))
-
 
 # ---------------------------------------------------------------- 캐릭터와 성장
 # 슬롯이 캐릭터다. check 가 문서 한 건마다 기록 한 줄을 남기고, 경험치와 레벨은 기록에서 매번 다시 계산한다.
@@ -1105,6 +1225,8 @@ def bundle_data(th):
         "classes": th.classes,
         "persona": th.persona,
         "base": _body(th.root / "base.md"),
+        "revise": _body(th.root / "revise.md"),
+        "review": _body(th.root / "review.md"),
         "kindText": {k: _body(th.kind_path(k)) for k in th.kinds},
         "rules": rules,
         "samples": samples,
@@ -1134,7 +1256,7 @@ def skill_text(th):
                      for a in COMPOSE_ORDER)
     return f"""---
 name: docs-suit
-description: 문서를 쓰거나 다듬을 때 docs-suit 테마를 입힌다. 보고서, 발표 자료, 회의록, 메일, 이력서, 자기소개서, 포트폴리오, 논문 초록, 설계 문서, PR 설명, 기획서, 업무 보고, 블로그, 뉴스레터, SNS 글을 써 달라는 요청을 받으면 쓰기 전에 이 스킬로 규칙을 조립해 따른다. 이 폴더에서는 평어체로, 팀장님께는 해요체로 써 달라는 식으로 문서의 말투나 모양을 앞으로 정해 달라는 요청도 이 스킬로 프로필이나 폴더 파일에 남긴다.
+description: 문서를 쓰거나 다듬거나 검토할 때 docs-suit 테마를 입힌다. 보고서, 발표 자료, 발표 원고, 회의록, 메일, 공지, 이력서, 자기소개서, 포트폴리오, 논문 초록, 설계 문서, PR 설명, 기획서, 업무 보고, 가이드와 README, 블로그, 뉴스레터, SNS 글을 써 달라거나 다듬어 달라는 요청을 받으면 쓰기 전에 이 스킬로 규칙을 조립해 따른다. 다 쓴 글을 검토해 달라는 요청도 이 스킬로 검토 지침을 만든다. 이 폴더에서는 평어체로, 팀장님께는 해요체로 써 달라는 식으로 문서의 말투나 모양을 앞으로 정해 달라는 요청도 이 스킬로 프로필이나 폴더 파일에 남긴다.
 ---
 {EXPORT_MARK} 다시 만들려면 `{run} export` 를 돌린다. -->
 
@@ -1149,17 +1271,18 @@ description: 문서를 쓰거나 다듬을 때 docs-suit 테마를 입힌다. �
    - 같은 출력의 `looks` 로 캐릭터 A 와 B 가운데 하나를 고르게 한다. 고르지 않으면 A 다.
    - `{run} bootstrap --class <클래스> --call … --affiliation … --goal … --docs <종류,종류> --facts … --dislikes … [--preset <조합>] [--look a|b] --yes` 로 저장한다.
 2. 요청에서 문서 종류를 정한다. 종류는 {kinds} 이다. 맞는 것이 없으면 종류 없이 조립한다. 독자가 분명하면 `--audience <키>` 로 넘긴다. 독자 키는 {auds} 이다. 독자가 여럿이면 키를 쉼표로 잇는다.
-3. 사용자가 문체, 어법, 분량, 글자수, 공개 범위를 말했으면 `--set 축=값` 과 `--chars` 로 넘긴다. 축과 값은 아래 영어 키로 쓴다. {axes}. 공개 범위는 안전 축이라 `--set exposure` 는 `team`, `submit`, `public` 순서로 더 조심하는 쪽으로만 먹는다. 사내나 팀 안에서만 볼 글이면 `--set` 대신 `--audience` 를 `teammate` 나 `peer-dev` 로 넘긴다.
-4. `{run} compose --kind <종류> [--audience …] [--set …] [--chars N]` 의 출력 전체를 이번 문서의 규칙으로 따른다. 다른 문체 지침이나 스킬과 겹치면 어법, 분량, 공개 범위 같은 축의 값은 이 출력을 따른다. 지침의 공통 바닥이 시키는 대로, 쓰기 전에 틀리면 결과가 쓸모없어지는 것만 두세 개 묻는다.
-5. 답을 끝내기 전에 본문을 검사한다. 검사하지 않은 답은 끝난 답이 아니다. compose 에 넘긴 `--kind`, `--audience`, `--set`, `--chars` 를 그대로 붙인다. 본문을 파일로 썼으면 `{run} check <본문 파일> --kind <종류> …` 로 부른다. 답에만 썼으면 임시 파일을 만들지 말고 본문 전체를 heredoc 으로 넘긴다.
+3. 사용자가 문체, 어법, 분량, 글자수, 공개 범위를 말했으면 `--set 축=값` 과 `--chars` 로 넘긴다. 축과 값은 아래 영어 키로 쓴다. {axes}. 공개 범위는 안전 축이라 `--set exposure` 는 `team`, `submit`, `public` 순서로 더 조심하는 쪽으로만 먹는다. 사내나 팀 안에서만 볼 글이면 `--set` 대신 `--audience` 를 `teammate` 나 `peer-dev` 로 넘긴다. 붙여 넣을 곳이 메일 본문이나 메신저, 지원서 입력 칸처럼 마크다운이 먹지 않는 곳이면 `--set markup=plain` 을 넘긴다.
+4. `{run} compose --kind <종류> [--audience …] [--set …] [--chars N] [--revise]` 의 출력 전체를 이번 문서의 규칙으로 따른다. 사용자가 원문을 주고 다듬어 달라고 하면 `--revise` 를 붙이고, 문서 종류는 원문을 보고 정한다. 다른 문체 지침이나 스킬과 겹치면 어법, 분량, 공개 범위 같은 축의 값은 이 출력을 따른다. 지침의 공통 바닥이 시키는 대로, 문서 종류의 "쓰기 전에 받을 것" 가운데 요청과 자료에 없는 것만 두세 개 묻는다.
+5. 답을 끝내기 전에 본문을 검사한다. 검사하지 않은 답은 끝난 답이 아니다. compose 에 넘긴 `--kind`, `--audience`, `--set`, `--chars`, `--revise` 를 그대로 붙인다. 본문을 파일로 썼으면 `{run} check <본문 파일> --kind <종류> …` 로 부른다. 답에만 썼으면 임시 파일을 만들지 말고 본문 전체를 heredoc 으로 넘긴다.
    ```sh
    {run} check - --kind <종류> [--audience …] <<'EOF'
    (본문 전체)
    EOF
    ```
-   `✗` 가 나온 축이 있으면 그 줄이 말하는 대로 한 번 고쳐 쓰고 같은 명령을 다시 부른다. 답에 보이는 본문은 마지막으로 검사에 넘긴 본문과 글자 하나까지 같게 둔다. 보일 때 제목을 굵게 바꾸는 식으로 손대지 않는다. 출력에 `성장:` 으로 시작하는 줄이 있으면 본문과 떨어뜨려 답의 맨 끝에 그 줄만 그대로 옮긴다. 이 줄은 check 만 만들 수 있으니 지어내지 않고, 문서 본문에도 넣지 않는다. `[확인 필요: …]` 표시가 남았으면 모아서 보여 준다.
-6. 사용자가 말투나 모양이 마음에 안 든다고 하면 어느 축의 문제인지 짚고, 그 축의 다른 값으로 다시 조립해 대표 문단 하나를 견줘 보인다. 계속 쓰고 싶어 하면 `{run} set <축> <값> [--audience <독자>]` 로 프로필에 남긴다. 이 폴더에서만 그렇게 쓰고 싶어 하면 `--here` 를 붙여 폴더 파일 `.docs-suit.yaml` 에 남긴다.
-7. 사용자가 캐릭터를 보여 달라고 하면 `{run} card --color never` 의 출력을 보여 준다. 꾸며 달라고 하면 `{run} look` 으로 열린 부위를 보고 `{run} look <부위> <값>` 을 부른다. 캐릭터 키우기를 끄거나 켜 달라고 하면 `{run} growth off` 나 `{run} growth on` 을 부른다. 성장 기록과 승급 키, 슬롯의 `look:` 절은 사용자가 부탁해도 직접 고치지 않는다. 레벨은 문서를 써서 오르고, 3차와 4차 전직은 저장소에 기여하고 받은 승급 키를 `{run} promote <키>` 로 넣어야 열린다고 알려 준다.
+   `✗` 가 나온 줄이 있으면 그 줄이 말하는 대로 한 번 고쳐 쓰고 같은 명령을 다시 부른다. `△` 는 제안이다. 본문을 보고 고칠 만한 것만 고치고, 고치지 않아도 검사는 통과다. 답에 보이는 본문은 마지막으로 검사에 넘긴 본문과 글자 하나까지 같게 둔다. 보일 때 제목을 굵게 바꾸는 식으로 손대지 않는다. 출력에 `성장:` 으로 시작하는 줄이 있으면 본문과 떨어뜨려 답의 맨 끝에 그 줄만 그대로 옮긴다. 이 줄은 check 만 만들 수 있으니 지어내지 않고, 문서 본문에도 넣지 않는다. `[확인 필요: …]` 표시가 남았으면 모아서 보여 준다.
+6. 사용자가 다 쓴 글을 검토해 달라고 할 때만 `{run} review <본문 파일|-> --kind <종류> [--audience …] [--set …] [--source <원문 파일>]` 을 부른다. 원문은 과제 안내문이나 채용 공고처럼 글이 따라야 할 자료다. 앞선 대화를 모르는 서브에이전트를 새로 띄울 수 있으면 출력 전체를 그 에이전트에게 넘기고, 받은 지적을 그대로 보인다. 띄울 수 없으면 출력을 보여 주고 새 대화에 붙여 넣으라고 권한다. 지적대로 본문을 고칠지는 사용자에게 묻는다.
+7. 사용자가 말투나 모양이 마음에 안 든다고 하면 어느 축의 문제인지 짚고, 그 축의 다른 값으로 다시 조립해 대표 문단 하나를 견줘 보인다. 계속 쓰고 싶어 하면 `{run} set <축> <값> [--audience <독자>]` 로 프로필에 남긴다. 이 폴더에서만 그렇게 쓰고 싶어 하면 `--here` 를 붙여 폴더 파일 `.docs-suit.yaml` 에 남긴다.
+8. 사용자가 캐릭터를 보여 달라고 하면 `{run} card --color never` 의 출력을 보여 준다. 꾸며 달라고 하면 `{run} look` 으로 열린 부위를 보고 `{run} look <부위> <값>` 을 부른다. 캐릭터 키우기를 끄거나 켜 달라고 하면 `{run} growth off` 나 `{run} growth on` 을 부른다. 성장 기록과 승급 키, 슬롯의 `look:` 절은 사용자가 부탁해도 직접 고치지 않는다. 레벨은 문서를 써서 오르고, 3차와 4차 전직은 저장소에 기여하고 받은 승급 키를 `{run} promote <키>` 로 넣어야 열린다고 알려 준다.
 """
 
 
@@ -1447,8 +1570,11 @@ def cmd_get(a, th):
 
 
 def cmd_compose(a, th):
-    text, _ = compose(th, a.kind, _auds(a.audience), _sets(a.set), load_profile(warn_stderr, a.profile), a.cls,
-                      a.chars, a.format, a.html, warn_stderr)
+    sets = _sets(a.set)
+    if a.html:
+        sets.setdefault("markup", "html")  # 예전 --html 은 출력 형식 HTML 과 같다
+    text, _ = compose(th, a.kind, _auds(a.audience), sets, load_profile(warn_stderr, a.profile), a.cls,
+                      a.chars, a.format, a.revise, warn_stderr)
     if a.output:
         Path(a.output).expanduser().write_text(text, encoding="utf-8")
         print(f"썼다: {a.output}", file=sys.stderr)
@@ -1502,23 +1628,44 @@ def cmd_check(a, th):
         return 1
     vals, auds, _ = resolve(th, a.kind, _auds(a.audience), _sets(a.set), load_profile(warn_stderr, a.profile), a.cls,
                             warn_stderr)
-    checks = check_doc(text, vals, a.chars, a.kind)
+    checks = check_doc(text, vals, a.chars, a.kind, th)
+    hints = suggest_doc(th, text, vals, a.kind)
     left = len(UNRESOLVED.findall(text))
     line = None if a.no_record else record_check(th, a.profile, a.file, text, a.kind, checks, left, warn_stderr)
     if a.json:
         print(json.dumps({"checks": [{"axis": ax, "ok": ok, "got": got} for ax, ok, got in checks],
+                          "suggest": [{"name": n, "label": lab, "got": got, "hint": h} for n, lab, got, h in hints],
                           "unresolved": left, "growth": line}, ensure_ascii=False, indent=1))
         return 0
     kind_label = th.kinds[a.kind]["label"] if a.kind else "일반 글"
     print(f"검사 · {kind_label} · 독자 {', '.join(th.audiences[x]['label'] for x in auds) or '정하지 않음'}")
     for ax, ok, got in checks:
-        print(f"{'✓' if ok else '✗'} {th.axes[ax]['label']}: {got}" + ("" if ok else f". {check_hint(th, ax, vals)}"))
+        print(f"{'✓' if ok else '✗'} {check_label(th, ax)}: {got}" + ("" if ok else f". {check_hint(th, ax, vals)}"))
+    for _, lab, got, h in hints:
+        print(f"△ {lab}: {got}. {h}")
+    if hints:
+        print("· △ 는 제안이다. 본문을 보고 고칠 만한 것만 고치고, 고치지 않아도 검사는 통과다")
     if not checks:
         print("· 잴 거리가 없다")
     if left:
         print(f"· [확인 필요] {left}곳이 남았다")
     if line:
         print(line)
+    return 0
+
+
+def cmd_review(a, th):
+    if a.file == "-" and a.source == "-":
+        print("오류: 본문과 원문을 둘 다 표준 입력으로 받을 수 없다. 원문은 파일로 넘긴다", file=sys.stderr)
+        return 1
+    read = lambda f: sys.stdin.read() if f == "-" else Path(f).expanduser().read_text(encoding="utf-8")
+    text = review(th, a.kind, _auds(a.audience), _sets(a.set), load_profile(warn_stderr, a.profile), a.cls, a.chars,
+                  read(a.file) if a.file else None, read(a.source) if a.source else None, warn_stderr)
+    if a.output:
+        Path(a.output).expanduser().write_text(text, encoding="utf-8")
+        print(f"썼다: {a.output}", file=sys.stderr)
+    else:
+        sys.stdout.write(text)
     return 0
 
 
@@ -2071,6 +2218,45 @@ def selftest(th):
           f"본문 검사가 어법, 강조, 분량을 다르게 잰다: {got}")
     got = {ax: ok for ax, ok, _ in check_doc("간다. 본다. 한다. 쓴다.\n" * 40, vals, 100)}
     check(got.get("register") is False and got.get("length") is False, f"본문 검사가 어법이나 글자수 한도를 놓친다: {got}")
+
+    # 문장 규칙 패턴. 모든 값의 보기는 깨끗한 예문이라 error 패턴이 하나도 걸리면 안 된다.
+    for name, tl in th.tells.items():
+        check(tl.get("layer") in ("error", "suggest") and tl.get("label") and tl.get("hint") and tl.get("re"),
+              f"tells.yaml 의 {name} 에 layer, label, hint, re 가 없다")
+        try:
+            re.compile(tl.get("re", ""))
+        except re.error as e:
+            problems.append(f"tells.yaml 의 {name} 정규식이 틀렸다: {e}")
+        check(all(k in th.kinds for k in tl.get("skip") or []), f"tells.yaml 의 {name} skip 에 모르는 종류가 있다")
+        check(not tl.get("exposure") or tl["exposure"] in th.axes["exposure"]["values"], f"tells.yaml 의 {name} exposure 를 모른다")
+    for k, words in th.must.items():
+        check(k in th.kinds, f"must 의 {k} 는 모르는 종류다")
+        for w in words if k in th.kinds else []:
+            check(w in _body(th.kind_path(k)), f"must 의 {k} 낱말 {w} 가 그 종류의 틀에 없다")
+    if not problems:
+        neutral = resolve(th)[0]
+        for axis in AXES_ORDER:
+            for v in th.axes[axis]["values"]:
+                bad = [n for n, _, ex in tells_found(th, _sample(th.rule_path(axis, v)), neutral)
+                       if th.tells[n]["layer"] == "error"]
+                check(not bad, f"보기에서 문장 규칙 {bad} 가 걸린다: {axis}/{v}.md")
+        bad_doc = ("이 일은 단순한 지연을 넘어 구조의 문제다 — 원인은 셋이다.\n판단되어진다. 자세히 알아보겠습니다.\n"
+                   "[이름] 님께 보낸다. password: hunter22\n")
+        found = {n for n, _, _ in tells_found(th, bad_doc, neutral)}
+        check({"dash", "passive2", "meta", "count", "placeholder", "secret", "beyond"} <= found,
+              f"문장 규칙이 걸러야 할 문형을 놓친다: {sorted(found)}")
+        quiet_doc = '기간은 2020–2024 년이다. 예문 "셋이다" 와 `—` 는 쓰지 않는다.\n```\n원인은 넷이다 — 코드다\n```\n'
+        check(not [n for n, _, _ in tells_found(th, quiet_doc, neutral) if th.tells[n]["layer"] == "error"],
+              "숫자 범위나 따옴표, 코드 블록 안의 예문을 문장 규칙으로 잡는다")
+        tips = {n for n, *_ in suggest_doc(th, "속도가 아니라 방향이다. 양이 아니라 질이다. 결론적으로 다양한 방법이 있다.", neutral)}
+        check({"tells:not-but", "tells:wrapup", "tells:vague"} <= tips, f"제안 패턴이 다르다: {sorted(tips)}")
+        got = {k: ok for k, ok, _ in check_doc("**제목**\n\n| 시간 | 대기 |\n", resolve(th, kind="email")[0], None, "email", th)}
+        check(got.get("markup") is False and got.get("tells") is True, f"서식 없음 문서의 마크다운을 잡지 못한다: {got}")
+        got = dict((k, (ok, v)) for k, ok, v in check_doc("목표를 정한다.\n", resolve(th, kind="design-doc")[0], None,
+                                                           "design-doc", th))
+        check(got.get("kind", (True, ""))[0] is False and "비목표" in got["kind"][1], f"틀이 정한 절이 빠진 것을 잡지 못한다: {got}")
+        got = {k: ok for k, ok, _ in check_doc("원인은 셋이다.\n", neutral, None, None, th)}
+        check(got.get("tells:count") is False and "tells" not in got, f"문장 규칙에 걸린 것을 따로 남기지 않는다: {got}")
     rules = argparse.Namespace(growth={
         "exp": {k: {"points": p, "label": k} for k, p in (("done", "10"), ("clean", "10"), ("resolved", "5"), ("new-kind", "20"))},
         "limit": {"daily-kind": "2"}, "level": {"1": "50", "2": "75"}, "max": "4",
@@ -2127,6 +2313,17 @@ def selftest(th):
         check(text.startswith("---\nname:") and "공백 포함 1000자" in text, "output-style 이나 글자수 조립이 다르다")
         check("- 호칭: 민수 님" in text and "- 클래스: 학생" in text and "report" not in text.split("## 쓰는 사람")[1][:200],
               "쓰는 사람 절이 다르다")
+        text, _ = compose(th, kind="email", revise=True, profile={"persona": {"call": "민수 님"}})
+        check(text.index("## 공통 바닥") < text.index("## 쓰는 사람") < text.index("## 다듬기") < text.index("## 문서 종류"),
+              "다듬기 절의 자리가 다르다")
+        check("## 출력 형식 · 서식 없음" in text and "## 디자인 · 문서" not in text, "메일이 서식 없음을 권하지 않거나 문서 디자인이 실렸다")
+        text, _ = compose(th, kind="report", sets={"markup": "html"})
+        check("## 디자인 · 문서 ·" in text and "## 다듬기" not in text, "출력 형식 HTML 에 문서 디자인이 실리지 않는다")
+        rv = review(th, kind="design-doc", profile={"persona": {"call": "민수 님"}})
+        check(rv.startswith("# 검토 지침 · 설계 문서") and "## 채점 기준 · 문서 종류 · 설계 문서" in rv and "민수" not in rv
+              and rv.rstrip().endswith(REVIEW_DOC), "검토 지침이 다르거나 페르소나가 실렸다")
+        rv = review(th, kind="email", doc="본문이다.\n", source="공고다.")
+        check(rv.rstrip().endswith("본문이다.") and "## 원문\n\n공고다." in rv, "검토 지침에 본문과 원문을 넣지 못한다")
         for bad in ({"skeleton": "template"}, {"nope": "x"}, {"voice": "nope"}):
             try:
                 resolve(th, sets=bad)
@@ -2394,7 +2591,8 @@ def main(argv=None):
         else:
             p.add_argument("--chars", type=int)
             p.add_argument("--format", choices=("prompt", "output-style"), default="prompt")
-            p.add_argument("--html", action="store_true", help="문서 디자인 규칙도 싣는다")
+            p.add_argument("--html", action="store_true", help="--set markup=html 과 같다. 문서 디자인 규칙도 실린다")
+            p.add_argument("--revise", action="store_true", help="사용자가 준 원문을 다듬을 때. 다듬기 절을 싣는다")
             p.add_argument("-o", "--output")
     s = sub.add_parser("set", parents=[slot])
     s.add_argument("axis")
@@ -2413,8 +2611,18 @@ def main(argv=None):
     c.add_argument("--audience")
     c.add_argument("--set", action="append", metavar="축=값")
     c.add_argument("--chars", type=int)
+    c.add_argument("--revise", action="store_true", help="compose 와 같은 인자를 그대로 붙일 수 있게 받는다. 재는 것은 같다")
     c.add_argument("--no-record", action="store_true", help="재기만 하고 성장 기록에 남기지 않는다")
     c.add_argument("--json", action="store_true")
+    rv = sub.add_parser("review", parents=[slot])
+    rv.add_argument("file", nargs="?", help="검토할 본문 파일. - 이면 표준 입력에서 읽고, 주지 않으면 빈자리로 둔다")
+    rv.add_argument("--source", help="글이 따라야 할 원문 파일. 과제 안내문, 채용 공고 같은 것")
+    rv.add_argument("--class", dest="cls")
+    rv.add_argument("--kind")
+    rv.add_argument("--audience")
+    rv.add_argument("--set", action="append", metavar="축=값")
+    rv.add_argument("--chars", type=int)
+    rv.add_argument("-o", "--output")
     ca = sub.add_parser("card", parents=[slot])
     ca.add_argument("--json", action="store_true")
     ca.add_argument("--color", choices=("auto", "always", "never"), default="auto",
@@ -2455,7 +2663,8 @@ def main(argv=None):
         if a.cmd == "selftest":
             return selftest(th)
         return {"bootstrap": cmd_bootstrap, "profile": cmd_profile, "list": cmd_list, "get": cmd_get,
-                "compose": cmd_compose, "set": cmd_set, "export": cmd_export, "check": cmd_check, "card": cmd_card,
+                "compose": cmd_compose, "set": cmd_set, "export": cmd_export, "check": cmd_check, "review": cmd_review,
+                "card": cmd_card,
                 "look": cmd_look, "preset": cmd_preset, "promote": cmd_promote, "growth": cmd_growth, "status": cmd_status, "widget": cmd_widget,
                 "bundle": cmd_bundle}[a.cmd](a, th)
     except Missing as e:

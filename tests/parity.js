@@ -10,10 +10,11 @@ const cases = all.compose;
 let bad = 0;
 for (const c of cases) {
   const r = C.resolve(c.kind, c.auds, c.sets, c.profile, c.cls);
-  const js = C.compose(c.kind, r.auds, r.vals, c.chars, c.fmt, c.html, r.cls, (c.profile || {}).persona);
-  if (js !== c.expected) {
+  const js = C.compose(c.kind, r.auds, r.vals, c.chars, c.fmt, c.revise, r.cls, (c.profile || {}).persona);
+  const rv = C.review(c.kind, r.auds, r.vals, c.chars);
+  if (js !== c.expected || rv !== c.review) {
     bad++;
-    if (bad <= 3) console.log(`다름: class=${c.cls} kind=${c.kind} audience=${c.auds} fmt=${c.fmt}`);
+    if (bad <= 3) console.log(`다름(${js !== c.expected ? "지침" : "검토"}): class=${c.cls} kind=${c.kind} audience=${c.auds} fmt=${c.fmt}`);
   }
 }
 // 웹 캐릭터 만들기의 슬롯 파일과 캐릭터 그림

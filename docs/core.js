@@ -73,30 +73,40 @@
         "사용자가 넣으라고 하지 않는 한 본문에 옮겨 적지 않는다.\n\n" + rows.join("\n");
     }
 
-    function compose(kind, auds, vals, chars, fmt, html, cls, persona) {
-      const kindLabel = kind ? T.kinds[kind].label : "일반 글";
-      const audLabel = auds.map((a) => T.audiences[a].label).join(", ") || "정하지 않음";
-      const parts = [
-        `# 글쓰기 테마 · ${kindLabel} · 독자 ${audLabel}`,
-        "이 대화에서 쓰는 글에 아래 규칙을 적용한다. 규칙끼리 부딪치면 앞에 나온 규칙을 따른다. 이 지침은 docs-suit 로 조립했다.",
-        "## 공통 바닥\n\n" + T.base,
-      ];
-      const who = personaSection(cls, persona);
-      if (who) parts.push(who);
-      if (kind) parts.push(`## 문서 종류 · ${kindLabel}\n\n` + T.kindText[kind]);
+    // suit.py rule_sections() 와 같다. compose 와 review 가 같이 쓴다. 앞에 나온 절이 이긴다.
+    function ruleSections(kind, vals, chars, revise) {
+      const out = [["공통 바닥", T.base]];
+      if (revise) out.push(["다듬기", T.revise]);
+      if (kind) out.push([`문서 종류 · ${T.kinds[kind].label}`, T.kindText[kind]]);
       for (const axis of T.composeOrder) {
         const v = vals[axis][0];
         if (v === "template") continue;
         if (axis === "visual-deck" && kind !== "slides") continue;
-        if (axis === "visual-doc" && !html) continue;
-        parts.push(`## ${T.axes[axis].label} · ${label(axis, v)}\n\n` + T.rules[`${axis}/${v}`]);
+        if (axis === "visual-doc" && vals.markup[0] !== "html") continue;
+        out.push([`${T.axes[axis].label} · ${label(axis, v)}`, T.rules[`${axis}/${v}`]]);
         if (axis === "length" && chars) {
-          parts.push(`## 글자수 · 공백 포함 ${chars}자 이내\n\n` +
+          out.push([`글자수 · 공백 포함 ${chars}자 이내`,
             `- 본문은 공백 포함 ${chars}자를 넘기지 않는다. 넘치면 근거가 약한 문장부터 뺀다.\n` +
             "- 다 쓴 뒤 끝에 `(공백 포함 n자)` 로 센 값을 적는다.\n" +
-            "- AI 가 센 글자수는 틀리기 쉽다. 제출 전에 글자수 세기 도구로 다시 잰다.");
+            "- AI 가 센 글자수는 틀리기 쉽다. 제출 전에 글자수 세기 도구로 다시 잰다."]);
         }
       }
+      return out;
+    }
+
+    function labels(kind, auds) {
+      return [kind ? T.kinds[kind].label : "일반 글", auds.map((a) => T.audiences[a].label).join(", ") || "정하지 않음"];
+    }
+
+    function compose(kind, auds, vals, chars, fmt, revise, cls, persona) {
+      const [kindLabel, audLabel] = labels(kind, auds);
+      const sections = ruleSections(kind, vals, chars, revise).map(([h, b]) => `## ${h}\n\n${b}`);
+      const who = personaSection(cls, persona);
+      const parts = [
+        `# 글쓰기 테마 · ${kindLabel} · 독자 ${audLabel}`,
+        "이 대화에서 쓰는 글에 아래 규칙을 적용한다. 규칙끼리 부딪치면 앞에 나온 규칙을 따른다. 이 지침은 docs-suit 로 조립했다.",
+        sections[0],
+      ].concat(who ? [who] : [], sections.slice(1));
       let text = parts.join("\n\n") + "\n";
       if (fmt === "output-style") {
         text = "---\n" + `name: ${kindLabel} (${audLabel})\n` +
@@ -105,6 +115,16 @@
       }
       return text;
     }
+    // suit.py review() 와 같다. 쓴 사람과 같은 값으로 채점하되 페르소나는 싣지 않는다.
+    function review(kind, auds, vals, chars) {
+      const [kindLabel, audLabel] = labels(kind, auds);
+      const parts = [`# 검토 지침 · ${kindLabel} · 독자 ${audLabel}`, T.review]
+        .concat(ruleSections(kind, vals, chars, false).map(([h, b]) => `## 채점 기준 · ${h}\n\n${b}`));
+      parts.push("## 원문\n\n(과제 안내문, 채용 공고, 요청 메일처럼 이 글이 따라야 할 원문 전체. 없으면 비워 둔다)");
+      parts.push("## 검토할 글\n\n(다 쓴 글 전체)");
+      return parts.join("\n\n") + "\n";
+    }
+
     // ---------------------------------------------------------------- 캐릭터와 슬롯 파일
     // suit.py 의 look_of, look_grid, title_of, level_of, dump_yaml, clean_text 와 같은 규칙이다. tests/parity.js 가 견준다.
     const LAYERS = ["top", "hair", "prop"];
@@ -189,7 +209,7 @@
       return lines.join("\n");
     }
 
-    return { resolve, compose, label, SRC, lookOf, lookGrid, titleOf, levelCost, cleanText, dumpYaml };
+    return { resolve, compose, review, label, SRC, lookOf, lookGrid, titleOf, levelCost, cleanText, dumpYaml };
   }
   if (typeof module !== "undefined" && module.exports) module.exports = make;
   else root.ThemeCore = make;

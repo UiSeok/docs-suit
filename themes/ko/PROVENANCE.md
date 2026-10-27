@@ -8,3 +8,17 @@
 | `visual-doc/newcss/LICENSE` | https://cdn.jsdelivr.net/npm/@exampledev/new.css@1.1.3/LICENSE | 1.1.3 | MIT | 63878ab5877658b5e5f695ff29eefe3392474519dcf3d68e856c535ac0b62e5b |
 | `visual-doc/sakura/theme.css` | https://cdn.jsdelivr.net/npm/sakura.css@1.5.0/css/sakura.css | 1.5.0 | MIT | c997043b8e58936644e2bd47acb561c2f997a1167daf5706ab6ad2ca4fe9629c |
 | `visual-doc/sakura/LICENSE` | https://cdn.jsdelivr.net/npm/sakura.css@1.5.0/LICENSE.txt | 1.5.0 | MIT | 2b225c797073b287572ceefd27af71cf209d413c90938ddc87b5cb58b8e69209 |
+
+## 본문 검사와 문장 규칙의 출처
+
+`tells.yaml` 의 패턴과 `base.md` 의 문장 규칙, 상투 표현 규칙은 아래 공개 자료에서 아이디어를 빌려 새로 썼다. 문구와 정규식은 옮기지 않았다. 외부 자료끼리 판정이 엇갈리거나 사람 글에도 흔하다고 잰 표현은 `error` 에 넣지 않았다.
+
+| 자료 | 빌린 것 | 라이선스 |
+|---|---|---|
+| im-not-ai, https://github.com/epoko77-ai/im-not-ai | 한국어 AI 말투의 분류와 사람 글 대비 빈도, 부정 대구와 분열문, 이중 조사, 피동 진행 같은 문형, 금지어로 두면 안 되는 표현과 오탐 사례 | MIT |
+| patina, https://github.com/devswha/patina | 사람 글보다 자주 나오는 표현 목록, 단어만 고친 글에 AI 티가 남는다는 실험 | MIT |
+| KatFishNet, https://arxiv.org/abs/2503.00032 | 연결어미 뒤 쉼표가 사람 글보다 LLM 글에 잦다는 측정 | 논문 CC BY-NC-ND 4.0 |
+| Wikipedia: Signs of AI writing, https://en.wikipedia.org/wiki/Wikipedia:Signs_of_AI_writing | 예고와 인사, 맺음 요약, 굵은 라벨 목록 같은 신호의 분류와 신호 하나로 판정하지 않는다는 원칙 | 위키백과 기본 CC BY-SA 4.0 |
+| textlint-rule-preset-ai-writing, https://github.com/textlint-ja/textlint-rule-preset-ai-writing | 술어 뒤 쌍점, 기계적인 강조, 과장어 규칙 | MIT |
+| vale-ai-tells, https://github.com/krishnasunkam/vale-ai-tells | 오류와 제안의 두 층, 깨끗한 글에서 걸리지 않는지 재는 방식 | MIT |
+| blader/humanizer, https://github.com/blader/humanizer | 패턴 분류와 검출기를 피하려는 게 아니라 사람 독자를 위해 고친다는 목표 | MIT |

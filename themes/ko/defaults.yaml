@@ -27,6 +27,7 @@ defaults:
   diagram: table
   sources: footnote
   exposure: public
+  markup: markdown
   ai-disclosure: none
 
 # 독자 풀. label 은 사람이 부르는 이름이고 나머지 키는 축이다.
@@ -62,17 +63,20 @@ kinds:
   blog: {label: 블로그·기술 글, audience: [reader], skeleton: template}
   newsletter: {label: 뉴스레터, audience: [reader], skeleton: template}
   sns: {label: SNS 글, audience: [reader], skeleton: template, diagram: none, sources: link}
+  guide: {label: 가이드·README·위키, audience: [reader], skeleton: template}
+  notice: {label: 공지, audience: [stakeholder], skeleton: template}
+  script: {label: 발표 원고, audience: [listener], skeleton: template, voice: prose, diagram: none}
 
 # 문서 종류가 권하는 값. 고정은 아니라서 인자와 프로필의 독자별 값이 바꿀 수 있다.
 prefer:
   report: {skeleton: imrad, sources: footnote, length: full}
   slides: {length: brief}
   minutes: {voice: bullet, length: brief, diagram: table}
-  email: {register: polite, length: brief, emphasis: none}
+  email: {register: polite, length: brief, emphasis: none, markup: plain}
   resume: {voice: bullet, diagram: none}
-  cover-letter: {register: polite}
+  cover-letter: {register: polite, markup: plain}
   portfolio: {voice: bullet, diagram: table}
-  interview: {register: polite, length: brief}
+  interview: {register: polite, length: brief, markup: plain}
   abstract: {length: brief, terms: major}
   proposal: {length: full, sources: apa}
   design-doc: {diagram: mermaid, terms: major}
@@ -82,4 +86,21 @@ prefer:
   work-report: {skeleton: bluf, voice: bullet, length: brief}
   blog: {sources: link}
   newsletter: {sources: link}
-  sns: {length: brief, emphasis: none}
+  sns: {length: brief, emphasis: none, markup: plain}
+  guide: {sources: link, diagram: table}
+  notice: {length: brief, diagram: table}
+  script: {emphasis: none, markup: plain}
+
+# 문서 종류의 틀이 꼭 쓰라고 한 절. suit.py check 가 본문에 이 낱말이 있는지 잰다.
+# 낱말은 kinds/<종류>.md 의 틀에 그대로 나와야 하고, 틀이 이름을 정하지 않은 절은 넣지 않는다.
+must:
+  report: [요구 항목]
+  slides: [근거 표]
+  minutes: [담당, 기한]
+  interview: [꼬리 질문]
+  design-doc: [비목표, 대안, 위험]
+  postmortem: [타임라인, 원인, 대책]
+  spec: [범위 밖]
+  work-report: [한 일, 할 일]
+  guide: [빠른 시작]
+  notice: [적용 시점, 할 일, 문의]

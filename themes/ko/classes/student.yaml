@@ -2,7 +2,7 @@ class:
   order: 1
   label: 학생
   desc: 과제와 수행평가, 조별 활동, 발표를 하는 중고등학생과 대학생
-  kinds: [report, slides, minutes, email]
+  kinds: [report, slides, minutes, email, script]
   titles: [새내기, 모범생, 우등생, 장학생, 수석]  # 기본, 1차, 2차, 3차, 4차 전직 칭호
 
 defaults:

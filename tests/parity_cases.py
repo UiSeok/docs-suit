@@ -17,17 +17,18 @@ profiles = [
      "defaults": {"register": "haeyo", "exposure": "team"}, "audiences": {"professor": {"skeleton": "pcs"}}},
 ]
 extras = [
-    {"sets": {}, "chars": None, "fmt": "prompt", "html": False},
-    {"sets": {"register": "polite", "exposure": "submit", "visual-deck": "contrast"}, "chars": 800,
-     "fmt": "output-style", "html": True},
+    {"sets": {}, "chars": None, "fmt": "prompt", "revise": False},
+    {"sets": {"register": "polite", "exposure": "submit", "visual-deck": "contrast", "markup": "html"}, "chars": 800,
+     "fmt": "output-style", "revise": True},
 ]
 aud_ids = list(th.audiences)
 cases = []
 for i, (cls, kind) in enumerate(itertools.product([None] + list(th.classes), [None] + list(th.kinds))):
     for prof, ex in itertools.product(profiles, extras):
         auds = [] if (i + len(cases)) % 3 else [aud_ids[i % len(aud_ids)]]
-        text, _ = suit.compose(th, kind, auds or None, ex["sets"], prof, cls, ex["chars"], ex["fmt"], ex["html"])
-        cases.append({"cls": cls, "kind": kind, "auds": auds, "profile": prof, **ex, "expected": text})
+        text, _ = suit.compose(th, kind, auds or None, ex["sets"], prof, cls, ex["chars"], ex["fmt"], ex["revise"])
+        rv = suit.review(th, kind, auds or None, ex["sets"], prof, cls, ex["chars"])
+        cases.append({"cls": cls, "kind": kind, "auds": auds, "profile": prof, **ex, "expected": text, "review": rv})
 # 웹 캐릭터 만들기가 내려받게 하는 슬롯 파일. suit.py 가 읽는 꼴과 같아야 한다.
 slots = [
     {"profile": {"class": "office", "lang": "ko", "agents": ["claude", "codex"]},

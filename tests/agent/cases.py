@@ -2,7 +2,7 @@
 
 expect 가 compose 이면 에이전트가 suit.py compose 를 불러야 한다. kind 는 기대하는 문서 종류이고, 여럿을 허용하면
 목록으로, 종류 없이 조립해야 하면 빈 문자열로 쓴다. want 는 조립 결과에서 이 값이어야 하는 축이다. audience 는 실제로
-쓰인 독자에 들어 있어야 하는 키다. expect 가 skip 이면 suit.py 를 부르지 않아야 한다. profile 이 False 이면 프로필 없이
+쓰인 독자에 들어 있어야 하는 키다. revise 가 True 면 --revise 를 붙여야 하고, 아니면 붙이지 않아야 한다. expect 가 skip 이면 suit.py 를 부르지 않아야 한다. profile 이 False 이면 프로필 없이
 시작한다. folder 는 작업 폴더에 둘 .docs-suit.yaml 이다. 어느 케이스든 사용자의 답 없이 bootstrap 으로 프로필을 저장하면
 틀린다.
 """
@@ -52,6 +52,12 @@ CASES = [
      "ask": "이번 달 구독자에게 보낼 뉴스레터 써 줘. 동네 버스 노선이 바뀐 소식이랑 정류장 대기 시간 조사 결과를 담을 거야."},
     {"id": "sns", "kind": "sns", "want": {"register": "haeyo", "length": "brief"},
      "ask": "주말에 다녀온 카페 인스타 후기 써 줘. 해요체로 짧게."},
+    {"id": "guide", "kind": "guide",
+     "ask": "우리 팀 저장소 README 써 줘. 로컬에서 서버 띄우는 법이랑 테스트 돌리는 법을 넣어야 해. 서버는 make run, 테스트는 make test 야."},
+    {"id": "notice", "kind": "notice", "audience": "stakeholder",
+     "ask": "다른 팀에 다음 주 API 변경을 알리는 공지 써 줘. 응답 필드 하나의 이름이 바뀌어."},
+    {"id": "script", "kind": "script",
+     "ask": "다음 주 동아리 발표 원고 써 줘. 정류장 대기 시간 조사 결과를 5분 동안 말로 발표할 거고, 슬라이드는 이미 만들어 뒀어."},
 
     # 사용자가 축을 말한 요청
     {"id": "set-register", "kind": "report", "want": {"register": "polite"},
@@ -60,6 +66,8 @@ CASES = [
      "ask": "어제 캐시 서버가 30분 멈춘 건 회고 문서로 써 줘. 개조식 말고 줄글로, 짧게."},
     {"id": "set-exposure", "kind": "blog", "want": {"exposure": "team"},
      "ask": "사내 위키에만 올릴 기술 글 써 줘. 밖에는 공개하지 않아. 주제는 로그 수집 파이프라인을 정리한 이야기야."},
+    {"id": "set-markup", "kind": "notice", "want": {"markup": "plain"},
+     "ask": "동아리 단톡방에 올릴 공지 써 줘. 다음 주 모임 장소가 정류장 앞 카페로 바뀌어. 단톡방이라 마크다운 기호는 그대로 보여."},
     {"id": "audience-stakeholder", "kind": "report", "audience": "stakeholder",
      "ask": "이번 분기 실험 결과 보고서를 다른 팀 사람들이 읽을 수 있게 써 줘. 추천 알고리즘을 바꿨더니 클릭률이 3% 올랐어."},
 
@@ -67,9 +75,14 @@ CASES = [
     {"id": "folder-defaults", "kind": "report", "folder": {"defaults": {"register": "haeyo"}}, "want": {"register": "haeyo"},
      "ask": "교수님께 낼 정류장 대기 시간 조사 보고서 써 줘. 평일 아침 사흘 동안 재 봤어."},
 
+    # 다듬기. 사용자가 원문을 주면 --revise 를 붙인다
+    {"id": "revise-email", "kind": "email", "audience": "professor", "revise": True,
+     "ask": "교수님께 보낼 메일인데 너무 장황해서 다듬어 줘.\n\n안녕하세요 교수님, 저는 공간정보공학과 3학년 김민수입니다. "
+            "다름이 아니오라 이번 학기 기말 보고서와 관련하여 여쭤볼 것이 있어서 이렇게 메일을 드리게 되었습니다. "
+            "제가 정류장 대기 시간을 주제로 조사를 하고 있는데, 데이터를 모으는 데 시간이 생각보다 오래 걸려서요, "
+            "혹시 마감을 일주일 정도 연장해 주실 수 있을지 여쭙고 싶습니다. 바쁘신 와중에 죄송합니다. 감사합니다."},
+
     # 경계
-    {"id": "ambiguous-notice", "kind": ["email", "minutes"], "audience": "stakeholder",
-     "ask": "다른 팀에 다음 주 API 변경을 알리는 공지 써 줘. 응답 필드 하나의 이름이 바뀌어."},
     {"id": "no-kind", "kind": "",
      "ask": "친구 결혼식 축사 써 줘. 대학 동아리에서 만난 친구야."},
     {"id": "skip-code", "expect": "skip",

@@ -6,7 +6,7 @@
   const KEY = "docs-suit.personal";
   const $ = (id) => document.getElementById(id);
   // 화면에 보이는 축 순서. 글에 바로 드러나는 축을 앞에 둔다.
-  const SHOW = ["voice", "register", "skeleton", "terms", "length", "sources", "exposure", "ai-disclosure",
+  const SHOW = ["voice", "register", "skeleton", "terms", "length", "markup", "sources", "exposure", "ai-disclosure",
     "diagram", "emphasis", "visual-deck", "visual-doc"];
   const state = { cls: null, kind: null, aud: null, sets: {} };
   let T = null, C = null;
@@ -140,7 +140,7 @@
       let note = "";
       if (locked) note = "이 축은 문서 종류가 정합니다.";
       else if (axis === "visual-deck" && state.kind !== "slides") note = "발표 PPT 를 고를 때만 지침에 실립니다.";
-      else if (axis === "visual-doc" && !$("html").checked) note = "오른쪽 '문서 디자인 규칙 포함' 을 켜면 지침에 실립니다.";
+      else if (axis === "visual-doc" && vals.markup[0] !== "html") note = "출력 형식을 HTML 로 고르면 지침에 실립니다.";
       else if (axis === "exposure") note = "개인정보를 지키는 축이라 더 조심하는 쪽으로만 바꿀 수 있습니다. 팀 안에서만 볼 글이면 독자를 바꿉니다.";
       if (note) {
         const n = document.createElement("p");
@@ -183,20 +183,25 @@
     $("warns").textContent = r.warns.join(" ");
     const chars = parseInt($("chars").value, 10) || null;
     const fmt = document.querySelector("input[name=fmt]:checked").value;
-    $("out").value = C.compose(state.kind, r.auds, r.vals, chars, fmt, $("html").checked, r.cls, null);
+    $("out").value = C.compose(state.kind, r.auds, r.vals, chars, fmt, $("revise").checked, r.cls, null);
+    state.review = C.review(state.kind, r.auds, r.vals, chars);
+  }
+
+  async function copy(text, done) {
+    try {
+      await navigator.clipboard.writeText(text);
+      $("status").textContent = done;
+    } catch (e) {
+      $("out").select();
+      $("status").textContent = "복사하지 못했습니다. 지침 칸을 선택해 두었으니 Ctrl+C 로 복사하세요.";
+    }
   }
 
   function wire() {
     document.querySelectorAll("aside input").forEach((el) => el.addEventListener("input", render));
-    $("copy").addEventListener("click", async () => {
-      try {
-        await navigator.clipboard.writeText($("out").value);
-        $("status").textContent = "복사했습니다.";
-      } catch (e) {
-        $("out").select();
-        $("status").textContent = "선택해 두었습니다. Ctrl+C 로 복사하세요.";
-      }
-    });
+    $("copy").addEventListener("click", () => copy($("out").value, "복사했습니다."));
+    $("copyReview").addEventListener("click", () => copy(state.review,
+      "검토 지침을 복사했습니다. 새 대화에 붙여 넣고 원문과 다 쓴 글을 빈자리에 채웁니다."));
     $("download").addEventListener("click", () => {
       const blob = new Blob([$("out").value], { type: "text/markdown" });
       const a = document.createElement("a");

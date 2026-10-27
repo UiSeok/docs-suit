@@ -68,6 +68,12 @@ exposure:
   submit: 정해진 상대
   team: 팀 내부
 
+markup:
+  label: 출력 형식
+  markdown: 마크다운
+  plain: 서식 없음
+  html: HTML
+
 ai-disclosure:
   label: AI 사용 고지
   footnote: 각주로 밝힘

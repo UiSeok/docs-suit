@@ -165,6 +165,7 @@ def compose_args(argv):
     p.add_argument("--set", action="append")
     p.add_argument("--chars", type=int)
     p.add_argument("--class", dest="cls")
+    p.add_argument("--revise", action="store_true")
     a, _ = p.parse_known_args(argv[1:])
     return a
 
@@ -204,6 +205,8 @@ def grade(case, calls):
             why.append(f"{axis} 가 {vals[axis][0]} 이다")
     if case.get("chars") and a.chars != case["chars"]:
         why.append(f"글자수가 {a.chars} 이다")
+    if bool(case.get("revise")) != a.revise:
+        why.append("다듬기인데 --revise 를 붙이지 않았다" if case.get("revise") else "새로 쓰는 글에 --revise 를 붙였다")
     return not why, shown, ", ".join(why), vals, a.chars
 
 
@@ -242,7 +245,7 @@ def doc_summary(checks):
         return "본문 없음"
     if not checks:
         return "잴 거리 없음"
-    bad = [f"{th.axes[axis]['label']} ({got})" for axis, ok, got in checks if not ok]
+    bad = [f"{suit.check_label(th, axis)} ({got})" for axis, ok, got in checks if not ok]
     return "맞음" if not bad else "틀림: " + ", ".join(bad)
 
 
@@ -308,7 +311,7 @@ def load_case(agent, case, base):
     replies = [AGENTS[agent]["meta"](t)["reply"] for t in transcripts] or [meta["reply"]]
     doc = max((doc_text(r, tmp / "proj") for r in replies), key=lambda d: len(suit.body_lines(d))) if vals else ""
     kind = compose_args(next(c for c in reversed(read_calls(tmp)) if c[:1] == ["compose"] and "--help" not in c)).kind if vals else None
-    meta["doc"] = None if not vals else suit.check_doc(doc, vals, chars, kind) if doc else None
+    meta["doc"] = None if not vals else suit.check_doc(doc, vals, chars, kind, th) if doc else None
     # 본문을 다 쓴 뒤 check 로 성장 기록을 남겼는지는 기록 파일로 본다. 빈 본문으로 부른 check 는 기록을 남기지 않는다.
     # 프로필 없이 시작한 케이스는 슬롯이 없어 기록이 남지 않으므로 호출만 본다. 재촉한 턴의 호출은 calls-2.jsonl 에 있다.
     calls = read_calls(tmp) + read_calls(tmp, "calls-2.jsonl")
@@ -403,6 +406,8 @@ def expected(case):
     parts += [f"{k}={v}" for k, v in case.get("want", {}).items()]
     if case.get("chars"):
         parts.append(f"{case['chars']}자")
+    if case.get("revise"):
+        parts.append("다듬기")
     return ", ".join(parts)
 
 

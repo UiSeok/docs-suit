@@ -38,11 +38,12 @@
       </div>
       <div class="row">
         <label>글자수 <input id="chars" type="number" min="100" step="100" placeholder="공백 포함"></label>
-        <label><input type="checkbox" id="html"> 문서 디자인 규칙 포함</label>
+        <label><input type="checkbox" id="revise"> 원문 다듬기</label>
       </div>
       <textarea id="out" readonly spellcheck="false"></textarea>
       <div class="actions">
         <button type="button" class="btn primary" id="copy">복사</button>
+        <button type="button" class="btn" id="copyReview">검토 지침 복사</button>
         <button type="button" class="btn" id="download">.md 로 저장</button>
         <button type="button" class="btn" id="save">고른 값을 내 기본값으로</button>
         <button type="button" class="btn" id="reset">초기화</button>
