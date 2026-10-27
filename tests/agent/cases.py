@@ -3,7 +3,8 @@
 expect 가 compose 이면 에이전트가 suit.py compose 를 불러야 한다. kind 는 기대하는 문서 종류이고, 여럿을 허용하면
 목록으로, 종류 없이 조립해야 하면 빈 문자열로 쓴다. want 는 조립 결과에서 이 값이어야 하는 축이다. audience 는 실제로
 쓰인 독자에 들어 있어야 하는 키다. expect 가 skip 이면 suit.py 를 부르지 않아야 한다. profile 이 False 이면 프로필 없이
-시작한다. 어느 케이스든 사용자의 답 없이 bootstrap 으로 프로필을 저장하면 틀린다.
+시작한다. folder 는 작업 폴더에 둘 .docs-suit.yaml 이다. 어느 케이스든 사용자의 답 없이 bootstrap 으로 프로필을 저장하면
+틀린다.
 """
 
 # 시험 프로필. bootstrap 이 만드는 것과 같은 꼴이다.
@@ -62,6 +63,10 @@ CASES = [
     {"id": "audience-stakeholder", "kind": "report", "audience": "stakeholder",
      "ask": "이번 분기 실험 결과 보고서를 다른 팀 사람들이 읽을 수 있게 써 줘. 추천 알고리즘을 바꿨더니 클릭률이 3% 올랐어."},
 
+    # 폴더 파일이 프로필 값을 덮는다
+    {"id": "folder-defaults", "kind": "report", "folder": {"defaults": {"register": "haeyo"}}, "want": {"register": "haeyo"},
+     "ask": "교수님께 낼 정류장 대기 시간 조사 보고서 써 줘. 평일 아침 사흘 동안 재 봤어."},
+
     # 경계
     {"id": "ambiguous-notice", "kind": ["email", "minutes"], "audience": "stakeholder",
      "ask": "다른 팀에 다음 주 API 변경을 알리는 공지 써 줘. 응답 필드 하나의 이름이 바뀌어."},
@@ -73,4 +78,21 @@ CASES = [
      "ask": "정류장 대기 시간을 영어로 뭐라고 해?"},
     {"id": "no-profile", "kind": "work-report", "profile": False,
      "ask": "팀장님께 올릴 주간 업무 보고 써 줘. 이번 주에는 로그인 오류를 고쳤어."},
+]
+
+# 여러 턴 흐름. 턴마다 같은 세션을 이어 가고, 끝난 뒤 프로필과 폴더 파일에 남은 값을 본다.
+# expect 의 profile 과 folder 는 점으로 이은 경로의 값이고, absent 는 프로필에 없어야 하는 경로다.
+FLOWS = [
+    {"id": "flow-bootstrap", "profile": False,
+     "turns": ["docs-suit 세팅해 줘.",
+               "직장인이야. 호칭은 지수 님, 소속은 플랫폼팀 백엔드 3년 차, 목표는 보고서를 빨리 끝내는 거야. "
+               "자주 쓰는 문서는 업무 보고랑 메일이고, 나머지 질문은 건너뛸게."],
+     "expect": {"profile": {"profile.class": "office", "persona.call": "지수 님", "persona.docs": ["work-report", "email"]}}},
+    {"id": "flow-restyle",
+     "turns": ["팀장님께 올릴 주간 업무 보고 써 줘. 이번 주에는 로그인 오류를 고쳤고, 다음 주에는 알림 재시도를 붙여.",
+               "말투가 너무 딱딱해. 해요체로 바꿔 줘. 앞으로 팀장님께 쓰는 글은 계속 해요체로 해 줘."],
+     "expect": {"profile": {"audiences.manager.register": "haeyo"}}},
+    {"id": "flow-here",
+     "turns": ["이 폴더에서는 앞으로 문서를 평어체로 써 줘. 다른 폴더는 지금처럼 두고."],
+     "expect": {"folder": {"defaults.register": "plain"}, "absent": ["defaults.register"]}},
 ]

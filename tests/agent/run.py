@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
-"""동작 테스트. 실제 에이전트에 요청을 넣고, 에이전트가 suit.py 를 어떤 인자로 불렀는지 모아 채점한다.
+"""동작 테스트. 실제 에이전트에 요청을 넣고, 에이전트가 suit.py 를 어떤 인자로 불렀는지와 쓴 본문을 채점한다.
 
 에이전트마다 로그인이 필요하고 돌릴 때마다 사용료가 들어서 CI 에는 넣지 않는다.
-  python3 tests/agent/run.py --agent claude                 # 케이스 전체
+  python3 tests/agent/run.py --agent claude                 # 케이스와 여러 턴 흐름 전체
   python3 tests/agent/run.py --agent antigravity --only sns,pr --model gemini-3.8-flash-high
   python3 tests/agent/run.py --agent claude --record        # tests/agent/results/claude.md 에 남긴다
+  python3 tests/agent/run.py --agent codex --global --only sns   # 홈 폴더에 깐 스킬이 불리는지
 홈 폴더의 스킬과 프로필은 건드리지 않는다. 케이스마다 임시 폴더에 프로젝트 단위 스킬과 시험 프로필을 두고,
 DOCS_SUIT_LOG 로 suit.py 호출 인자를 모은다. Claude Code 는 사용자 설정과 개인 스킬을 끄고 돌린다.
 """
@@ -14,6 +15,8 @@ import hashlib
 import importlib.util
 import json
 import os
+import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -29,23 +32,25 @@ spec = importlib.util.spec_from_file_location("suit", SUIT)
 suit = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(suit)
 sys.path.insert(0, str(HERE))
-from cases import CASES, PROFILE  # noqa: E402
+from cases import CASES, FLOWS, PROFILE  # noqa: E402
 
 th = suit.Themes(ROOT / "themes" / suit.DEFAULT_LANG)
 RUN = f"python3 {SUIT}"
 
 
-def claude_cmd(ask, tmp, model):
+# ---------------------------------------------------------------- 에이전트
+def claude_cmd(ask, tmp, model, session=None, keep=False):
     # 사용자 설정과 개인 스킬, 전역 CLAUDE.md, MCP 를 끄고 처음 설치한 사람과 같은 조건으로 돌린다.
     return ["claude", "-p", ask, "--output-format", "stream-json", "--verbose",
             "--setting-sources", "project,local", "--strict-mcp-config",
             "--settings", '{"disableAllHooks": true}',
             "--allowedTools", f"Bash({RUN}:*)", "Bash(date:*)", "Read", "Skill",
-            "--disallowedTools", "Write", "Edit"] + (["--model", model] if model else [])
+            "--disallowedTools", "Write", "Edit"] + (["--model", model] if model else []) + \
+        (["--resume", session] if session else [])
 
 
 def claude_meta(out):
-    meta = {"skills": [], "denied": 0, "cost": 0.0, "model": ""}
+    meta = {"skills": [], "denied": 0, "cost": 0.0, "model": "", "reply": "", "session": ""}
     for line in out.splitlines():
         try:
             o = json.loads(line)
@@ -53,6 +58,7 @@ def claude_meta(out):
             continue
         if o.get("type") == "system" and o.get("subtype") == "init":
             meta["model"] = o.get("model", "")
+            meta["session"] = o.get("session_id", "")
         elif o.get("type") == "assistant":
             for b in o["message"].get("content", []):
                 if b.get("type") == "tool_use" and b.get("name") == "Skill":
@@ -65,15 +71,15 @@ def claude_meta(out):
     return meta
 
 
-def antigravity_cmd(ask, tmp, model):
+def antigravity_cmd(ask, tmp, model, session=None, keep=False):
     # 한 번 실행 모드는 확인 창을 띄우지 못해 명령을 거절한다. 작업 폴더 단위 설정이 없으므로
     # ~/.gemini/antigravity-cli/settings.json 의 permissions.allow 에 command(python3 <suit.py 절대 경로>) 가 있어야 한다.
     return ["agy", "-p", ask, "--output-format", "stream-json", "--print-timeout", "900s"] + \
-        (["--model", model] if model else [])
+        (["--model", model] if model else []) + (["--conversation", session] if session else [])
 
 
 def antigravity_meta(out):
-    meta = {"skills": [], "denied": 0, "cost": 0.0, "model": "", "reply": ""}
+    meta = {"skills": [], "denied": 0, "cost": 0.0, "model": "", "reply": "", "session": ""}
     for line in out.splitlines():
         try:
             o = json.loads(line)
@@ -89,23 +95,30 @@ def antigravity_meta(out):
             meta["denied"] = len(r.get("denied_actions") or [])
             meta["sec"] = round(r.get("duration_seconds", 0))
             meta["reply"] = r.get("response", "")
+            meta["session"] = r.get("conversation_id", "")
     return meta
 
 
-def codex_cmd(ask, tmp, model):
+def codex_cmd(ask, tmp, model, session=None, keep=False):
     # exec 모드는 확인을 묻지 않고 샌드박스 안에서 돌린다. suit.py 가 호출 기록을 쓰도록 임시 폴더를 쓰기 자리에 더하고,
-    # 사용자 config.toml 은 읽지 않는다.
-    return ["codex", "exec", ask, "--json", "--sandbox", "workspace-write", "--add-dir", str(tmp),
-            "--skip-git-repo-check", "--ignore-user-config", "--ephemeral"] + (["--model", model] if model else [])
+    # 사용자 config.toml 은 읽지 않는다. 여러 턴 흐름은 세션을 이어 가야 해서 그때만 세션을 남긴다.
+    common = ["--json", "--skip-git-repo-check", "--ignore-user-config"] + (["--model", model] if model else [])
+    if session:
+        return ["codex", "exec", "resume", session, ask, "-c", 'sandbox_mode="workspace-write"',
+                "-c", f'sandbox_workspace_write.writable_roots=["{tmp}"]'] + common
+    return ["codex", "exec", ask, "--sandbox", "workspace-write", "--add-dir", str(tmp)] + common + \
+        ([] if keep else ["--ephemeral"])
 
 
 def codex_meta(out):
-    meta = {"skills": [], "denied": 0, "cost": 0.0, "model": "", "reply": ""}
+    meta = {"skills": [], "denied": 0, "cost": 0.0, "model": "", "reply": "", "session": ""}
     for line in out.splitlines():
         try:
             o = json.loads(line)
         except ValueError:
             continue
+        if o.get("type") == "thread.started":
+            meta["session"] = o.get("thread_id", "")
         item = o.get("item") or {}
         if o.get("type") != "item.completed":
             continue
@@ -139,7 +152,12 @@ AGENTS = {
               "version": ["codex", "--version"], "plan": codex_plan},
 }
 
+# 에이전트 쪽 사정으로 답 없이 끝난 건은 틀림이 아니라 재지 못한 것으로 센다. 앞의 까닭이 먼저 잡힌다.
+UNMEASURED = (("사용 한도", ("quota", "RESOURCE_EXHAUSTED", "usage limit", "rate limit")),
+              ("연결 실패", ('"type":"turn.failed"', "AGY_ERROR")))
 
+
+# ---------------------------------------------------------------- 고르기 채점
 def compose_args(argv):
     p = argparse.ArgumentParser(add_help=False)
     p.add_argument("--kind")
@@ -155,28 +173,30 @@ def describe(argv):
     return " ".join(x for x in argv if not x.startswith("/"))
 
 
+def case_profile(case):
+    return suit.merge_folder(PROFILE if case.get("profile", True) else {}, case.get("folder", {}))
+
+
 def grade(case, calls):
-    """(맞았나, 에이전트가 부른 것, 어긋난 까닭) 을 돌려준다."""
+    """(맞았나, 에이전트가 부른 것, 어긋난 까닭, 조립된 값, 글자수) 를 돌려준다."""
     expect = case.get("expect", "compose")
     composes = [c for c in calls if c[:1] == ["compose"] and not {"--help", "-h"} & set(c)]
     shown = "; ".join(describe(c) for c in composes) or ", ".join(sorted({c[0] for c in calls if c})) or "부르지 않음"
     if expect == "skip":
-        return not calls, shown, "" if not calls else "문서 요청이 아닌데 suit.py 를 불렀다"
+        return not calls, shown, "" if not calls else "문서 요청이 아닌데 suit.py 를 불렀다", None, None
     if any(c[:1] == ["bootstrap"] and "--yes" in c for c in calls):
-        return False, shown, "사용자의 답 없이 프로필을 저장했다"
+        return False, shown, "사용자의 답 없이 프로필을 저장했다", None, None
     if not composes:
-        return False, shown, "compose 를 부르지 않았다"
+        return False, shown, "compose 를 부르지 않았다", None, None
     a = compose_args(composes[-1])
     why = []
     kinds = case["kind"] if isinstance(case["kind"], list) else [case["kind"]]
     if (a.kind or "") not in kinds:
         why.append(f"종류가 {a.kind or '없음'} 이다")
     try:
-        sets = suit._sets(a.set)
-        prof = PROFILE if case.get("profile", True) else {}
-        vals, auds, _ = suit.resolve(th, a.kind or None, suit._auds(a.audience), sets, prof, a.cls)
+        vals, auds, _ = suit.resolve(th, a.kind or None, suit._auds(a.audience), suit._sets(a.set), case_profile(case), a.cls)
     except suit.Missing as e:
-        return False, shown, f"엔진이 거절했다: {e}"
+        return False, shown, f"엔진이 거절했다: {e}", None, None
     if case.get("audience") and case["audience"] not in auds:
         why.append(f"독자가 {','.join(auds) or '없음'} 이다")
     for axis, v in case.get("want", {}).items():
@@ -184,57 +204,232 @@ def grade(case, calls):
             why.append(f"{axis} 가 {vals[axis][0]} 이다")
     if case.get("chars") and a.chars != case["chars"]:
         why.append(f"글자수가 {a.chars} 이다")
-    return not why, shown, ", ".join(why)
+    return not why, shown, ", ".join(why), vals, a.chars
 
 
-# 에이전트 쪽 사정으로 답 없이 끝난 건은 틀림이 아니라 재지 못한 것으로 센다. 앞의 까닭이 먼저 잡힌다.
-UNMEASURED = (("사용 한도", ("quota", "RESOURCE_EXHAUSTED", "usage limit", "rate limit")),
-              ("연결 실패", ('"type":"turn.failed"', "AGY_ERROR")))
+# ---------------------------------------------------------------- 본문 검사
+# 조립된 값대로 썼는지 어림 기준으로 잰다. 기준은 대략값이라 틀림이 나오면 본문을 직접 읽어 확인한다.
+LENGTH_LIMIT = {"brief": 1500, "page": 3500}
+# 자료가 모자라 질문만 하고 멈추면 실제 사용자처럼 한 번 더 재촉해 본문을 받는다. 고르기 채점은 첫 턴 기록만 쓴다.
+FOLLOWUP = "더 줄 정보는 없어. 모르는 곳은 [확인 필요]로 비워 두고 지금 써 줘."
+ENDING = (("polite", ("니다", "니까", "십시오")), ("haeyo", ("요",)), ("plain", ("다", "까", "라")))
+
+
+def doc_text(reply, proj):
+    """에이전트가 쓴 본문. 작업 폴더에 만든 .md 가 있으면 그것을, 없으면 답의 코드 블록이나 --- 사이, 메일 꼴,
+    답 전체 순으로 쓴다. 질문만 하고 멈췄으면 빈 문자열을 돌려준다."""
+    made = [f for f in proj.rglob("*.md") if not {".agents", ".claude"} & set(f.parts)]
+    if made:
+        return max(made, key=lambda f: f.stat().st_size).read_text(encoding="utf-8")
+    blocks = [b for b in re.findall(r"```[a-z]*\n(.*?)```", reply, re.S) if len(b) > 200]
+    if blocks:
+        return max(blocks, key=len)
+    # --- 로 나뉜 답은 본문과 덧붙인 안내가 섞여 있다. [확인 필요] 표시가 가장 많은 조각을 본문으로 본다.
+    mail = re.search(r"^제목\s*[:：].*?(?:올림|드림|배상)\s*$", reply, re.M | re.S)
+    if mail:
+        return mail.group(0)
+    # 질문이 여럿이고 본문의 [확인 필요] 표시가 없으면 질문만 하고 멈춘 것이다. 백틱 안의 표시는 표시 방식을 설명한 말이다.
+    asks = len(re.findall(r"\?|주세요|여쭤|여쭙|주시면", reply))
+    if asks >= 2 and not re.search(r"(?<!`)\[확인 필요", reply):
+        return ""
+    # --- 로 나뉜 답은 본문과 덧붙인 안내가 섞여 있다. [확인 필요] 표시가 가장 많은 조각을 본문으로 본다.
+    parts = re.split(r"^---\s*$", reply, flags=re.M)
+    if len(parts) >= 2:
+        return max(parts, key=lambda x: (x.count("[확인 필요"), len(x)))
+    return reply
+
+
+def body_lines(doc):
+    return [ln.strip() for ln in doc.splitlines()
+            if ln.strip() and not ln.lstrip().startswith(("#", "|", "```", "---", ">"))]
+
+
+def endings(lines):
+    count = {k: 0 for k, _ in ENDING}
+    for ln in lines:
+        for sent in re.split(r"(?<=[.!?])\s+", re.sub(r"^([-*+]|\d+[.)])\s+", "", ln)):
+            if sent.rstrip(" *`\"'”’)").endswith("?"):
+                continue  # 질문 문장은 본문에 실린 예상 질문일 수 있어 어법을 세지 않는다
+            tail = re.sub(r"(\[[^\]]*\]|\([^)]*\)|[\s.!?\"'”’*`:])+$", "", sent)
+            if tail.endswith("세요"):
+                continue  # "알려 주세요", "안녕하세요" 는 합쇼체 글에도 들어가서 어법을 가르지 못한다
+            for name, ends in ENDING:
+                if tail.endswith(ends):
+                    count[name] += 1
+                    break
+    return count
+
+
+def check_doc(doc, vals, chars, kind=None):
+    """[(축, 맞았나, 잰 값)]. 잴 거리가 모자라면 그 축은 빼고 낸다."""
+    out = []
+    lines = body_lines(doc)
+    count = endings(lines)
+    total = sum(count.values())
+    want = vals["register"][0]
+    if total >= 3:
+        out.append(("어법", count[want] >= 0.6 * total, " · ".join(f"{k} {n}" for k, n in count.items() if n)))
+    # 틀이 정한 문서는 골격 규칙이 문체 규칙보다 앞서서 문체를 재지 않는다.
+    if len(lines) >= 4 and vals["skeleton"][0] != suit.TEMPLATE:
+        ratio = sum(1 for ln in lines if re.match(r"([-*+]|\d+[.)])\s", ln)) / len(lines)
+        ok = ratio >= 0.3 if vals["voice"][0] == "bullet" else ratio <= 0.5
+        out.append(("문체", ok, f"목록 줄 {ratio:.0%}"))
+    size = len("\n".join(lines))
+    limit = int(chars * 1.1) if chars else None if kind == "slides" else LENGTH_LIMIT.get(vals["length"][0])
+    if limit:
+        out.append(("분량", size <= limit, f"{size}자, 한도 {limit}자"))
+    if vals["emphasis"][0] == "none":
+        out.append(("강조", "**" not in doc, "굵은 글씨 있음" if "**" in doc else "없음"))
+    return out
+
+
+def doc_summary(checks):
+    if checks is None:
+        return "본문 없음"
+    if not checks:
+        return "잴 거리 없음"
+    bad = [f"{name} ({got})" for name, ok, got in checks if not ok]
+    return "맞음" if not bad else "틀림: " + ", ".join(bad)
+
+
+# ---------------------------------------------------------------- 실행
+def invoke(agent, ask, tmp, proj, env, model, session=None, keep=False):
+    try:
+        p = subprocess.run(AGENTS[agent]["cmd"](ask, tmp, model, session, keep), cwd=proj, env=env,
+                           stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=900)
+        return p.stdout, p.stderr
+    except subprocess.TimeoutExpired as e:
+        out = e.stdout or ""
+        return (out.decode() if isinstance(out, bytes) else out), "시간 초과"
+
+
+def prepare(agent, item, base, glob):
+    """케이스 하나의 임시 폴더. 스킬, 시험 프로필, 폴더 파일을 두고 suit.py 에 넘길 환경 변수를 돌려준다."""
+    tmp = base / item["id"]
+    proj = tmp / "proj"
+    proj.mkdir(parents=True)
+    if not glob:
+        skill = proj / AGENTS[agent]["skill"]
+        skill.parent.mkdir(parents=True)
+        skill.write_text(suit.skill_text(th), encoding="utf-8")
+    prof = tmp / "profile.yaml"
+    if item.get("profile", True):
+        prof.write_text(suit.dump_yaml(PROFILE), encoding="utf-8")
+    if item.get("folder"):
+        suit.write_folder(item["folder"], proj)
+    env = dict(os.environ, DOCS_SUIT_PROFILE=str(prof), DOCS_SUIT_LOG=str(tmp / "calls.jsonl"))
+    return tmp, proj, env
+
+
+def read_calls(tmp):
+    log = tmp / "calls.jsonl"
+    return [json.loads(x)["argv"] for x in log.read_text(encoding="utf-8").splitlines()] if log.exists() else []
+
+
+def finish_meta(agent, tmp, transcripts, ok):
+    metas = [AGENTS[agent]["meta"](t) for t in transcripts]
+    meta = dict(metas[-1]) if metas else AGENTS[agent]["meta"]("")
+    meta["skills"] = [s for m in metas for s in m["skills"]]
+    meta["denied"] = sum(m["denied"] for m in metas)
+    meta["cost"] = sum(m["cost"] for m in metas)
+    meta["sec"] = sum(m.get("sec", 0) for m in metas)
+    err = (tmp / "stderr.txt").read_text(encoding="utf-8") if (tmp / "stderr.txt").exists() else ""
+    seen = err + "".join(transcripts).replace('": "', '":"')
+    meta["unmeasured"] = "" if ok else next((why for why, signs in UNMEASURED if any(k in seen for k in signs)), "")
+    skill = tmp / "proj" / AGENTS[agent]["skill"]
+    meta["skill"] = hashlib.sha1(skill.read_bytes()).hexdigest()[:8] if skill.exists() else "전역"
+    return meta
 
 
 def load_case(agent, case, base):
     """지난 실행의 기록으로 다시 채점한다. 기대값만 고쳤을 때 에이전트를 다시 부르지 않는다."""
     tmp = base / case["id"]
-    log = tmp / "calls.jsonl"
-    calls = [json.loads(x)["argv"] for x in log.read_text(encoding="utf-8").splitlines()] if log.exists() else []
-    ok, shown, why = grade(case, calls)
-    transcript = (tmp / "transcript.jsonl").read_text(encoding="utf-8")
-    meta = AGENTS[agent]["meta"](transcript)
-    meta.setdefault("sec", 0)
-    err = (tmp / "stderr.txt").read_text(encoding="utf-8") if (tmp / "stderr.txt").exists() else ""
-    seen = err + transcript.replace('": "', '":"')
-    meta["unmeasured"] = "" if ok else next((why for why, signs in UNMEASURED if any(k in seen for k in signs)), "")
-    skill = tmp / "proj" / AGENTS[agent]["skill"]
-    meta["skill"] = hashlib.sha1(skill.read_bytes()).hexdigest()[:8] if skill.exists() else ""
+    ok, shown, why, vals, chars = grade(case, read_calls(tmp))
+    transcripts = [(tmp / name).read_text(encoding="utf-8") for name in ("transcript.jsonl", "transcript-2.jsonl")
+                   if (tmp / name).exists()]
+    meta = finish_meta(agent, tmp, transcripts, ok)
+    meta["followup"] = len(transcripts) > 1
+    doc = doc_text(meta["reply"], tmp / "proj") if vals else ""
+    kind = compose_args(next(c for c in reversed(read_calls(tmp)) if c[:1] == ["compose"] and "--help" not in c)).kind if vals else None
+    meta["doc"] = None if not vals else check_doc(doc, vals, chars, kind) if doc else None
     return case, ok, shown, why, meta
 
 
-def run_case(agent, case, base, model):
-    tmp = base / case["id"]
-    proj = tmp / "proj"
-    skill = proj / AGENTS[agent]["skill"]
-    skill.parent.mkdir(parents=True)
-    skill.write_text(suit.skill_text(th), encoding="utf-8")
-    prof = tmp / "profile.yaml"
-    if case.get("profile", True):
-        prof.write_text(suit.dump_yaml(PROFILE), encoding="utf-8")
-    log = tmp / "calls.jsonl"
-    env = dict(os.environ, DOCS_SUIT_PROFILE=str(prof), DOCS_SUIT_LOG=str(log))
+def run_case(agent, case, base, model, glob=False):
+    tmp, proj, env = prepare(agent, case, base, glob)
     t0 = time.time()
-    try:
-        p = subprocess.run(AGENTS[agent]["cmd"](case["ask"], tmp, model), cwd=proj, env=env, stdin=subprocess.DEVNULL,
-                           capture_output=True, text=True, timeout=900)
-        out, err = p.stdout, p.stderr
-    except subprocess.TimeoutExpired as e:
-        out, err = e.stdout or "", "시간 초과"
-        out = out.decode() if isinstance(out, bytes) else out
+    out, err = invoke(agent, case["ask"], tmp, proj, env, model, keep=True)
     (tmp / "transcript.jsonl").write_text(out, encoding="utf-8")
     (tmp / "stderr.txt").write_text(err or "", encoding="utf-8")
+    first = AGENTS[agent]["meta"](out)
+    vals = grade(case, read_calls(tmp))[3]
+    if vals and first["session"] and not doc_text(first["reply"], proj):
+        env2 = dict(env, DOCS_SUIT_LOG=str(tmp / "calls-2.jsonl"))
+        out2, err2 = invoke(agent, FOLLOWUP, tmp, proj, env2, model, first["session"], keep=True)
+        (tmp / "transcript-2.jsonl").write_text(out2, encoding="utf-8")
+        (tmp / "stderr.txt").write_text((err or "") + "\n" + (err2 or ""), encoding="utf-8")
     case, ok, shown, why, meta = load_case(agent, case, base)
     meta["sec"] = round(time.time() - t0)
     return case, ok, shown, why, meta
 
 
+# ---------------------------------------------------------------- 여러 턴 흐름
+def dig(data, path):
+    for key in path.split("."):
+        if not isinstance(data, dict) or key not in data:
+            return None
+        data = data[key]
+    return data
+
+
+def same(got, want):
+    if isinstance(want, list):
+        return isinstance(got, list) and set(want) <= set(got)
+    return isinstance(got, str) and got.replace(" ", "") == str(want).replace(" ", "")
+
+
+def grade_flow(flow, tmp):
+    """흐름이 끝난 뒤 프로필과 폴더 파일이 기대대로 남았는지 본다."""
+    files = {"profile": suit.read_slot(tmp / "profile.yaml"), "folder": suit.read_folder(tmp / "proj" / suit.FOLDER_FILE)}
+    why = []
+    for where, want in flow["expect"].items():
+        if where == "absent":
+            why += [f"프로필에 {p} 가 남았다" for p in want if dig(files["profile"], p) is not None]
+            continue
+        for path, value in want.items():
+            got = dig(files[where], path)
+            if not same(got, value):
+                why.append(f"{'프로필' if where == 'profile' else '폴더 파일'}의 {path} 가 {got} 이다")
+    return not why, ", ".join(why)
+
+
+def load_flow(agent, flow, base):
+    tmp = base / flow["id"]
+    ok, why = grade_flow(flow, tmp)
+    transcripts = [(tmp / f"transcript-{i}.jsonl").read_text(encoding="utf-8")
+                   for i in range(1, len(flow["turns"]) + 1) if (tmp / f"transcript-{i}.jsonl").exists()]
+    calls = read_calls(tmp)
+    shown = "; ".join(describe(c) for c in calls if c[:1] in (["bootstrap"], ["set"], ["profile"]) and len(c) > 1) or "-"
+    return flow, ok, shown, why, finish_meta(agent, tmp, transcripts, ok)
+
+
+def run_flow(agent, flow, base, model, glob=False):
+    tmp, proj, env = prepare(agent, flow, base, glob)
+    session, errs, t0 = None, [], time.time()
+    for i, ask in enumerate(flow["turns"], 1):
+        out, err = invoke(agent, ask, tmp, proj, env, model, session, keep=True)
+        (tmp / f"transcript-{i}.jsonl").write_text(out, encoding="utf-8")
+        errs.append(err or "")
+        session = AGENTS[agent]["meta"](out)["session"] or session
+        if not session:
+            break
+    (tmp / "stderr.txt").write_text("\n".join(errs), encoding="utf-8")
+    flow, ok, shown, why, meta = load_flow(agent, flow, base)
+    meta["sec"] = round(time.time() - t0)
+    return flow, ok, shown, why, meta
+
+
+# ---------------------------------------------------------------- 보고
 def expected(case):
     expect = case.get("expect", "compose")
     if expect == "skip":
@@ -249,61 +444,103 @@ def expected(case):
     return ", ".join(parts)
 
 
-def report(agent, results, version, model=None):
-    models = sorted({m["model"] for *_, m in results if m["model"]}) or ([model] if model else [])
-    passed = sum(1 for _, ok, *_ in results if ok)
+def flow_expected(flow):
+    parts = [f"{'프로필' if w == 'profile' else '폴더 파일'} {p}={v}"
+             for w, want in flow["expect"].items() if w != "absent" for p, v in want.items()]
+    parts += [f"프로필에 {p} 없음" for p in flow["expect"].get("absent", [])]
+    return ", ".join(parts)
+
+
+def verdict(ok, why, m):
+    return "맞음" if ok else f"재지 못함: {m['unmeasured']}" if m["unmeasured"] else f"틀림: {why}"
+
+
+def report(agent, results, flows, version, model=None, glob=False):
+    every = results + flows
+    models = sorted({m["model"] for *_, m in every if m["model"]}) or ([model] if model else [])
     unmeasured = sum(1 for *_, m in results if m["unmeasured"])
-    cost = sum(m["cost"] for *_, m in results)
+    docs = [m["doc"] for *_, m in results if m.get("doc")]
+    doc_ok = sum(1 for d in docs if all(ok for _, ok, _ in d))
+    flow_unmeasured = sum(1 for *_, m in flows if m["unmeasured"])
+    cost = sum(m["cost"] for *_, m in every)
     lines = [f"# 동작 테스트: {agent}", "",
              f"- 날짜: {date.today().isoformat()}",
              f"- 에이전트: {version}",
-             f"- SKILL.md 지문: {', '.join(sorted({m['skill'] for *_, m in results if m['skill']})) or '알 수 없음'}",
+             f"- 스킬 자리: {'홈 폴더 (전역)' if glob else '임시 작업 폴더'}",
+             f"- SKILL.md 지문: {', '.join(sorted({m['skill'] for *_, m in every if m['skill']})) or '알 수 없음'}",
              f"- 모델: {', '.join(models) or '알 수 없음'}",
              *([f"- 요금제: {AGENTS[agent]['plan']() or '알 수 없음'}"] if AGENTS[agent].get("plan") else []),
-             f"- 맞음: {passed}/{len(results) - unmeasured}" + (f" (재지 못한 {unmeasured}건 제외)" if unmeasured else ""),
+             f"- 고르기: {sum(1 for _, ok, *_ in results if ok)}/{len(results) - unmeasured} 맞음"
+             + (f" (재지 못한 {unmeasured}건 제외)" if unmeasured else ""),
+             f"- 본문 검사: {doc_ok}/{len(docs)} 맞음. 어법, 문체, 분량, 강조를 어림 기준으로 잰다",
+             *([f"- 여러 턴 흐름: {sum(1 for _, ok, *_ in flows if ok)}/{len(flows) - flow_unmeasured} 맞음"
+                + (f" (재지 못한 {flow_unmeasured}건 제외)" if flow_unmeasured else "")] if flows else []),
              f"- 사용료: {cost:.2f}달러" if cost else "- 사용료: 에이전트가 알려 주지 않음",
-             *([f"- 한계: {AGENTS[agent]['note']}"] if AGENTS[agent].get("note") else []),
-             "", "| 케이스 | 기대 | 에이전트가 부른 것 | 판정 | 비고 | 초 |", "|---|---|---|---|---|---|"]
-    for case, ok, shown, why, m in results:
-        others = sorted({s for s in m["skills"] if s and s != "docs-suit"})
-        note = ", ".join(([f"같이 불린 스킬 {', '.join(others)}"] if others else [])
-                         + ([f"거절된 도구 {m['denied']}건"] if m["denied"] else []))
-        verdict = "맞음" if ok else f"재지 못함: {m['unmeasured']}" if m["unmeasured"] else f"틀림: {why}"
-        lines.append(f"| {case['id']} | {expected(case)} | `{shown}` | {verdict} | {note} | {m['sec']} |")
+             *([f"- 한계: {AGENTS[agent]['note']}"] if AGENTS[agent].get("note") else [])]
+    if results:
+        lines += ["", "## 요청 하나", "", "| 케이스 | 기대 | 에이전트가 부른 것 | 판정 | 본문 검사 | 비고 | 초 |",
+                  "|---|---|---|---|---|---|---|"]
+        for case, ok, shown, why, m in results:
+            lines.append(f"| {case['id']} | {expected(case)} | `{shown}` | {verdict(ok, why, m)} | "
+                         f"{doc_summary(m['doc']) if ok and case.get('expect') != 'skip' else '-'} | {note(m)} | {m['sec']} |")
+    if flows:
+        lines += ["", "## 여러 턴 흐름", "", "| 흐름 | 기대 | 에이전트가 부른 것 | 판정 | 비고 | 초 |", "|---|---|---|---|---|---|"]
+        for flow, ok, shown, why, m in flows:
+            lines.append(f"| {flow['id']} | {flow_expected(flow)} | `{shown}` | {verdict(ok, why, m)} | {note(m)} | {m['sec']} |")
     return "\n".join(lines) + "\n"
+
+
+def note(m):
+    others = sorted({s for s in m["skills"] if s and s != "docs-suit"})
+    return ", ".join(([f"같이 불린 스킬 {', '.join(others)}"] if others else [])
+                     + ([f"거절된 도구 {m['denied']}건"] if m["denied"] else [])
+                     + (["먼저 질문해 한 번 더 재촉함"] if m.get("followup") else []))
 
 
 def main():
     ap = argparse.ArgumentParser(description="docs-suit 동작 테스트")
     ap.add_argument("--agent", required=True, choices=list(AGENTS))
-    ap.add_argument("--only", help="케이스 id 를 쉼표로 잇는다")
+    ap.add_argument("--only", help="케이스나 흐름 id 를 쉼표로 잇는다")
     ap.add_argument("--jobs", type=int, default=4)
     ap.add_argument("--model", help="에이전트에 넘길 모델. 주지 않으면 에이전트 기본값")
+    ap.add_argument("--global", dest="glob", action="store_true",
+                    help="임시 폴더에 스킬을 두지 않고 홈 폴더에 깐 스킬이 불리는지 본다")
     ap.add_argument("--record", action="store_true", help="tests/agent/results/<agent>.md 에 남긴다")
     ap.add_argument("--regrade", metavar="기록 폴더", help="에이전트를 부르지 않고 지난 실행의 기록으로 다시 채점한다")
+    ap.add_argument("--into", metavar="기록 폴더", help="고른 케이스만 지난 실행의 기록 폴더에 다시 돌려 넣는다. 뒤이어 --regrade 로 채점한다")
     a = ap.parse_args()
     only = set(a.only.split(",")) if a.only else None
     cases = [c for c in CASES if not only or c["id"] in only]
-    if a.record and only:
-        ap.error("--record 는 케이스 전체를 돌릴 때만 쓴다")
+    flows = [f for f in FLOWS if not only or f["id"] in only]
+    if a.into and not only:
+        ap.error("--into 는 --only 로 고른 케이스만 다시 돌릴 때 쓴다")
+    if a.record and (only or a.glob or a.into):
+        ap.error("--record 는 임시 작업 폴더로 케이스 전체를 돌릴 때만 쓴다")
+    if a.glob and a.agent == "claude":
+        ap.error("Claude Code 의 홈 폴더 스킬은 사용자 설정을 켜야 읽혀서 이 실행기로는 재지 않는다")
     version = subprocess.run(AGENTS[a.agent]["version"], capture_output=True, text=True).stdout.strip()
     if a.regrade:
         base = Path(a.regrade)
-        results = [load_case(a.agent, c, base) for c in cases]
+        results = [load_case(a.agent, c, base) for c in cases if (base / c["id"]).exists()]
+        flow_results = [load_flow(a.agent, f, base) for f in flows if (base / f["id"]).exists()]
     else:
-        base = Path(tempfile.mkdtemp(prefix=f"docs-suit-agent-{a.agent}-"))
-        print(f"{a.agent} {version}, 케이스 {len(cases)}건, 기록은 {base}", file=sys.stderr)
+        base = Path(a.into) if a.into else Path(tempfile.mkdtemp(prefix=f"docs-suit-agent-{a.agent}-"))
+        for item in (cases + flows) if a.into else []:
+            shutil.rmtree(base / item["id"], ignore_errors=True)
+        print(f"{a.agent} {version}, 케이스 {len(cases)}건, 흐름 {len(flows)}건, 기록은 {base}", file=sys.stderr)
         with ThreadPoolExecutor(a.jobs) as ex:
-            results = list(ex.map(lambda c: run_case(a.agent, c, base, a.model), cases))
-    for case, ok, shown, why, m in results:
-        print(f"{'맞음' if ok else '틀림'} {case['id']}: {shown}" + (f" ({why})" if why else ""), file=sys.stderr)
-    text = report(a.agent, results, version, a.model)
+            flow_jobs = [ex.submit(run_flow, a.agent, f, base, a.model, a.glob) for f in flows]
+            results = list(ex.map(lambda c: run_case(a.agent, c, base, a.model, a.glob), cases))
+            flow_results = [j.result() for j in flow_jobs]
+    for item, ok, shown, why, m in results + flow_results:
+        print(f"{'맞음' if ok else '틀림'} {item['id']}: {shown}" + (f" ({why})" if why else ""), file=sys.stderr)
+    text = report(a.agent, results, flow_results, version, a.model, a.glob)
     print(text)
     if a.record:
         out = HERE / "results" / f"{a.agent}.md"
         out.parent.mkdir(exist_ok=True)
         out.write_text(text, encoding="utf-8")
-    return 0 if all(ok or m["unmeasured"] for _, ok, *_, m in results) else 1
+    return 0 if all(ok or m["unmeasured"] for _, ok, *_, m in results + flow_results) else 1
 
 
 if __name__ == "__main__":

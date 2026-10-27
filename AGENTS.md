@@ -29,10 +29,19 @@ CI 가 같은 검사를 돌린다. `docs/themes.json` 이 테마와 다르면 se
 selftest 와 parity 는 문서 종류와 독자를 넘겨받은 뒤의 조립만 잰다. 요청 문장을 보고 종류와 독자를 고르는 일은 SKILL.md 를 읽은 에이전트가 하므로, 실제 에이전트에 요청을 넣어 확인한다.
 
 ```sh
-python3 tests/agent/run.py --agent claude             # 케이스 전체
+python3 tests/agent/run.py --agent claude             # 케이스와 여러 턴 흐름 전체
 python3 tests/agent/run.py --agent antigravity --only sns  # 몇 건만
 python3 tests/agent/run.py --agent claude --record    # 결과를 tests/agent/results/ 에 남긴다
+python3 tests/agent/run.py --agent codex --global --only sns  # 홈 폴더에 깐 스킬이 불리는지
+python3 tests/agent/run.py --agent claude --regrade <기록 폴더>  # 에이전트를 부르지 않고 다시 채점
 ```
+
+채점은 세 가지를 본다.
+- 고르기: 에이전트가 넘긴 compose 인자로 조립한 값이 기대와 같은지 본다.
+- 본문 검사: 쓴 본문이 어법, 문체, 분량, 강조 규칙을 지켰는지 어림 기준으로 잰다. 틀이 정한 문서는 골격이 문체보다 앞서서 문체를 재지 않는다. 틀림이 나오면 본문을 직접 읽어 확인한다.
+- 여러 턴 흐름: 세션을 이어 가며 대화로 bootstrap 하고, 말투를 바꿔 저장하고, 이 폴더에서만 저장한 뒤 프로필과 폴더 파일에 남은 값을 본다.
+
+자료가 모자라 에이전트가 질문만 하고 멈추면, 실제 사용자처럼 모르는 곳은 비워 두고 지금 쓰라고 한 번 더 재촉해 본문을 받는다. 고르기 채점은 첫 턴 기록만 쓴다.
 
 SKILL.md 문구나 문서 종류, 독자를 바꿨으면 돌리고 `--record` 로 결과를 갱신한다. 새 문서 종류를 더하면 `cases.py` 에도 케이스를 하나 더한다. 에이전트 로그인이 필요하고 돌릴 때마다 사용료가 들어서 CI 에는 넣지 않는다.
 
