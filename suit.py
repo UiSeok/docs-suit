@@ -739,7 +739,8 @@ def check_doc(doc, vals, chars, kind=None, th=None):
     limit = int(chars * 1.1) if chars else None if kind == "slides" else LENGTH_LIMIT.get(pick("length"))
     if limit:
         out.append(("length", size <= limit, f"{size}자, 한도 {limit}자"))
-    if pick("emphasis") == "none":
+    # 서식 없음 문서의 굵은 글씨는 출력 형식 검사가 잡는다. 한 원인으로 ✗ 가 두 줄 나오지 않게 강조는 건너뛴다.
+    if pick("emphasis") == "none" and not (th and pick("markup") == "plain"):
         out.append(("emphasis", "**" not in doc, "굵은 글씨 있음" if "**" in doc else "없음"))
     if th is None:
         return out
@@ -2252,7 +2253,8 @@ def selftest(th):
         tips = {n for n, *_ in suggest_doc(th, "속도가 아니라 방향이다. 양이 아니라 질이다. 결론적으로 다양한 방법이 있다.", neutral)}
         check({"tells:not-but", "tells:wrapup", "tells:vague"} <= tips, f"제안 패턴이 다르다: {sorted(tips)}")
         got = {k: ok for k, ok, _ in check_doc("**제목**\n\n| 시간 | 대기 |\n", resolve(th, kind="email")[0], None, "email", th)}
-        check(got.get("markup") is False and got.get("tells") is True, f"서식 없음 문서의 마크다운을 잡지 못한다: {got}")
+        check(got.get("markup") is False and got.get("tells") is True and "emphasis" not in got,
+              f"서식 없음 문서의 마크다운을 잡지 못하거나 굵은 글씨를 두 번 센다: {got}")
         got = dict((k, (ok, v)) for k, ok, v in check_doc("목표를 정한다.\n", resolve(th, kind="design-doc")[0], None,
                                                            "design-doc", th))
         check(got.get("kind", (True, ""))[0] is False and "비목표" in got["kind"][1], f"틀이 정한 절이 빠진 것을 잡지 못한다: {got}")
