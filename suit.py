@@ -770,7 +770,8 @@ def check_hint(th, axis, vals):
     hint = CHECK_HINT[axis]
     if isinstance(hint, dict):
         return hint[vals[axis][0]]
-    return hint.format(want=th.label(axis, vals[axis][0]))
+    # 문서 종류의 틀(kind)처럼 축이 아닌 검사는 맞출 값이 없어 문구만 낸다
+    return hint.format(want=th.label(axis, vals[axis][0])) if axis in vals else hint
 
 # ---------------------------------------------------------------- 캐릭터와 성장
 # 슬롯이 캐릭터다. check 가 문서 한 건마다 기록 한 줄을 남기고, 경험치와 레벨은 기록에서 매번 다시 계산한다.
@@ -2255,6 +2256,8 @@ def selftest(th):
         got = dict((k, (ok, v)) for k, ok, v in check_doc("목표를 정한다.\n", resolve(th, kind="design-doc")[0], None,
                                                            "design-doc", th))
         check(got.get("kind", (True, ""))[0] is False and "비목표" in got["kind"][1], f"틀이 정한 절이 빠진 것을 잡지 못한다: {got}")
+        check(all(check_hint(th, k, vals) for k in CHECK_HINT if k in vals or not isinstance(CHECK_HINT[k], dict)),
+              "check 가 틀린 축에 붙일 안내를 만들지 못한다")
         got = {k: ok for k, ok, _ in check_doc("원인은 셋이다.\n", neutral, None, None, th)}
         check(got.get("tells:count") is False and "tells" not in got, f"문장 규칙에 걸린 것을 따로 남기지 않는다: {got}")
     rules = argparse.Namespace(growth={
