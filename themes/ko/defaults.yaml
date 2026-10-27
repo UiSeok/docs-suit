@@ -31,7 +31,7 @@ defaults:
 
 # 독자 풀. label 은 사람이 부르는 이름이고 나머지 키는 축이다.
 audiences:
-  professor: {label: 교수·지도교수, voice: prose, register: plain, terms: major, length: full, exposure: submit}
+  professor: {label: 선생님·교수, voice: prose, register: plain, terms: major, length: full, exposure: submit}
   teammate: {label: 팀원·동료, voice: bullet, register: haeyo, terms: explained, exposure: team}
   recruiter: {label: 채용 담당·면접관, voice: bullet, register: polite, terms: explained, exposure: submit}
   listener: {label: 발표 청중, voice: bullet, register: polite, terms: everyday, length: brief, exposure: public}

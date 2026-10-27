@@ -1,7 +1,7 @@
 class:
   order: 1
-  label: 대학생
-  desc: 수업 과제와 팀 프로젝트, 교수님께 보내는 메일을 쓰는 학부생
+  label: 학생
+  desc: 과제와 수행평가, 조별 활동, 발표를 하는 중고등학생과 대학생
   kinds: [report, slides, minutes, email]
 
 defaults:

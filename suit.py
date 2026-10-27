@@ -862,7 +862,7 @@ def selftest(th):
         text, _ = compose(th, kind="report", cls="student", chars=1000, fmt="output-style",
                           profile={"persona": {"call": "민수 님", "docs": ["report"]}})
         check(text.startswith("---\nname:") and "공백 포함 1000자" in text, "output-style 이나 글자수 조립이 다르다")
-        check("- 호칭: 민수 님" in text and "- 클래스: 대학생" in text and "report" not in text.split("## 쓰는 사람")[1][:200],
+        check("- 호칭: 민수 님" in text and "- 클래스: 학생" in text and "report" not in text.split("## 쓰는 사람")[1][:200],
               "쓰는 사람 절이 다르다")
         for bad in ({"skeleton": "template"}, {"nope": "x"}, {"voice": "nope"}):
             try:
