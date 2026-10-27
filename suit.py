@@ -25,7 +25,7 @@ profiles/<이름>.yaml 이다. 폴더의 .docs-suit.yaml 은 쓸 슬롯과 그 �
 사용
   python3 suit.py bootstrap                             처음 세팅. 클래스와 페르소나를 묻고 프로필을 만든다
   python3 suit.py bootstrap --class C [--call …] [--affiliation …] [--goal …] [--docs a,b]
-                            [--facts …] [--dislikes …] [--agents a,b] [--look a|b] --yes [--force]
+                            [--facts …] [--dislikes …] [--agents a,b] [--look a|b] [--preset 이름] --yes [--force]
   python3 suit.py bootstrap --questions                 에이전트가 대신 물을 때 쓸 질문 목록
   python3 suit.py profile [show|list]                   지금 쓰는 프로필 보기, 슬롯 목록
   python3 suit.py profile use <슬롯> [--here]           기본 슬롯을 바꾼다. --here 는 지금 폴더에 적는다
@@ -40,17 +40,22 @@ profiles/<이름>.yaml 이다. 폴더의 .docs-suit.yaml 은 쓸 슬롯과 그 �
                                                     다 쓴 본문을 조립한 값대로 재고 성장 기록에 남긴다
   python3 suit.py card [--json] [--color auto|always|never]   캐릭터 카드
   python3 suit.py look [<부위> <값>] [--json]        꾸미기. 부위는 base, color, hair, prop, top
+  python3 suit.py promote [<키>]                    기여하고 받은 승급 키를 넣는다. 3차와 4차 전직에 쓴다
+  python3 suit.py preset list|show|use|export [<이름>] [--here] [--by 아이디] [--label …] [--desc …]
+                                                    테마 조합. 남의 조합을 입히거나 내 조합을 기여용 파일로 낸다
   python3 suit.py growth on|off                     캐릭터 키우기를 켜고 끈다. 기록은 지우지 않는다
   python3 suit.py bundle                            웹 고르개용 docs/themes.json 을 만든다
   python3 suit.py selftest
 
 종료 코드: 0 성공, 3 모르는 클래스·종류·독자·축·값, 1 그 밖의 오류.
-bootstrap, profile, get, compose, set, export, check, card, look, growth 에는 --profile <슬롯> 을 붙일 수 있다.
+bootstrap, profile, get, compose, set, export, check, card, look, preset, promote, growth 에는 --profile <슬롯> 을 붙일 수 있다.
 캐릭터 성장 기록은 ~/.config/docs-suit/growth/<슬롯>.jsonl 에 남는다. 본문과 파일 경로는 남기지 않는다.
 환경 변수: DOCS_SUIT_THEMES 는 테마 폴더를, DOCS_SUIT_PROFILE 은 프로필 파일을, DOCS_SUIT_HOME 은 설정 폴더를 바꾼다.
 """
 import argparse
+import base64
 import hashlib
+import hmac
 import json
 import os
 import re
@@ -72,6 +77,8 @@ TEMPLATE = "template"
 CONFIG_DEFAULT = "~/.config/docs-suit"  # 기본 슬롯은 profile.yaml, 이름 붙은 슬롯은 profiles/<이름>.yaml
 FOLDER_FILE = ".docs-suit.yaml"
 FOLDER_KEYS = ("profile", "defaults", "audiences")
+PRESET_HEAD = ("# docs-suit 테마 조합. suit.py preset use <이름> 으로 내 슬롯에 입힌다.\n"
+               "# 공개 저장소에 올라가므로 페르소나와 회사, 사람 이름은 넣지 않는다.")
 SLOT_RE = re.compile(r"^[\w-]+$")
 PROFILE_HEAD = "# docs-suit 프로필. suit.py bootstrap 과 set 이 쓴다. 손으로 고쳐도 된다."
 FOLDER_HEAD = ("# docs-suit 폴더 설정. 이 폴더와 아래 폴더에 적용된다. profile 은 쓸 슬롯 이름이고,\n"
@@ -87,6 +94,19 @@ AGENT_TARGETS = {
     "web": {"label": "웹 채팅에 붙여 넣을 지침", "path": "~/.config/docs-suit/prompt.md", "checked": True},
 }
 AGENT_ALIASES = {"grok": ["claude", "agents"], "codex": ["agents"], "gemini": ["antigravity"], "all": list(AGENT_TARGETS)}
+# 승급 키를 확인하는 공개 키. 개인 키는 저장소 관리자만 갖고 저장소 밖에 둔다. tools/issue-key.py 가 키를 만든다.
+# 키를 바꿔도 지난 키가 계속 먹도록 kid 마다 남겨 둔다.
+PROMOTE_KEYS = {
+    "dodokim-2026": (int(
+        "a9845486fb250b2495f25710aac8a18456b0d9ccbd281632477982c58f6c1547b5e8e663c6c9b15982e29cbd8292b000"
+        "651cdf8880a8abca999759ef7927bacbcb7081a2013a7ee86f7ceb5224e89d768ed8c49ac0ec8111c7448542ff74c3b4"
+        "950ffc4622f92b54d033349220f4f0e16acbd97e2e3dd1ea55557a40a276806427e9b8bb6e8a781f902b6c9e1bb923f4"
+        "9dae7ac3548b65a880601511757e26d676b837539e6b9c5e01ce6c503522b462c6d6ddbc22628fa8eee167da4411b33d"
+        "83062bca017225847b157f283c12782987aba2cddcf6cb7286f4cb54c22d79a35a18b1a01e923a0c3b8025e0d6aa81dc"
+        "8f4e4de5ae8e597b83701790bfebecdd"
+        , 16), 65537),
+}
+SHA256_INFO = bytes.fromhex("3031300d060960864801650304020105000420")  # PKCS#1 v1.5 의 SHA-256 머리
 
 
 class Missing(Exception):
@@ -240,6 +260,11 @@ class Themes:
         self.growth = parse_yaml(gr.read_text(encoding="utf-8")) if gr.exists() else {}
         lk = self.root / "look.yaml"
         self.look = parse_yaml(lk.read_text(encoding="utf-8")) if lk.exists() else {}
+        self.presets = {}
+        for f in sorted((self.root / "presets").glob("*.yaml")):
+            d = parse_yaml(f.read_text(encoding="utf-8"))
+            self.presets[f.stem] = {**d.get("preset", {}), "defaults": d.get("defaults", {}),
+                                    "audiences": d.get("audiences", {})}
 
     def part_path(self, part, name):
         """캐릭터 그림 한 장. part 는 base, top, hair, prop 이다."""
@@ -659,18 +684,29 @@ def doc_key(src, text):
     return hashlib.sha1(key.encode("utf-8")).hexdigest()[:12]
 
 
+def level_cost(th, level):
+    """이 레벨에서 다음 레벨로 가는 데 드는 경험치. growth.yaml 의 level 은 `시작 레벨: 경험치` 구간이다."""
+    cost = 0
+    for start, pts in sorted((int(k), int(v)) for k, v in th.growth["level"].items()):
+        if level >= start:
+            cost = pts
+    return cost
+
+
 def level_of(th, exp):
-    """(레벨, 이번 레벨에서 쌓은 경험치, 다음 레벨까지 드는 경험치)."""
-    base, step = int(th.growth["level"]["base"]), int(th.growth["level"]["step"])
-    level, need = 1, base
-    while exp >= need:
+    """(레벨, 이번 레벨에서 쌓은 경험치, 다음 레벨까지 드는 경험치). 최고 레벨이면 마지막 값은 0 이다."""
+    top = int(th.growth.get("max") or 0)
+    level = 1
+    while not top or level < top:
+        need = level_cost(th, level)
+        if exp < need:
+            return level, exp, need
         exp -= need
         level += 1
-        need = base + step * (level - 1)
-    return level, exp, need
+    return level, exp, 0
 
 
-def growth_state(th, entries):
+def growth_state(th, entries, keys=()):
     """기록에서 경험치와 레벨, 문서 종류별 건수를 계산한다. 같은 문서는 가장 좋은 기록 하나로 센다.
     resolved 는 앞선 기록에 [확인 필요] 가 있던 문서를 다시 검사해 0 이 됐을 때만 준다. 처음부터 표시가 없는
     문서에 주면 모르는 곳을 [이름] 처럼 맨 괄호로 숨긴 글이 점수를 받는다."""
@@ -697,13 +733,24 @@ def growth_state(th, entries):
         gains[key] = parts
         exp += sum(pts[p] for p in parts)
     level, into, need = level_of(th, exp)
-    return {"exp": exp, "level": level, "into": into, "need": need, "tier": tier_of(th, level), "docs": len(docs),
-            "kinds": kinds, "gains": gains}
+    return {"exp": exp, "level": level, "into": into, "need": need, "tier": tier_of(th, level, keys),
+            "docs": len(docs), "kinds": kinds, "gains": gains}
 
 
-def tier_of(th, level):
-    """전직 차수. 0 은 전직 전이다. 진급 퀘스트를 정하기 전까지는 레벨만 본다."""
-    return sum(1 for lv in (th.growth.get("promote") or {}).values() if level >= int(lv))
+def promote_rules(th):
+    """[(차수, 문턱 레벨, 승급 키가 필요한가)]."""
+    return sorted((int(t), int(v["level"]), str(v.get("key", "")).lower() == "true")
+                  for t, v in (th.growth.get("promote") or {}).items())
+
+
+def tier_of(th, level, keys=()):
+    """전직 차수. 0 은 전직 전이다. 키가 걸린 차수는 그 차수의 승급 키가 keys 에 있어야 오른다."""
+    tier = 0
+    for t, lv, keyed in promote_rules(th):
+        if level < lv or (keyed and t not in keys):
+            break
+        tier = t
+    return tier
 
 
 def title_of(th, cls, tier):
@@ -733,7 +780,8 @@ def growth_line(th, before, after, key, kind, cls=None):
         title = title_of(th, cls, tier)
         lv += f" · 전직 [{title}]" if title else f" · {tier}차 전직"
         lv += "".join(f" · {label} 열림" for label in opened_at(th, tier))
-    return f"성장: {head} · {lv} · 다음 레벨까지 {after['need'] - after['into']}"
+    left = f"다음 레벨까지 {after['need'] - after['into']}" if after["need"] else "최고 레벨"
+    return f"성장: {head} · {lv} · {left}"
 
 
 def record_check(th, name, src, text, kind, checks, left, warn=lambda m: None):
@@ -749,8 +797,97 @@ def record_check(th, name, src, text, kind, checks, left, warn=lambda m: None):
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "a", encoding="utf-8") as f:
         f.write(json.dumps(entry, ensure_ascii=False) + "\n")
-    return growth_line(th, growth_state(th, entries), growth_state(th, entries + [entry]), entry["doc"], kind,
+    keys = key_tiers(promote_keys(warn))
+    return growth_line(th, growth_state(th, entries, keys), growth_state(th, entries + [entry], keys), entry["doc"], kind,
                        (slot_data.get("profile") or {}).get("class"))
+
+
+# ---------------------------------------------------------------- 테마 조합
+# 축 기본값과 독자별 값을 한 묶음으로 남긴 것이다. 게임의 스킬 조합처럼 남이 기여한 조합을 내 슬롯에 입힌다.
+# 자기 조합을 기여하는 것이 4차 전직의 조건이다.
+def preset_order(th, cls=None):
+    """추천 표시가 있는 조합, 고른 클래스의 조합 순으로 앞에 둔다."""
+    return sorted(th.presets, key=lambda k: (str(th.presets[k].get("featured")) != "true",
+                                             bool(cls) and th.presets[k].get("class") != cls, k))
+
+
+def apply_preset(data, preset):
+    """슬롯이나 폴더 파일의 축 값을 조합의 값으로 바꾼다. 페르소나와 꾸미기는 그대로 둔다."""
+    data["defaults"] = dict(preset.get("defaults") or {})
+    data["audiences"] = {k: dict(v) for k, v in (preset.get("audiences") or {}).items() if isinstance(v, dict)}
+    return data
+
+
+def known_values(th, values):
+    """알려진 축 값만 남긴다. 조합으로 내보낼 때 모르는 값을 걸러 낸다."""
+    out = {}
+    for axis, value in (values or {}).items():
+        try:
+            th.known(axis, value)
+            out[axis] = value
+        except Missing:
+            pass
+    return out
+
+
+# ---------------------------------------------------------------- 승급 키
+# 3차와 4차 전직은 저장소에 기여하고 받은 승급 키가 있어야 오른다. 키는 `dsk1.<내용>.<서명>` 꼴이고,
+# 내용은 GitHub 아이디와 차수, 기여 링크다. 엔진과 기록이 사용자 컴퓨터에 있어 마음먹은 조작은 막지 못한다.
+# 키는 정직하게 오르는 길을 기여로 잇는 장치다.
+def rsa_verify(n, e, msg, sig):
+    """RSA PKCS#1 v1.5 SHA-256 서명 확인. 표준 라이브러리의 큰 정수 거듭제곱으로 한다."""
+    k = (n.bit_length() + 7) // 8
+    if len(sig) != k:
+        return False
+    em = pow(int.from_bytes(sig, "big"), e, n).to_bytes(k, "big")
+    t = SHA256_INFO + hashlib.sha256(msg).digest()
+    return hmac.compare_digest(em, b"\x00\x01" + b"\xff" * (k - len(t) - 3) + b"\x00" + t)
+
+
+def _unb64(s):
+    return base64.urlsafe_b64decode(s + "=" * (-len(s) % 4))
+
+
+def read_promote_key(text, keys=None):
+    """서명이 맞으면 키의 내용을, 아니면 None 을 돌려준다."""
+    keys = PROMOTE_KEYS if keys is None else keys
+    parts = text.strip().split(".")
+    if len(parts) != 3 or parts[0] != "dsk1":
+        return None
+    try:
+        payload, sig = json.loads(_unb64(parts[1]).decode("utf-8")), _unb64(parts[2])
+    except (ValueError, UnicodeDecodeError):
+        return None
+    pub = keys.get(payload.get("kid")) if isinstance(payload, dict) else None
+    if not pub or not rsa_verify(pub[0], pub[1], parts[1].encode("ascii"), sig):
+        return None
+    if not isinstance(payload.get("tier"), int) or not payload.get("who"):
+        return None
+    return payload
+
+
+def keys_path():
+    """승급 키는 사람 단위라 슬롯마다 두지 않고 설정 폴더에 한 파일로 둔다."""
+    return config_dir() / "keys.txt"
+
+
+def promote_keys(warn=lambda m: None):
+    path = keys_path()
+    if not path.exists():
+        return []
+    out = []
+    for line in path.read_text(encoding="utf-8").split():
+        payload = read_promote_key(line)
+        if payload:
+            out.append(payload)
+        else:
+            warn(f"확인하지 못한 승급 키를 건너뛴다: {path}")
+    return out
+
+
+def key_tiers(payloads):
+    """키가 열어 주는 차수. 4차 키는 3차 조건인 기여도 채운다."""
+    return {t for p in payloads for t in range(1, int(p["tier"]) + 1)}
 
 
 # ---------------------------------------------------------------- 도트 그림
@@ -801,8 +938,9 @@ def sprite_grid(path, custom=None):
 LOOK_LAYERS = ("top", "hair", "prop")  # 기본 몸 위에 이 순서로 겹친다
 
 
-def look_of(th, slot_data, warn=lambda m: None):
-    """슬롯의 look 절에 기본값을 채운다. 모르는 값은 기본값으로 돌린다. 손으로 고친 값은 열렸는지 따지지 않는다."""
+def look_of(th, slot_data, tier=None, warn=lambda m: None):
+    """슬롯의 look 절에 기본값을 채운다. 모르는 값은 기본값으로 돌린다. tier 를 주면 그 차수까지 열린 부위만
+    입힌다. 슬롯 파일을 손으로 고쳐 잠긴 옷을 입히는 길을 막는다."""
     have = (slot_data or {}).get("look") or {}
     have = have if isinstance(have, dict) else {}
     bases = th.look.get("base") or {}
@@ -811,9 +949,10 @@ def look_of(th, slot_data, warn=lambda m: None):
     for part, table in (("top", th.look.get("top")), ("hair", th.look.get("hair")), ("prop", th.look.get("prop")),
                         ("color", th.look.get("colors"))):
         val = have.get(part)
-        if val and val in (table or {}):
+        locked = tier is not None and tier < int(((th.look.get("unlock") or {}).get(part) or {}).get("at", 0))
+        if val and val in (table or {}) and not locked:
             look[part] = val
-        elif val:
+        elif val and not locked:
             warn(f"프로필의 look.{part}={val} 는 모르는 값이라 기본값을 쓴다")
     return look
 
@@ -859,23 +998,26 @@ def beside(art, width, info):
             for i in range(rows)]
 
 
-def card_lines(th, slot_data, slot, state, depth, vals=None):
-    """캐릭터 카드. 색을 쓸 수 있으면 왼쪽에 도트 그림을 그리고 오른쪽에 글을 놓는다."""
+def card_lines(th, slot_data, slot, state, depth, vals=None, held=()):
+    """캐릭터 카드. 색을 쓸 수 있으면 왼쪽에 도트 그림을 그리고 오른쪽에 글을 놓는다. held 는 받은 승급 키다."""
     cls = (slot_data.get("profile") or {}).get("class")
     name = (slot_data.get("persona") or {}).get("call") or slot or "이름 없음"
     title = title_of(th, cls, state["tier"])
-    filled = state["into"] * 10 // state["need"]
+    filled = state["into"] * 10 // state["need"] if state["need"] else 10
     tops = sorted(state["kinds"].items(), key=lambda kv: -kv[1])[:3]
-    promote = th.growth.get("promote") or {}
-    nxt = state["tier"] + 1
-    info = [(f"[{title}] " if title else "") + f"{name} · {th.classes[cls]['label'] if cls in th.classes else '클래스 없음'}",
-            f"Lv.{state['level']}  {'█' * filled}{'░' * (10 - filled)}  {state['into']}/{state['need']}",
+    nxt = next(((t, lv, keyed) for t, lv, keyed in promote_rules(th) if t == state["tier"] + 1), None)
+    who = max(held, key=lambda k: k["tier"])["who"] if held else None
+    info = [(f"[{title}] " if title else "") + f"{name} · {th.classes[cls]['label'] if cls in th.classes else '클래스 없음'}"
+            + (f" · 기여 @{who}" if who else ""),
+            f"Lv.{state['level']}  {'█' * filled}{'░' * (10 - filled)}  "
+            + (f"{state['into']}/{state['need']}" if state["need"] else "최고 레벨"),
             f"문서 {state['docs']}건 · 도감 {len(state['kinds'])}/{len(th.kinds)} 종류",
             "많이 쓴 문서 " + (" · ".join(f"{th.kinds[k]['label']} {n}" for k, n in tops if k in th.kinds) or "아직 없음")]
-    if str(nxt) in promote:
-        nt = title_of(th, cls, nxt)
-        info.append(f"다음 전직 Lv.{promote[str(nxt)]}" + (f" [{nt}]" if nt else "")
-                    + "".join(f" · {label} 열림" for label in opened_at(th, nxt)))
+    if nxt:
+        t, lv, keyed = nxt
+        nt = title_of(th, cls, t)
+        when = "승급 키를 받으면" if keyed and state["level"] >= lv else f"Lv.{lv}" + (" + 승급 키" if keyed else "")
+        info.append(f"다음 전직 {when}" + (f" [{nt}]" if nt else "") + "".join(f" · {label} 열림" for label in opened_at(th, t)))
     else:
         info.append("전직을 모두 마쳤다")
     if vals:
@@ -884,7 +1026,7 @@ def card_lines(th, slot_data, slot, state, depth, vals=None):
         info.append("캐릭터 키우기가 꺼져 있다. 켜려면 suit.py growth on")
     if not depth or not th.look:
         return info
-    grid = look_grid(th, look_of(th, slot_data))
+    grid = look_grid(th, look_of(th, slot_data, state["tier"]))
     return beside(render_grid(grid, depth), len(grid[0]), info)
 
 
@@ -1031,6 +1173,17 @@ def bootstrap_interactive(th):
         cls = picked[0] if picked else None
     c = th.classes[cls]
     print(f"\n→ {c['label']} 클래스를 골랐다.\n")
+    preset = None
+    order = preset_order(th, cls)
+    if order:
+        print("다른 사람이 기여한 테마 조합으로 시작할 수 있다. Enter 면 클래스 기본값으로 시작한다.\n")
+        for i, k in enumerate(order, 1):
+            v = th.presets[k]
+            mark = " · 추천" if str(v.get("featured")) == "true" else ""
+            print(f"  {i}. {v.get('label', k)} · @{v.get('by', '')}{mark}\n     {v.get('desc', '')}")
+        picked = _pick_numbers(_ask("\n번호를 고른다: "), order)
+        preset = picked[0] if picked else None
+        print()
     print("2단계. 페르소나. 답하기 싫으면 Enter 로 넘어간다.\n")
     persona = {}
     for key, q in th.persona.items():
@@ -1064,7 +1217,7 @@ def bootstrap_interactive(th):
     for i, b in enumerate(bases, 1):
         print(f"  {i}. {th.look['base'][b]['label']}")
     picked = _pick_numbers(_ask("\n번호를 고른다. Enter 면 1번: "), bases)
-    return cls, persona, agents, (picked[0] if picked else None)
+    return cls, persona, agents, (picked[0] if picked else None), preset
 
 
 def cmd_bootstrap(a, th):
@@ -1091,17 +1244,21 @@ def cmd_bootstrap(a, th):
                     raise Missing(f"모르는 문서 종류: {d}")
             persona["docs"] = docs
         agents = [x.strip() for x in a.agents.split(",") if x.strip()] if a.agents else []
-        base = a.look
+        base, preset = a.look, a.preset
     else:
         if not sys.stdin.isatty():
             raise Missing("대화형 입력을 받을 수 없다. --class 와 --yes 로 진행한다")
-        cls, persona, agents, base = bootstrap_interactive(th)
+        cls, persona, agents, base, preset = bootstrap_interactive(th)
     expand_agents(agents)
     if base and base not in (th.look.get("base") or {}):
         raise Missing(f"모르는 캐릭터: {base}. 고를 수 있는 것은 {', '.join(th.look.get('base') or {})}")
     data = {"profile": {"class": cls, "lang": DEFAULT_LANG}, "persona": persona}
     if base:
         data["look"] = {"base": base}
+    if preset:
+        if preset not in th.presets:
+            raise Missing(f"모르는 조합: {preset}. 고를 수 있는 조합은 {', '.join(preset_order(th)) or '없음'}")
+        apply_preset(data, th.presets[preset])
     if agents:
         data["profile"]["agents"] = agents
     if p.exists():
@@ -1305,15 +1462,17 @@ def cmd_card(a, th):
     if not data:
         print(f"프로필이 없다: {path}\n`python3 suit.py bootstrap` 으로 캐릭터를 만든다")
         return 3
-    state = growth_state(th, read_growth(growth_path(a.profile), warn_stderr))
+    held = promote_keys(warn_stderr)
+    state = growth_state(th, read_growth(growth_path(a.profile), warn_stderr), key_tiers(held))
     if a.json:
         cls = (data.get("profile") or {}).get("class")
         print(json.dumps({"slot": slot, "name": (data.get("persona") or {}).get("call") or slot, "class": cls,
-                          "title": title_of(th, cls, state["tier"]), "look": look_of(th, data), "on": growth_on(data),
+                          "title": title_of(th, cls, state["tier"]), "look": look_of(th, data, state["tier"]), "on": growth_on(data),
+                          "keys": [{k: p[k] for k in ("tier", "who", "ref", "at") if k in p} for p in held],
                           **{k: v for k, v in state.items() if k != "gains"}}, ensure_ascii=False, indent=1))
         return 0
     vals = resolve(th, profile=load_profile(warn_stderr, a.profile), warn=warn_stderr)[0]
-    print("\n".join(card_lines(th, data, slot, state, color_depth(a.color), vals)))
+    print("\n".join(card_lines(th, data, slot, state, color_depth(a.color), vals, held)))
     return 0
 
 
@@ -1324,8 +1483,8 @@ def cmd_look(a, th):
     if not data:
         print(f"프로필이 없다: {path}\n`python3 suit.py bootstrap` 으로 캐릭터를 만든다")
         return 3
-    tier = growth_state(th, read_growth(growth_path(a.profile), warn_stderr))["tier"]
-    look = look_of(th, data, warn_stderr)
+    tier = growth_state(th, read_growth(growth_path(a.profile), warn_stderr), key_tiers(promote_keys(warn_stderr)))["tier"]
+    look = look_of(th, data, tier, warn_stderr)
     unlock = th.look.get("unlock") or {}
     tables = {"base": {k: v["label"] for k, v in th.look["base"].items()}, "top": th.look["top"],
               "hair": th.look["hair"], "prop": th.look["prop"],
@@ -1362,6 +1521,97 @@ def cmd_look(a, th):
     data["look"] = want
     write_profile(data, a.profile)
     print(f"바꿨다: {labels[a.part]} → {tables[a.part].get(a.value, '없음')}. suit.py card 로 본다")
+    return 0
+
+
+def cmd_preset(a, th):
+    """테마 조합 보기, 입히기, 내 설정을 조합 파일로 내보내기."""
+    if a.action == "list":
+        order = preset_order(th, a.cls)
+        if not order:
+            print("아직 조합이 없다")
+        for k in order:
+            v = th.presets[k]
+            mark = " · 추천" if str(v.get("featured")) == "true" else ""
+            cls = th.classes.get(v.get("class"), {}).get("label", "클래스 없음")
+            print(f"- {k}: {v.get('label', k)} · {cls} · @{v.get('by', '')}{mark}\n  {v.get('desc', '')}")
+        return 0
+    if not a.name:
+        raise Missing(f"조합 이름을 준다: suit.py preset {a.action} <이름>")
+    if a.action == "export":
+        if not SLOT_RE.match(a.name):
+            raise Missing(f"조합 이름은 글자, 숫자, -, _ 로 쓴다: {a.name}")
+        if not a.by:
+            raise Missing("--by 에 GitHub 아이디를 준다. 기여한 사람으로 남고 승급 키를 받을 때 쓴다")
+        prof = load_profile(warn_stderr, a.profile)
+        defaults = known_values(th, prof.get("defaults"))
+        auds = {k: known_values(th, v) for k, v in (prof.get("audiences") or {}).items()
+                if k in th.audiences and isinstance(v, dict) and known_values(th, v)}
+        if not defaults and not auds:
+            print("오류: 내보낼 축 값이 없다. suit.py set 으로 고른 값이 있어야 조합이 된다", file=sys.stderr)
+            return 1
+        meta = {"label": a.label or a.name, "desc": a.desc or "", "by": a.by.lstrip("@"),
+                "class": (prof.get("profile") or {}).get("class", "")}
+        out = Path(a.output or f"{a.name}.yaml").expanduser()
+        out.write_text(dump_yaml({"preset": {k: v for k, v in meta.items() if v}, "defaults": defaults,
+                                  "audiences": auds}, PRESET_HEAD), encoding="utf-8")
+        print(f"썼다: {out}\n이 파일을 docs-suit 저장소의 themes/ko/presets/ 에 넣어 PR 을 보낸다. "
+              "머지되면 4차 승급 키를 받는다" + ("" if a.desc else ". --desc 로 쓰임새를 한 줄 적으면 고르는 사람이 알아보기 쉽다"))
+        return 0
+    if a.name not in th.presets:
+        raise Missing(f"모르는 조합: {a.name}. 고를 수 있는 조합은 {', '.join(preset_order(th)) or '없음'}")
+    v = th.presets[a.name]
+    if a.action == "show":
+        print(f"{v.get('label', a.name)} · @{v.get('by', '')}\n{v.get('desc', '')}")
+        for axis, value in (v.get("defaults") or {}).items():
+            print(f"- {th.axes[axis]['label']}: {th.label(axis, value)}")
+        for aud, vals in (v.get("audiences") or {}).items():
+            print(f"- 독자 {th.audiences[aud]['label']}: " + ", ".join(f"{th.axes[x]['label']} {th.label(x, y)}"
+                                                                    for x, y in vals.items()))
+        return 0
+    if a.here:
+        data = read_folder(Path.cwd() / FOLDER_FILE, warn_stderr)
+        where = write_folder(apply_preset(data, v))
+    else:
+        path = profile_path(a.profile)
+        data = read_slot(path, warn_stderr)
+        if path.exists():
+            path.with_name(path.name + ".bak").write_text(path.read_text(encoding="utf-8"), encoding="utf-8")
+        where = write_profile(apply_preset(data, v), a.profile)
+    print(f"입혔다: {v.get('label', a.name)} → {where}. 축 기본값과 독자별 값을 이 조합으로 바꿨다")
+    return 0
+
+
+def cmd_promote(a, th):
+    """승급 키를 넣거나, 받은 키를 보인다."""
+    held = promote_keys(warn_stderr)
+    if not a.key:
+        if not held:
+            print("받은 승급 키가 없다. 저장소에 기여하고 받은 키를 suit.py promote <키> 로 넣는다")
+        for k in held:
+            print(f"- {k['tier']}차 승급 키 · @{k['who']} · {k.get('ref', '')} · {k.get('at', '')}")
+        return 0
+    payload = read_promote_key(a.key)
+    if not payload:
+        print("오류: 승급 키가 맞지 않는다. 받은 키 전체를 줄바꿈 없이 그대로 넣는다", file=sys.stderr)
+        return 1
+    path = keys_path()
+    have = path.read_text(encoding="utf-8").split() if path.exists() else []
+    if a.key.strip() not in have:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with open(path, "a", encoding="utf-8") as f:
+            f.write(a.key.strip() + "\n")
+    print(f"승급 키를 받았다: {payload['tier']}차 · @{payload['who']} · {payload.get('ref', '')}")
+    data = read_slot(profile_path(a.profile), warn_stderr)
+    if data:
+        before = growth_state(th, read_growth(growth_path(a.profile), warn_stderr), key_tiers(held))
+        after = growth_state(th, read_growth(growth_path(a.profile), warn_stderr), key_tiers(held + [payload]))
+        cls = (data.get("profile") or {}).get("class")
+        for tier in range(before["tier"] + 1, after["tier"] + 1):
+            print(f"전직 [{title_of(th, cls, tier)}]" + "".join(f" · {label} 열림" for label in opened_at(th, tier)))
+        if after["tier"] == before["tier"]:
+            lv = next((lv for t, lv, _ in promote_rules(th) if t == after["tier"] + 1), None)
+            print(f"지금 Lv.{after['level']}" + (f". Lv.{lv} 이 되면 전직한다" if lv else ""))
     return 0
 
 
@@ -1468,14 +1718,31 @@ def selftest(th):
         check(isinstance(spec, dict) and str(spec.get("points", "")).isdigit() and spec.get("label"),
               f"growth.yaml 의 exp.{k} 에 points 나 label 이 없다")
     check(str((gr.get("limit") or {}).get("daily-kind", "")).isdigit(), "growth.yaml 의 limit.daily-kind 가 없다")
-    check(all(str((gr.get("level") or {}).get(k, "")).isdigit() for k in ("base", "step"))
-          and int((gr.get("level") or {}).get("base", 0) or 0) > 0, "growth.yaml 의 level 이 없거나 base 가 0 이다")
+    lv = gr.get("level") or {}
+    check("1" in lv and all(str(k).isdigit() and str(v).isdigit() and int(v) > 0 for k, v in lv.items()),
+          "growth.yaml 의 level 은 1 레벨부터 `시작 레벨: 경험치` 꼴이어야 한다")
     promote = gr.get("promote") or {}
-    check(list(promote) == ["1", "2", "3", "4"] and all(str(v).isdigit() for v in promote.values())
-          and [int(v) for v in promote.values()] == sorted({int(v) for v in promote.values()}),
-          "growth.yaml 의 promote 는 1차부터 4차까지 커지는 레벨이어야 한다")
+    try:
+        rules_p = promote_rules(th)
+        steps = [lvl for _, lvl, _ in rules_p]
+        check([t for t, _, _ in rules_p] == [1, 2, 3, 4] and steps == sorted(set(steps))
+              and steps[-1] < int(gr.get("max") or steps[-1] + 1),
+              "growth.yaml 의 promote 는 1차부터 4차까지 커지는 레벨이고 최고 레벨보다 낮아야 한다")
+    except (KeyError, TypeError, ValueError, AttributeError):
+        problems.append("growth.yaml 의 promote 는 `차수: {level: 레벨}` 꼴이어야 한다")
     for k, v in th.classes.items():
         check(len(v["titles"]) == len(promote) + 1, f"클래스 {k} 의 칭호는 기본과 전직 차수만큼 {len(promote) + 1}개다")
+
+    for k, v in th.presets.items():
+        check(SLOT_RE.match(k) and v.get("label") and v.get("desc") and v.get("by"),
+              f"조합 {k} 에 label, desc, by 가 없거나 이름이 다르다")
+        check(not v.get("class") or v.get("class") in th.classes, f"조합 {k} 의 클래스를 모른다")
+        check(str(v.get("featured", "false")) in ("true", "false"), f"조합 {k} 의 featured 는 true 나 false 다")
+        check(v.get("defaults") or v.get("audiences"), f"조합 {k} 에 축 값이 없다")
+        check_profile(f"조합 {k}", v.get("defaults") or {}, False)
+        for aud, vals in (v.get("audiences") or {}).items():
+            check(aud in th.audiences and isinstance(vals, dict), f"조합 {k} 의 독자 {aud} 를 모른다")
+            check_profile(f"조합 {k} 독자 {aud}", vals if isinstance(vals, dict) else {}, False)
 
     # 캐릭터 그림과 꾸미기. 모든 그림은 기본 몸과 같은 크기라야 겹쳐 그릴 수 있다.
     lk = th.look
@@ -1517,7 +1784,8 @@ def selftest(th):
     check(got.get("register") is False and got.get("length") is False, f"본문 검사가 어법이나 글자수 한도를 놓친다: {got}")
     rules = argparse.Namespace(growth={
         "exp": {k: {"points": p, "label": k} for k, p in (("done", "10"), ("clean", "10"), ("resolved", "5"), ("new-kind", "20"))},
-        "limit": {"daily-kind": "2"}, "level": {"base": "50", "step": "25"}})
+        "limit": {"daily-kind": "2"}, "level": {"1": "50", "2": "75"}, "max": "4",
+        "promote": {"1": {"level": "2"}, "2": {"level": "3", "key": "true"}}})
     day1, day2 = "2026-01-01T09:00", "2026-01-02T09:00"
     log = [{"doc": "a", "at": day1, "kind": "email", "checks": {"emphasis": False}, "unresolved": 1},
            {"doc": "a", "at": day1, "kind": "email", "checks": {"emphasis": True}, "unresolved": 0},
@@ -1531,9 +1799,10 @@ def selftest(th):
           f"[확인 필요] 를 채운 문서만 resolved 를 받아야 한다: {st['gains']}")
     st = growth_state(rules, log + [{"doc": "a", "at": day2, "kind": "email", "checks": {"emphasis": False}, "unresolved": 3}])
     check(st["exp"] == 85, "다시 검사해 나빠진 기록이 경험치를 깎았다")
-    check(level_of(rules, 50 + 75) == (3, 0, 100), "레벨 문턱 계산이 다르다")
-    check([tier_of(th, lv) for lv in (1, 2, 3, 7, 12, 17, 18, 40)] == [0, 0, 1, 2, 3, 3, 4, 4]
-          if list(promote.values()) == ["3", "7", "12", "18"] else True, "전직 차수 계산이 다르다")
+    check(level_of(rules, 50 + 75) == (3, 0, 75) and level_of(rules, 50 + 75 * 2 + 30) == (4, 30, 0),
+          "레벨 구간이나 최고 레벨 계산이 다르다")
+    check([tier_of(rules, x) for x in (1, 2, 3)] == [0, 1, 1] and tier_of(rules, 3, {2}) == 2,
+          "전직 차수 계산이 다르다. 키가 걸린 차수는 키가 있어야 오른다")
     check(title_of(th, "office", 0) == th.classes["office"]["titles"][0]
           and title_of(th, "office", 9) == th.classes["office"]["titles"][-1], "칭호를 차수로 고르지 못한다")
 
@@ -1590,11 +1859,15 @@ def selftest(th):
         try:
             ns = argparse.Namespace(questions=False, force=False, cls="developer", yes=True, profile=None,
                                     call='민수 "님"', affiliation="백엔드, 2년 차: 결제", goal=None,
-                                    facts="#1 은 지도 시각화", dislikes=None, docs="pr,design-doc", agents="", look="b")
+                                    facts="#1 은 지도 시각화", dislikes=None, docs="pr,design-doc", agents="", look="b",
+                                    preset=next(iter(th.presets), None))
             quiet(cmd_bootstrap, ns, th)
             prof = load_profile(start=td)
             check(prof.get("profile", {}).get("class") == "developer", "bootstrap 이 클래스를 남기지 않았다")
             check(prof.get("look") == {"base": "b"}, "bootstrap 이 캐릭터를 남기지 않았다")
+            if th.presets:
+                check(prof.get("defaults") == th.presets[next(iter(th.presets))]["defaults"],
+                      "bootstrap 이 고른 조합으로 시작하지 않았다")
             per = prof.get("persona", {})
             check(per.get("affiliation") == "백엔드, 2년 차: 결제" and per.get("facts") == "#1 은 지도 시각화"
                   and per.get("docs") == ["pr", "design-doc"] and "”" in per.get("call", ""),
@@ -1686,7 +1959,65 @@ def selftest(th):
                 problems.append("슬롯 이름에 경로를 받았다")
             except Missing:
                 pass
+            out = Path(td) / "mine.yaml"
+            ns = argparse.Namespace(action="export", name="mine", by="@someone", label="내 조합", desc="시험", output=str(out),
+                                    cls=None, here=False, profile="work")
+            quiet(cmd_preset, ns, th)
+            mine = parse_yaml(out.read_text(encoding="utf-8")) if out.exists() else {}
+            check(mine.get("preset", {}).get("by") == "someone" and mine.get("defaults") == {"voice": "prose"}
+                  and "persona" not in mine and "call" not in out.read_text(encoding="utf-8"),
+                  f"조합 내보내기가 다르거나 페르소나가 섞였다: {mine}")
+            if th.presets:
+                name = next(iter(th.presets))
+                quiet(cmd_preset, argparse.Namespace(action="use", name=name, cls=None, here=False, profile="work",
+                                                    by=None, label=None, desc=None, output=None), th)
+                work = read_slot(slot_path("work"))
+                check(work.get("defaults") == th.presets[name]["defaults"] and work.get("persona") == {"call": "회사"}
+                      and slot_path("work").with_name("work.yaml.bak").exists(),
+                      "조합 입히기가 축 값을 바꾸지 못하거나 페르소나를 건드렸거나 .bak 을 남기지 않았다")
         finally:
+            for k, v in saved.items():
+                os.environ.pop(k, None)
+                if v is not None:
+                    os.environ[k] = v
+
+    # 승급 키. 시험용 작은 키로 서명한다. 이 키는 selftest 안에서만 PROMOTE_KEYS 에 잠깐 넣는다.
+    tp = int("a5cacdc975e6a50165ab7aa7524623ee067919475ac06831b64a4dcfff2f88716519", 16)
+    tq = int("8f91e9b245d2bc6f599805b725d29f00e8fa6218dc0e0008b7a9d320889cd03b3281", 16)
+    tn, td_ = tp * tq, pow(65537, -1, (tp - 1) * (tq - 1))
+
+    def test_key(payload):
+        body = base64.urlsafe_b64encode(json.dumps(payload).encode()).rstrip(b"=").decode()
+        k = (tn.bit_length() + 7) // 8
+        t = SHA256_INFO + hashlib.sha256(body.encode("ascii")).digest()
+        em = int.from_bytes(b"\x00\x01" + b"\xff" * (k - len(t) - 3) + b"\x00" + t, "big")
+        sig = base64.urlsafe_b64encode(pow(em, td_, tn).to_bytes(k, "big")).rstrip(b"=").decode()
+        return f"dsk1.{body}.{sig}"
+
+    key3 = test_key({"v": 1, "kid": "selftest", "who": "someone", "tier": 3, "ref": "PR #1"})
+    check((read_promote_key(key3, {"selftest": (tn, 65537)}) or {}).get("tier") == 3, "승급 키 서명을 확인하지 못한다")
+    check(read_promote_key(key3) is None, "실제 공개 키가 시험 키를 받았다")
+    body = key3.split(".")[1]
+    forged = key3.replace(body, base64.urlsafe_b64encode(json.dumps(
+        {"v": 1, "kid": "selftest", "who": "someone", "tier": 4, "ref": "PR #1"}).encode()).rstrip(b"=").decode())
+    check(read_promote_key(forged, {"selftest": (tn, 65537)}) is None, "내용을 바꾼 승급 키를 받았다")
+    check(key_tiers([{"tier": 4}]) == {1, 2, 3, 4}, "4차 키가 3차 조건을 채우지 않는다")
+    with tempfile.TemporaryDirectory() as td:
+        saved = {k: os.environ.pop(k, None) for k in ("DOCS_SUIT_PROFILE", "DOCS_SUIT_HOME")}
+        os.environ["DOCS_SUIT_HOME"] = td
+        PROMOTE_KEYS["selftest"] = (tn, 65537)
+        try:
+            write_profile({"profile": {"class": "office"}}, "default")
+            check(quiet(cmd_promote, argparse.Namespace(key="dsk1.x.y", profile=None), th) == 1, "틀린 승급 키를 받았다")
+            quiet(cmd_promote, argparse.Namespace(key=key3, profile=None), th)
+            quiet(cmd_promote, argparse.Namespace(key=key3, profile=None), th)
+            check([k["tier"] for k in promote_keys()] == [3], "승급 키를 한 번만 남기지 않는다")
+            many = [{"doc": str(i), "at": datetime.fromordinal(738000 + i).isoformat(), "kind": None, "checks": {},
+                     "unresolved": 0} for i in range(400)]
+            check(growth_state(th, many)["tier"] == 2 and growth_state(th, many, key_tiers(promote_keys()))["tier"] == 3,
+                  "승급 키 없이 3차에 오르거나, 키가 있는데 오르지 못한다")
+        finally:
+            PROMOTE_KEYS.pop("selftest", None)
             for k, v in saved.items():
                 os.environ.pop(k, None)
                 if v is not None:
@@ -1722,6 +2053,7 @@ def main(argv=None):
     b.add_argument("--docs", help="자주 쓰는 문서 종류. 쉼표로 잇는다")
     b.add_argument("--agents", help="스킬을 설치할 도구. 쉼표로 잇는다")
     b.add_argument("--look", help="캐릭터 a 나 b. 주지 않으면 a")
+    b.add_argument("--preset", help="이 테마 조합으로 시작한다. suit.py preset list 로 본다")
     b.add_argument("--yes", action="store_true", help="묻지 않고 진행한다")
     b.add_argument("--force", action="store_true", help="있는 프로필을 .bak 으로 남기고 새로 만든다")
     b.add_argument("--questions", action="store_true", help="클래스와 페르소나 질문 목록을 JSON 으로 낸다")
@@ -1772,6 +2104,17 @@ def main(argv=None):
     lo.add_argument("part", nargs="?", help="base, color, hair, prop, top")
     lo.add_argument("value", nargs="?", help="고를 값. prop 과 color 는 none 으로 지운다")
     lo.add_argument("--json", action="store_true")
+    ps = sub.add_parser("preset", parents=[slot])
+    ps.add_argument("action", choices=("list", "show", "use", "export"))
+    ps.add_argument("name", nargs="?")
+    ps.add_argument("--class", dest="cls", help="list 에서 이 클래스의 조합을 앞에 둔다")
+    ps.add_argument("--here", action="store_true", help="use 를 지금 폴더의 .docs-suit.yaml 에 쓴다")
+    ps.add_argument("--by", help="export 에 남길 GitHub 아이디")
+    ps.add_argument("--label", help="export 에 남길 조합 이름")
+    ps.add_argument("--desc", help="export 에 남길 한 줄 소개")
+    ps.add_argument("-o", "--output", help="export 로 쓸 파일. 주지 않으면 <이름>.yaml")
+    pm = sub.add_parser("promote", parents=[slot])
+    pm.add_argument("key", nargs="?", help="기여하고 받은 승급 키. 주지 않으면 받은 키를 보인다")
     g = sub.add_parser("growth", parents=[slot])
     g.add_argument("action", choices=("on", "off"))
     sub.add_parser("bundle")
@@ -1783,7 +2126,7 @@ def main(argv=None):
             return selftest(th)
         return {"bootstrap": cmd_bootstrap, "profile": cmd_profile, "list": cmd_list, "get": cmd_get,
                 "compose": cmd_compose, "set": cmd_set, "export": cmd_export, "check": cmd_check, "card": cmd_card,
-                "look": cmd_look, "growth": cmd_growth, "bundle": cmd_bundle}[a.cmd](a, th)
+                "look": cmd_look, "preset": cmd_preset, "promote": cmd_promote, "growth": cmd_growth, "bundle": cmd_bundle}[a.cmd](a, th)
     except Missing as e:
         print(f"오류: {e}", file=sys.stderr)
         return 3

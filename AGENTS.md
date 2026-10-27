@@ -6,13 +6,15 @@ docs-suit 를 고치는 사람과 AI 에이전트가 읽는 작업 규칙이다.
 
 | 자리 | 내용 |
 |---|---|
-| `suit.py` | 엔진 한 파일. bootstrap, compose, check, card, look, export, bundle, selftest |
+| `suit.py` | 엔진 한 파일. bootstrap, compose, check, card, look, preset, promote, export, bundle, selftest |
 | `themes/ko/` | 한국어 테마 팩. 축과 값은 `axes.yaml`, 독자와 문서 종류는 `defaults.yaml`, 클래스는 `classes/`, 페르소나 질문은 `persona.yaml` |
 | `themes/ko/<축>/<값>.md` | 값마다 규칙 문서 한 장. 끝의 `## 보기` 절은 웹 카드에만 쓰고 지침에는 싣지 않는다 |
 | `themes/ko/kinds/<종류>.md` | 문서 종류의 틀 |
 | `themes/ko/growth.yaml` | 캐릭터 성장 규칙. 문서 한 건이 받는 경험치와 레벨, 전직 문턱 |
 | `themes/ko/look.yaml` | 캐릭터 A, B 와 전직마다 여는 꾸미기, 부품과 옷 색 목록 |
+| `themes/ko/presets/<이름>.yaml` | 기여받은 테마 조합. 축 기본값과 독자별 값, 소개, 만든 사람 |
 | `themes/ko/sprites/<부위>/<값>.txt` | 도트 그림 부품. 기본 몸(`base`) 위에 옷(`top`), 머리(`hair`), 소품(`prop`) 순으로 겹친다. 모두 같은 크기다 |
+| `tools/issue-key.py` | 관리자가 승급 키를 만드는 도구. 개인 키는 저장소 밖 `~/.config/docs-suit-admin/` 에 둔다 |
 | `docs/` | 웹 고르개. `core.js` 가 조립하고 `themes.json` 은 `suit.py bundle` 이 만든다 |
 | `tests/parity.js` | 웹과 엔진의 조립 결과를 견준다 |
 | `tests/agent/` | 실제 에이전트에 요청을 넣는 동작 테스트. 케이스는 `cases.py`, 에이전트별 결과는 `results/` |
@@ -62,5 +64,7 @@ Antigravity CLI 는 한 번 실행 모드에서 확인 창을 띄우지 못해 �
 - 새 값의 `## 보기` 는 다른 값과 같은 예문인 정류장 대기 시간 조사로 쓴다. 같은 예문이어야 카드끼리 견줄 수 있다.
 - 규칙과 예문에 특정 회사의 이름과 내부 정보, 실제 사람의 이름과 연락처를 넣지 않는다. 공개 저장소다.
 - 도트 그림과 칭호는 새로 만든다. 다른 게임에서는 전직 단계 같은 구조와 느낌만 빌리고, 그림과 이름을 옮겨 오지 않는다. 부품을 더하면 `look.yaml` 에도 한 줄을 더하고, selftest 가 둘이 맞는지 잰다. 공개 저장소라 게임 이름도 적지 않는다.
+- 승급 키의 개인 키는 저장소에 넣지 않는다. 키를 바꾸면 `PROMOTE_KEYS` 에 새 kid 를 더하고 지난 kid 는 남겨 둔다. 지난 키를 받은 사람의 전직이 풀리지 않게 하기 위해서다.
+- 테마 조합 PR 은 축 값이 알려진 값인지, 소개가 쓰임새를 말하는지, 회사와 사람 이름이 없는지 보고 머지한다. 머지하면 `tools/issue-key.py issue --tier 4` 로 키를 만들어 PR 댓글로 준다.
 - 성장 기록에는 본문과 파일 경로를 남기지 않는다. 같은 문서인지는 경로의 해시로만 가린다.
 - 프로필은 `~/.config/docs-suit/` 에 두고 저장소에 넣지 않는다. export 를 시험할 때는 `--dest` 로 임시 폴더에 쓰고, 실제 홈 폴더의 스킬 자리에 쓰는 일은 사람에게 확인받은 뒤에 한다.
