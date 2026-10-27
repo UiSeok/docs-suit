@@ -20,7 +20,7 @@ bootstrap 은 세 단계를 묻습니다.
 2. 페르소나 여섯 가지. 호칭, 소속, 목표, 자주 쓰는 문서, AI 가 모르는 나, 싫어하는 말투입니다. 답하기 싫은 것은 넘어갑니다.
 3. 쓰는 AI 도구 고르기. 고른 도구에 docs-suit 스킬을 설치합니다.
 
-답은 `~/.config/docs-suit/profile.yaml` 에 남습니다. 저장소 밖이라 실수로 커밋되지 않습니다. 에이전트에게 "docs-suit 세팅해 줘" 라고 해도 됩니다. 스킬이 같은 질문을 대신 묻고 `bootstrap --class … --yes` 로 저장합니다.
+답은 기본 슬롯인 `~/.config/docs-suit/profile.yaml` 에 남습니다. 저장소 밖이라 실수로 커밋되지 않습니다. 에이전트에게 "docs-suit 세팅해 줘" 라고 해도 됩니다. 스킬이 같은 질문을 대신 묻고 `bootstrap --class … --yes` 로 저장합니다.
 
 ## 클래스
 
@@ -58,7 +58,31 @@ python3 suit.py export --agent web                       # 웹 채팅용 지침�
 | Grok Build | Claude 자리와 공용 자리에 함께 설치 |
 | 웹 채팅 | `export --agent web` 이 만든 지침이나 웹 고르개에서 복사한 지침을 맞춤 지침, 프로젝트, Gem 에 붙여 넣기 |
 
-Claude Code, Antigravity CLI, Codex CLI 는 실제 요청을 넣어 스킬이 불리는 것을 확인했습니다. 결과는 `tests/agent/results/` 에 있습니다. Codex CLI 는 ChatGPT 무료 요금제로도 됩니다. Antigravity 와 Codex 는 작업 폴더의 `.agents/skills/` 로 확인했습니다. 두 도구의 전역 자리와 나머지 도구의 자리는 2차 자료 기준이라 각 도구 문서로 확인이 필요합니다. 스킬 파일은 이 저장소의 `suit.py` 를 절대 경로로 부르므로, `git pull` 하면 모든 도구에 바로 반영됩니다. 저장소를 옮겼다면 `export` 를 다시 돌립니다.
+Claude Code, Antigravity CLI, Codex CLI 는 실제 요청을 넣어 스킬이 불리는 것을 확인했습니다. 결과는 `tests/agent/results/` 에 있습니다. Codex CLI 는 ChatGPT 무료 요금제로도 됩니다. Codex 는 홈 폴더의 `~/.agents/skills/` 까지 확인했고, Antigravity 는 작업 폴더의 `.agents/skills/` 로 확인했습니다. Antigravity 의 전역 자리와 나머지 도구의 자리는 2차 자료 기준이라 각 도구 문서로 확인이 필요합니다. 스킬 파일은 이 저장소의 `suit.py` 를 절대 경로로 부르므로, `git pull` 하면 모든 도구에 바로 반영됩니다. 저장소를 옮겼다면 `export` 를 다시 돌립니다.
+
+## 프로필을 여러 개 두고 폴더마다 고르기
+
+회사 일과 개인 작업처럼 쓰는 사람이 달라지면 프로필을 슬롯으로 나눕니다. 기본 슬롯은 `profile.yaml` 이고, 이름 붙은 슬롯은 `~/.config/docs-suit/profiles/<이름>.yaml` 에 생깁니다.
+
+```sh
+python3 suit.py bootstrap --profile work   # work 슬롯을 새로 만든다
+python3 suit.py profile list               # 슬롯 목록. * 가 지금 쓰는 슬롯
+python3 suit.py profile use work           # 어느 폴더에서든 work 슬롯을 쓴다
+cd ~/작업폴더
+python3 <docs-suit 경로>/suit.py profile use work --here    # 이 폴더에서만 work 슬롯
+python3 <docs-suit 경로>/suit.py set register plain --here  # 이 폴더에서만 평어체
+```
+
+`--here` 는 그 폴더에 `.docs-suit.yaml` 을 만듭니다. 엔진은 지금 폴더부터 홈 폴더까지 올라가며 이 파일들을 겹쳐 읽고, 가까운 폴더의 값이 이깁니다. 에이전트는 작업 폴더에서 엔진을 부르므로 Claude Code, Codex, Antigravity 어디서든 같은 설정이 적용됩니다.
+
+폴더 파일에는 쓸 슬롯 이름과 축 값만 들어갑니다. 페르소나는 넣지 않으므로, 저장소에 함께 올려 팀이 같은 문서 규칙을 써도 개인정보가 새지 않습니다.
+
+슬롯은 아래 순서로 정하고, 앞의 것이 이깁니다.
+1. 환경 변수 `DOCS_SUIT_PROFILE` 이 가리키는 파일
+2. `--profile` 인자
+3. 폴더 파일의 `profile`
+4. `profile use` 로 고른 슬롯
+5. 기본 슬롯
 
 ## 웹 고르개
 

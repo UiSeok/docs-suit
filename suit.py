@@ -3,14 +3,17 @@
 
 글의 모양과 말투를 축 열두 가지로 나누고, 축마다 값을 하나 고른다. 값은 themes/<언어>/<축>/<값>.md 규칙 문서
 하나를 가리킨다. 처음 받으면 bootstrap 으로 클래스(직업)와 페르소나를 정해 프로필을 만든다. 프로필은
-~/.config/docs-suit/profile.yaml 에 있고 저장소 밖이라 커밋되지 않는다. 표준 라이브러리만 쓴다(python3 3.9 이상).
+~/.config/docs-suit/ 에 슬롯으로 두고 저장소 밖이라 커밋되지 않는다. 기본 슬롯은 profile.yaml, 이름 붙은 슬롯은
+profiles/<이름>.yaml 이다. 폴더의 .docs-suit.yaml 은 쓸 슬롯과 그 폴더의 축 값을 정하고, 위쪽 폴더부터 겹쳐 읽어
+가까운 폴더가 이긴다. 슬롯은 환경 변수, --profile, 폴더 파일, profile use, 기본 슬롯 순으로 정한다.
+표준 라이브러리만 쓴다(python3 3.9 이상).
 
 값을 정하는 순서 (위가 이긴다)
   1. 문서 종류가 고정한 축          defaults.yaml 의 kinds
   2. 명령 인자                      --set 축=값
-  3. 프로필의 독자별 값              profile.yaml 의 audiences
+  3. 프로필의 독자별 값              슬롯과 폴더 파일의 audiences. 폴더 파일이 앞선다
   4. 문서 종류가 권하는 값           defaults.yaml 의 prefer
-  5. 프로필의 기본값                 profile.yaml 의 defaults
+  5. 프로필의 기본값                 슬롯과 폴더 파일의 defaults. 폴더 파일이 앞선다
   6. 독자 프로필                    defaults.yaml 의 audiences
   7. 클래스 기본값                  classes/<클래스>.yaml 의 defaults
   8. 중립 기본값                    defaults.yaml 의 defaults
@@ -24,19 +27,21 @@
   python3 suit.py bootstrap --class C [--call …] [--affiliation …] [--goal …] [--docs a,b]
                             [--facts …] [--dislikes …] [--agents a,b] --yes [--force]
   python3 suit.py bootstrap --questions                 에이전트가 대신 물을 때 쓸 질문 목록
-  python3 suit.py profile                               프로필 보기
+  python3 suit.py profile [show|list]                   지금 쓰는 프로필 보기, 슬롯 목록
+  python3 suit.py profile use <슬롯> [--here]           기본 슬롯을 바꾼다. --here 는 지금 폴더에 적는다
   python3 suit.py list [--classes] [--json]
   python3 suit.py get     [--class C] [--kind K] [--audience A[,B]] [--set 축=값]... [--json]
   python3 suit.py compose [--class C] [--kind K] [--audience A[,B]] [--set 축=값]... [--chars N]
                           [--format prompt|output-style] [--html] [-o 파일]
-  python3 suit.py set <축> <값> [--audience A]       프로필에 쓴다
-  python3 suit.py set <축> --unset [--audience A]
+  python3 suit.py set <축> <값> [--audience A] [--here]   프로필에 쓴다. --here 는 지금 폴더의 폴더 파일에 쓴다
+  python3 suit.py set <축> --unset [--audience A] [--here]
   python3 suit.py export --agent claude,agents,antigravity,cursor,grok,web|all [--dest 폴더] [--dry-run]
   python3 suit.py bundle                            웹 고르개용 docs/themes.json 을 만든다
   python3 suit.py selftest
 
 종료 코드: 0 성공, 3 모르는 클래스·종류·독자·축·값, 1 그 밖의 오류.
-환경 변수: DOCS_SUIT_THEMES 는 테마 폴더를, DOCS_SUIT_PROFILE 은 프로필 파일을 바꾼다.
+bootstrap, profile, get, compose, set, export 에는 --profile <슬롯> 을 붙일 수 있다.
+환경 변수: DOCS_SUIT_THEMES 는 테마 폴더를, DOCS_SUIT_PROFILE 은 프로필 파일을, DOCS_SUIT_HOME 은 설정 폴더를 바꾼다.
 """
 import argparse
 import json
@@ -56,13 +61,19 @@ COMPOSE_ORDER = ("exposure", "skeleton", "voice", "register", "terms", "length",
 EXPOSURE_STRICT = ("public", "submit", "team")   # 앞이 가장 조심하는 쪽이다
 TERMS_PLAIN = ("everyday", "explained", "major")  # 앞이 가장 풀어 쓴다
 TEMPLATE = "template"
-PROFILE_DEFAULT = "~/.config/docs-suit/profile.yaml"
+CONFIG_DEFAULT = "~/.config/docs-suit"  # 기본 슬롯은 profile.yaml, 이름 붙은 슬롯은 profiles/<이름>.yaml
+FOLDER_FILE = ".docs-suit.yaml"
+FOLDER_KEYS = ("profile", "defaults", "audiences")
+SLOT_RE = re.compile(r"^[\w-]+$")
+PROFILE_HEAD = "# docs-suit 프로필. suit.py bootstrap 과 set 이 쓴다. 손으로 고쳐도 된다."
+FOLDER_HEAD = ("# docs-suit 폴더 설정. 이 폴더와 아래 폴더에 적용된다. profile 은 쓸 슬롯 이름이고,\n"
+               "# defaults 와 audiences 는 슬롯의 값보다 앞선다. 저장소에 올라갈 수 있어 페르소나는 넣지 않는다.")
 PERSONA_IN_PROMPT = ("call", "affiliation", "goal", "facts", "dislikes")  # docs 는 싣지 않는다
 EXPORT_MARK = "<!-- docs-suit export 가 만든 파일이다."
 # 에이전트마다 SKILL.md 를 놓는 자리. checked 가 False 인 자리는 2차 자료 기준이라 쓰기 전에 안내한다.
 AGENT_TARGETS = {
     "claude": {"label": "Claude Code", "path": "~/.claude/skills/docs-suit/SKILL.md", "checked": True},
-    "agents": {"label": "Agent Skills 공용 자리 (Codex 등)", "path": "~/.agents/skills/docs-suit/SKILL.md", "checked": False},
+    "agents": {"label": "Agent Skills 공용 자리 (Codex 등)", "path": "~/.agents/skills/docs-suit/SKILL.md", "checked": True},
     "antigravity": {"label": "Antigravity CLI", "path": "~/.gemini/config/skills/docs-suit/SKILL.md", "checked": False},
     "cursor": {"label": "Cursor", "path": "~/.cursor/skills/docs-suit/SKILL.md", "checked": False},
     "web": {"label": "웹 채팅에 붙여 넣을 지침", "path": "~/.config/docs-suit/prompt.md", "checked": True},
@@ -133,7 +144,7 @@ def _strip_comment(line):
 
 
 def parse_yaml(text):
-    """맨 앞 칸에 절 이름, 들여 쓴 줄에 `키: 값` 하나인 두 단계 YAML 만 읽는다."""
+    """맨 앞 칸에 절 이름, 들여 쓴 줄에 `키: 값` 하나인 두 단계 YAML 만 읽는다. 맨 앞 칸의 `키: 값` 도 받는다."""
     data, section = {}, None
     for n, raw in enumerate(text.splitlines(), 1):
         line = _strip_comment(raw).rstrip()
@@ -142,7 +153,9 @@ def parse_yaml(text):
         if not line[0].isspace():
             key, _, rest = line.partition(":")
             if rest.strip():
-                raise ValueError(f"{n}행: 절 이름 뒤에는 값을 쓰지 않는다")
+                data[key.strip()] = _value(rest)
+                section = None
+                continue
             section = key.strip()
             data[section] = {}
             continue
@@ -162,16 +175,19 @@ def _quote(v):
     return v
 
 
-def dump_yaml(data):
+def dump_yaml(data, head=PROFILE_HEAD):
     def one(v):
         if isinstance(v, list):
             return "[" + ", ".join(_quote(x) for x in v) + "]"
         if isinstance(v, dict):
             return "{" + ", ".join(f"{k}: {one(x)}" for k, x in v.items()) + "}"
         return _quote(v)
-    lines = ["# docs-suit 프로필. suit.py bootstrap 과 set 이 쓴다. 손으로 고쳐도 된다.", ""]
+    lines = [head, ""]
     for section, body in data.items():
         if not body:
+            continue
+        if not isinstance(body, dict):
+            lines += [f"{section}: {one(body)}", ""]
             continue
         lines.append(f"{section}:")
         lines.extend(f"  {k}: {one(v)}" for k, v in body.items())
@@ -240,25 +256,121 @@ class Themes:
         return self.axes[axis]["values"].get(value, value)
 
 
-def profile_path():
-    return Path(os.path.expanduser(os.environ.get("DOCS_SUIT_PROFILE", PROFILE_DEFAULT)))
+# ---------------------------------------------------------------- 프로필, 슬롯, 폴더 파일
+def config_dir():
+    return Path(os.path.expanduser(os.environ.get("DOCS_SUIT_HOME", CONFIG_DEFAULT)))
 
 
-def load_profile(warn=lambda m: None):
-    p = profile_path()
-    if not p.exists():
+def slot_path(name):
+    if not SLOT_RE.match(name or ""):
+        raise Missing(f"슬롯 이름은 글자, 숫자, -, _ 로 쓴다: {name}")
+    return config_dir() / ("profile.yaml" if name == "default" else f"profiles/{name}.yaml")
+
+
+def find_folder_files(start=None):
+    """지금 폴더부터 위로 홈 폴더까지 있는 .docs-suit.yaml 을 가까운 것부터 돌려준다."""
+    here = Path(start or os.getcwd()).resolve()
+    home = Path.home().resolve()
+    found = []
+    for d in (here, *here.parents):
+        if (d / FOLDER_FILE).is_file():
+            found.append(d / FOLDER_FILE)
+        if d == home:
+            break
+    return found
+
+
+def read_folder(path, warn=lambda m: None):
+    """폴더 파일은 저장소에 올라갈 수 있어서 슬롯 이름과 축 값만 읽고 페르소나는 버린다."""
+    if not path or not path.exists():
         return {}
     try:
-        return parse_yaml(p.read_text(encoding="utf-8"))
+        data = parse_yaml(path.read_text(encoding="utf-8"))
     except (OSError, ValueError) as e:
-        warn(f"프로필을 읽지 못해 무시한다: {p}: {e}")
+        warn(f"폴더 파일을 읽지 못해 무시한다: {path}: {e}")
+        return {}
+    for k in [k for k in data if k not in FOLDER_KEYS]:
+        warn(f"폴더 파일의 {k} 는 쓰지 않는다. 페르소나는 슬롯 프로필에 둔다: {path}")
+        data.pop(k)
+    return data
+
+
+def folder_settings(start=None, warn=lambda m: None):
+    """폴더 파일을 먼 것부터 겹쳐 읽는다. 가까운 폴더의 값이 이긴다. (합친 값, 폴더 파일들)"""
+    files = find_folder_files(start)
+    merged = {}
+    for f in reversed(files):
+        data = read_folder(f, warn)
+        merged = merge_folder(merged, data)
+        if data.get("profile"):
+            merged["profile"] = data["profile"]
+    return merged, files
+
+
+def profile_source(name=None, start=None):
+    """(프로필 파일, 슬롯 이름, 폴더 파일들, 정한 까닭). 까닭은 env · arg · folder · current · default 순으로 이긴다."""
+    settings, folder = folder_settings(start)
+    env = os.environ.get("DOCS_SUIT_PROFILE")
+    if env:
+        return Path(os.path.expanduser(env)), None, folder, "env"
+    if name:
+        return slot_path(name), name, folder, "arg"
+    slot = settings.get("profile")
+    if slot:
+        return slot_path(slot), slot, folder, "folder"
+    current = config_dir() / "current"
+    slot = current.read_text(encoding="utf-8").strip() if current.exists() else ""
+    if slot:
+        return slot_path(slot), slot, folder, "current"
+    return slot_path("default"), "default", folder, "default"
+
+
+def profile_path(name=None):
+    return profile_source(name)[0]
+
+
+def read_slot(path, warn=lambda m: None):
+    if not path.exists():
+        return {}
+    try:
+        return parse_yaml(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as e:
+        warn(f"프로필을 읽지 못해 무시한다: {path}: {e}")
         return {}
 
 
-def write_profile(data):
-    p = profile_path()
+def merge_folder(profile, folder):
+    """폴더 파일의 축 값을 슬롯 프로필 위에 얹는다. 같은 축이면 폴더가 이긴다."""
+    out = dict(profile)
+    defaults = dict(profile.get("defaults") or {})
+    defaults.update(folder.get("defaults") or {})
+    auds = {k: dict(v) for k, v in (profile.get("audiences") or {}).items() if isinstance(v, dict)}
+    for k, v in (folder.get("audiences") or {}).items():
+        if isinstance(v, dict):
+            auds.setdefault(k, {}).update(v)
+    if defaults:
+        out["defaults"] = defaults
+    if auds:
+        out["audiences"] = auds
+    return out
+
+
+def load_profile(warn=lambda m: None, name=None, start=None):
+    """적용되는 슬롯 프로필에 폴더 파일의 축 값을 얹어 돌려준다."""
+    path = profile_source(name, start)[0]
+    return merge_folder(read_slot(path, warn), folder_settings(start, warn)[0])
+
+
+def write_profile(data, name=None):
+    p = profile_path(name)
     p.parent.mkdir(parents=True, exist_ok=True)
     p.write_text(dump_yaml(data), encoding="utf-8")
+    return p
+
+
+def write_folder(data, where=None):
+    p = Path(where or os.getcwd()) / FOLDER_FILE
+    p.write_text(dump_yaml(data, FOLDER_HEAD), encoding="utf-8")
     return p
 
 
@@ -473,13 +585,13 @@ def skill_text(th):
                      for a in COMPOSE_ORDER)
     return f"""---
 name: docs-suit
-description: 문서를 쓰거나 다듬을 때 docs-suit 테마를 입힌다. 보고서, 발표 자료, 회의록, 메일, 이력서, 자기소개서, 포트폴리오, 논문 초록, 설계 문서, PR 설명, 기획서, 업무 보고, 블로그, 뉴스레터, SNS 글을 써 달라는 요청을 받으면 쓰기 전에 이 스킬로 규칙을 조립해 따른다.
+description: 문서를 쓰거나 다듬을 때 docs-suit 테마를 입힌다. 보고서, 발표 자료, 회의록, 메일, 이력서, 자기소개서, 포트폴리오, 논문 초록, 설계 문서, PR 설명, 기획서, 업무 보고, 블로그, 뉴스레터, SNS 글을 써 달라는 요청을 받으면 쓰기 전에 이 스킬로 규칙을 조립해 따른다. 이 폴더에서는 평어체로, 팀장님께는 해요체로 써 달라는 식으로 문서의 말투나 모양을 앞으로 정해 달라는 요청도 이 스킬로 프로필이나 폴더 파일에 남긴다.
 ---
 {EXPORT_MARK} 다시 만들려면 `{run} export` 를 돌린다. -->
 
 # docs-suit
 
-엔진은 `{run}` 이다. 출력은 마크다운 지침 한 장이고, 어떤 에이전트든 그대로 따르면 된다.
+엔진은 `{run}` 이다. 출력은 마크다운 지침 한 장이고, 어떤 에이전트든 그대로 따르면 된다. 프로필은 폴더마다 다를 수 있으니 엔진은 사용자의 작업 폴더에서 부르고, 엔진 폴더로 옮겨 가서 부르지 않는다.
 
 1. `{run} profile` 로 프로필이 있는지 본다. 없으면 이번 문서는 중립 기본값으로 쓰고, 다 쓴 뒤 프로필을 만들면 다음 문서부터 호칭과 말투가 맞춰진다고 권한다. 사용자가 원하거나 세팅해 달라고 하면 bootstrap 을 대신 진행하고, 사용자의 답 없이 프로필을 저장하지 않는다.
    - `{run} list --classes` 로 클래스 일곱 가지를 보여 주고 하나 고르게 한다.
@@ -489,7 +601,7 @@ description: 문서를 쓰거나 다듬을 때 docs-suit 테마를 입힌다. �
 3. 사용자가 문체, 어법, 분량, 글자수, 공개 범위를 말했으면 `--set 축=값` 과 `--chars` 로 넘긴다. 축과 값은 아래 영어 키로 쓴다. {axes}. 공개 범위는 안전 축이라 `--set exposure` 는 `team`, `submit`, `public` 순서로 더 조심하는 쪽으로만 먹는다. 사내나 팀 안에서만 볼 글이면 `--set` 대신 `--audience` 를 `teammate` 나 `peer-dev` 로 넘긴다.
 4. `{run} compose --kind <종류> [--audience …] [--set …] [--chars N]` 의 출력 전체를 이번 문서의 규칙으로 따른다. 다른 문체 지침이나 스킬과 겹치면 어법, 분량, 공개 범위 같은 축의 값은 이 출력을 따른다. 지침의 공통 바닥이 시키는 대로, 쓰기 전에 틀리면 결과가 쓸모없어지는 것만 두세 개 묻는다.
 5. 다 쓴 뒤 `[확인 필요: …]` 표시가 남았으면 모아서 보여 준다.
-6. 사용자가 말투나 모양이 마음에 안 든다고 하면 어느 축의 문제인지 짚고, 그 축의 다른 값으로 다시 조립해 대표 문단 하나를 견줘 보인다. 계속 쓰고 싶어 하면 `{run} set <축> <값> [--audience <독자>]` 로 프로필에 남긴다.
+6. 사용자가 말투나 모양이 마음에 안 든다고 하면 어느 축의 문제인지 짚고, 그 축의 다른 값으로 다시 조립해 대표 문단 하나를 견줘 보인다. 계속 쓰고 싶어 하면 `{run} set <축> <값> [--audience <독자>]` 로 프로필에 남긴다. 이 폴더에서만 그렇게 쓰고 싶어 하면 `--here` 를 붙여 폴더 파일 `.docs-suit.yaml` 에 남긴다.
 """
 
 
@@ -594,7 +706,7 @@ def cmd_bootstrap(a, th):
                                       for k, v in th.classes.items()},
                           "questions": th.persona}, ensure_ascii=False, indent=1))
         return 0
-    p = profile_path()
+    p = profile_path(a.profile)
     if p.exists() and not a.force:
         print(f"이미 프로필이 있다: {p}\n다시 만들려면 --force 를 붙인다. 지금 프로필은 `suit.py profile` 로 본다.")
         return 1
@@ -622,12 +734,12 @@ def cmd_bootstrap(a, th):
         data["profile"]["agents"] = agents
     if p.exists():
         p.with_name(p.name + ".bak").write_text(p.read_text(encoding="utf-8"), encoding="utf-8")
-    print(f"\n프로필을 저장했다: {write_profile(data)}")
+    print(f"\n프로필을 저장했다: {write_profile(data, a.profile)}")
     if agents:
         if not a.yes and _ask("고른 도구에 스킬을 설치할까? [Y/n] ", "y").lower() not in ("y", "yes", "ㅛ"):
             print("설치를 건너뛰었다. 나중에 `suit.py export --agent …` 로 설치한다.")
         else:
-            export(th, agents, profile=load_profile())
+            export(th, agents, profile=load_profile(name=a.profile))
     print("\n이제 `python3 suit.py compose --kind <종류>` 로 지침을 조립한다. 종류는 `python3 suit.py list` 로 본다.")
     return 0
 
@@ -682,17 +794,50 @@ def cmd_list(a, th):
 
 
 def cmd_profile(a, th):
-    p = profile_path()
-    if not p.exists():
-        print(f"프로필이 없다: {p}\n`python3 suit.py bootstrap` 으로 만든다.")
-        return 3
-    print(f"# {p}\n")
-    print(p.read_text(encoding="utf-8"))
-    return 0
+    path, slot, folder, why = profile_source(a.profile)
+    if a.action == "list":
+        slots = ["default"] + sorted(f.stem for f in (config_dir() / "profiles").glob("*.yaml"))
+        for name in slots:
+            mark = "*" if name == slot else " "
+            note = "" if slot_path(name).exists() else "  아직 없음"
+            print(f"{mark} {name:<12} {slot_path(name)}{note}")
+        for f in folder:
+            print(f"폴더 파일: {f}")
+        return 0
+    if a.action == "use":
+        if not a.name:
+            raise Missing("슬롯 이름을 준다: suit.py profile use <이름> [--here]")
+        target = slot_path(a.name)
+        if a.here:
+            data = read_folder(Path.cwd() / FOLDER_FILE, warn_stderr)
+            data = {"profile": a.name, **{k: v for k, v in data.items() if k != "profile"}}
+            print(f"폴더 파일 {write_folder(data)} 이 슬롯 {a.name} 을 쓴다")
+        else:
+            current = config_dir() / "current"
+            current.parent.mkdir(parents=True, exist_ok=True)
+            if a.name == "default":
+                current.unlink(missing_ok=True)
+            else:
+                current.write_text(a.name + "\n", encoding="utf-8")
+            print(f"이제 슬롯 {a.name} 을 쓴다. 폴더 파일이 있는 폴더에서는 폴더 파일이 앞선다")
+        if not target.exists():
+            print(f"슬롯 {a.name} 은 아직 없다. `python3 suit.py bootstrap --profile {a.name}` 으로 만든다")
+        return 0
+    reason = {"env": "환경 변수 DOCS_SUIT_PROFILE", "arg": "--profile 인자", "folder": "폴더 파일",
+              "current": "profile use 로 고른 슬롯", "default": "기본 슬롯"}[why]
+    if not path.exists():
+        print(f"프로필이 없다: {path}\n`python3 suit.py bootstrap` 으로 만든다. 슬롯 {slot or '-'} ({reason})")
+    else:
+        print(f"# 슬롯 {slot or '-'}: {path} ({reason})\n")
+        print(path.read_text(encoding="utf-8"))
+    for f in reversed(folder):
+        print(f"\n# 폴더 파일 {f} 이 얹는 값. 아래 파일일수록 앞선다\n")
+        print(f.read_text(encoding="utf-8"))
+    return 0 if path.exists() else 3
 
 
 def cmd_get(a, th):
-    vals, auds, cls = resolve(th, a.kind, _auds(a.audience), _sets(a.set), load_profile(warn_stderr), a.cls,
+    vals, auds, cls = resolve(th, a.kind, _auds(a.audience), _sets(a.set), load_profile(warn_stderr, a.profile), a.cls,
                               warn_stderr)
     if a.json:
         print(json.dumps({"class": cls, "kind": a.kind, "audiences": auds, "axes": {
@@ -707,7 +852,7 @@ def cmd_get(a, th):
 
 
 def cmd_compose(a, th):
-    text, _ = compose(th, a.kind, _auds(a.audience), _sets(a.set), load_profile(warn_stderr), a.cls,
+    text, _ = compose(th, a.kind, _auds(a.audience), _sets(a.set), load_profile(warn_stderr, a.profile), a.cls,
                       a.chars, a.format, a.html, warn_stderr)
     if a.output:
         Path(a.output).expanduser().write_text(text, encoding="utf-8")
@@ -726,7 +871,8 @@ def cmd_set(a, th):
         raise Missing(f"모르는 축: {a.axis}")
     if a.audience and a.audience not in th.audiences:
         raise Missing(f"모르는 독자: {a.audience}")
-    data = load_profile(warn_stderr)
+    # 쓸 때는 폴더 값을 얹지 않은 원본에 쓴다. --here 는 지금 폴더의 폴더 파일에 쓴다.
+    data = read_folder(Path.cwd() / FOLDER_FILE, warn_stderr) if a.here else read_slot(profile_path(a.profile), warn_stderr)
     data.setdefault("defaults", {})
     data.setdefault("audiences", {})
     if a.audience:
@@ -741,15 +887,15 @@ def cmd_set(a, th):
             data["audiences"].pop(a.audience)
     else:
         target[a.axis] = a.value
-    p = write_profile(data)
+    p = write_folder(data) if a.here else write_profile(data, a.profile)
     where = f"독자 {a.audience}" if a.audience else "기본값"
-    print(f"프로필 {p} 의 {where} 에 {a.axis}={'(지움)' if a.unset else a.value}")
+    print(f"{'폴더 파일' if a.here else '프로필'} {p} 의 {where} 에 {a.axis}={'(지움)' if a.unset else a.value}")
     return 0
 
 
 def cmd_export(a, th):
     agents = [x.strip() for x in a.agent.split(",") if x.strip()]
-    export(th, agents, a.dest, a.dry_run, load_profile(warn_stderr))
+    export(th, agents, a.dest, a.dry_run, load_profile(warn_stderr, a.profile))
     return 0
 
 
@@ -887,23 +1033,24 @@ def selftest(th):
         old = os.environ.get("DOCS_SUIT_PROFILE")
         os.environ["DOCS_SUIT_PROFILE"] = str(Path(td) / "profile.yaml")
         try:
-            ns = argparse.Namespace(questions=False, force=False, cls="developer", yes=True,
+            ns = argparse.Namespace(questions=False, force=False, cls="developer", yes=True, profile=None,
                                     call='민수 "님"', affiliation="백엔드, 2년 차: 결제", goal=None,
                                     facts="#1 은 지도 시각화", dislikes=None, docs="pr,design-doc", agents="")
             quiet(cmd_bootstrap, ns, th)
-            prof = load_profile()
+            prof = load_profile(start=td)
             check(prof.get("profile", {}).get("class") == "developer", "bootstrap 이 클래스를 남기지 않았다")
             per = prof.get("persona", {})
             check(per.get("affiliation") == "백엔드, 2년 차: 결제" and per.get("facts") == "#1 은 지도 시각화"
                   and per.get("docs") == ["pr", "design-doc"] and "”" in per.get("call", ""),
                   f"페르소나가 그대로 읽히지 않는다: {per}")
             check(quiet(cmd_bootstrap, ns, th) == 1, "프로필이 있는데 --force 없이 덮어썼다")
-            quiet(cmd_set, argparse.Namespace(axis="register", value="haeyo", unset=False, audience="peer-dev"), th)
-            vals, _, _ = resolve(th, kind="pr", profile=load_profile())
+            quiet(cmd_set, argparse.Namespace(axis="register", value="haeyo", unset=False, audience="peer-dev",
+                                                 here=False, profile=None), th)
+            vals, _, _ = resolve(th, kind="pr", profile=load_profile(start=td))
             check(vals["register"] == ("haeyo", "profile-audience"), "set 으로 쓴 프로필 값을 읽지 못한다")
-            check(load_profile().get("persona", {}).get("affiliation") == "백엔드, 2년 차: 결제", "set 이 페르소나를 망가뜨렸다")
+            check(load_profile(start=td).get("persona", {}).get("affiliation") == "백엔드, 2년 차: 결제", "set 이 페르소나를 망가뜨렸다")
             out = Path(td) / "export"
-            paths = quiet(export, th, ["all"], str(out), False, load_profile())
+            paths = quiet(export, th, ["all"], str(out), False, load_profile(start=td))
             check(len(paths) == len(AGENT_TARGETS), "export 가 모든 자리에 쓰지 않았다")
             skill = (out / "claude" / "SKILL.md").read_text(encoding="utf-8")
             check(skill.startswith("---\nname: docs-suit") and EXPORT_MARK in skill and str(HERE / "suit.py") in skill,
@@ -921,6 +1068,40 @@ def selftest(th):
                 os.environ.pop("DOCS_SUIT_PROFILE", None)
             else:
                 os.environ["DOCS_SUIT_PROFILE"] = old
+
+    # 슬롯과 폴더 파일
+    with tempfile.TemporaryDirectory() as td:
+        saved = {k: os.environ.pop(k, None) for k in ("DOCS_SUIT_PROFILE", "DOCS_SUIT_HOME")}
+        os.environ["DOCS_SUIT_HOME"] = str(Path(td) / "conf")
+        top, sub = Path(td) / "proj", Path(td) / "proj" / "sub"
+        sub.mkdir(parents=True)
+        try:
+            write_profile({"profile": {"class": "office"}, "persona": {"call": "회사"}, "defaults": {"voice": "prose"}}, "work")
+            write_profile({"profile": {"class": "student"}}, "default")
+            check(profile_source(start=sub)[1] == "default", "폴더 파일이 없는데 기본 슬롯을 쓰지 않는다")
+            write_folder({"profile": "work", "defaults": {"register": "haeyo"}, "persona": {"call": "새면 안 된다"}}, top)
+            write_folder({"defaults": {"register": "plain"}}, sub)
+            _, name, files, why = profile_source(start=sub)
+            check(name == "work" and why == "folder" and len(files) == 2, "위쪽 폴더 파일의 슬롯을 따르지 않는다")
+            prof = load_profile(start=sub)
+            check(prof.get("defaults") == {"voice": "prose", "register": "plain"}, "가까운 폴더 파일의 값이 이기지 않는다")
+            check(prof.get("persona") == {"call": "회사"}, "폴더 파일의 페르소나가 섞였다")
+            check(profile_source("default", start=sub)[1] == "default", "--profile 이 폴더 파일을 이기지 못한다")
+            os.environ["DOCS_SUIT_PROFILE"] = str(Path(td) / "env.yaml")
+            check(profile_source("work", start=sub)[3] == "env", "환경 변수가 --profile 을 이기지 못한다")
+            os.environ.pop("DOCS_SUIT_PROFILE")
+            (Path(td) / "conf" / "current").write_text("work\n", encoding="utf-8")
+            check(profile_source(start=td)[1] == "work", "profile use 로 고른 슬롯을 쓰지 않는다")
+            try:
+                slot_path("../x")
+                problems.append("슬롯 이름에 경로를 받았다")
+            except Missing:
+                pass
+        finally:
+            for k, v in saved.items():
+                os.environ.pop(k, None)
+                if v is not None:
+                    os.environ[k] = v
 
     web = HERE / "docs" / "themes.json"
     if (HERE / "docs").is_dir() and th.root.resolve() == (HERE / "themes" / DEFAULT_LANG).resolve():
@@ -943,7 +1124,9 @@ def main(argv=None):
             pass
     ap = argparse.ArgumentParser(prog="suit.py", description="docs-suit: 문서에 옷을 입히는 AI 글쓰기 테마 엔진")
     sub = ap.add_subparsers(dest="cmd", required=True)
-    b = sub.add_parser("bootstrap")
+    slot = argparse.ArgumentParser(add_help=False)
+    slot.add_argument("--profile", metavar="슬롯", help="이 슬롯의 프로필을 쓴다. 폴더 파일과 profile use 보다 앞선다")
+    b = sub.add_parser("bootstrap", parents=[slot])
     b.add_argument("--class", dest="cls")
     for k in PERSONA_IN_PROMPT:
         b.add_argument(f"--{k}")
@@ -952,12 +1135,15 @@ def main(argv=None):
     b.add_argument("--yes", action="store_true", help="묻지 않고 진행한다")
     b.add_argument("--force", action="store_true", help="있는 프로필을 .bak 으로 남기고 새로 만든다")
     b.add_argument("--questions", action="store_true", help="클래스와 페르소나 질문 목록을 JSON 으로 낸다")
-    sub.add_parser("profile")
+    pr = sub.add_parser("profile", parents=[slot])
+    pr.add_argument("action", nargs="?", choices=("show", "list", "use"), default="show")
+    pr.add_argument("name", nargs="?", help="profile use 로 고를 슬롯 이름")
+    pr.add_argument("--here", action="store_true", help="지금 폴더의 .docs-suit.yaml 에 슬롯을 적는다")
     li = sub.add_parser("list")
     li.add_argument("--classes", action="store_true")
     li.add_argument("--json", action="store_true")
     for name in ("get", "compose"):
-        p = sub.add_parser(name)
+        p = sub.add_parser(name, parents=[slot])
         p.add_argument("--class", dest="cls")
         p.add_argument("--kind")
         p.add_argument("--audience")
@@ -969,12 +1155,13 @@ def main(argv=None):
             p.add_argument("--format", choices=("prompt", "output-style"), default="prompt")
             p.add_argument("--html", action="store_true", help="문서 디자인 규칙도 싣는다")
             p.add_argument("-o", "--output")
-    s = sub.add_parser("set")
+    s = sub.add_parser("set", parents=[slot])
     s.add_argument("axis")
     s.add_argument("value", nargs="?")
     s.add_argument("--unset", action="store_true")
     s.add_argument("--audience")
-    e = sub.add_parser("export")
+    s.add_argument("--here", action="store_true", help="슬롯 대신 지금 폴더의 .docs-suit.yaml 에 쓴다")
+    e = sub.add_parser("export", parents=[slot])
     e.add_argument("--agent", required=True, help="claude, agents, codex, antigravity, cursor, grok, web, all")
     e.add_argument("--dest", help="에이전트별 하위 폴더로 이 폴더 아래에 쓴다. 시험용")
     e.add_argument("--dry-run", action="store_true")
