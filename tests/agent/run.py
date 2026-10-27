@@ -228,7 +228,7 @@ def doc_text(reply, proj):
         return mail.group(0)
     # 질문이 여럿이고 본문의 [확인 필요] 표시가 없으면 질문만 하고 멈춘 것이다. 백틱 안의 표시는 표시 방식을 설명한 말이다.
     asks = len(re.findall(r"\?|주세요|여쭤|여쭙|주시면", reply))
-    if asks >= 2 and not re.search(r"(?<!`)\[확인 필요", reply):
+    if asks >= 2 and not suit.UNRESOLVED.search(reply):
         return ""
     # --- 로 나뉜 답은 본문과 덧붙인 안내가 섞여 있다. [확인 필요] 표시가 가장 많은 조각을 본문으로 본다.
     parts = re.split(r"^---\s*$", reply, flags=re.M)
@@ -304,7 +304,9 @@ def load_case(agent, case, base):
                    if (tmp / name).exists()]
     meta = finish_meta(agent, tmp, transcripts, ok)
     meta["followup"] = len(transcripts) > 1
-    doc = doc_text(meta["reply"], tmp / "proj") if vals else ""
+    # 재촉했으면 두 답 가운데 본문이 더 긴 쪽을 쓴다. 첫 답에 본문을 쓰고 둘째 답은 안내만 하는 경우가 있다.
+    replies = [AGENTS[agent]["meta"](t)["reply"] for t in transcripts] or [meta["reply"]]
+    doc = max((doc_text(r, tmp / "proj") for r in replies), key=lambda d: len(suit.body_lines(d))) if vals else ""
     kind = compose_args(next(c for c in reversed(read_calls(tmp)) if c[:1] == ["compose"] and "--help" not in c)).kind if vals else None
     meta["doc"] = None if not vals else suit.check_doc(doc, vals, chars, kind) if doc else None
     # 본문을 다 쓴 뒤 check 로 성장 기록을 남겼는지는 기록 파일로 본다. 빈 본문으로 부른 check 는 기록을 남기지 않는다.

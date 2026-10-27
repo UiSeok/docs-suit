@@ -123,6 +123,18 @@ python3 suit.py growth off                          # 캐릭터 키우기를 끈
 
 기록은 `~/.config/docs-suit/growth/<슬롯>.jsonl` 에 남습니다. 날짜와 문서 종류, 검사 결과, 남은 `[확인 필요]` 개수만 적고 본문과 파일 경로는 남기지 않습니다. 에이전트는 성장 줄을 답 끝에만 붙이고 문서 본문에는 넣지 않습니다. 그림은 `themes/ko/sprites/` 에 기본 몸과 옷, 머리, 소품 부품으로 나뉘어 있고, 부품을 더하면 `themes/ko/look.yaml` 에 한 줄을 더합니다.
 
+## 세션을 열면 캐릭터가 뜨게 하기
+
+Claude Code 는 화면 맨 아래 상태 줄에 캐릭터를 그릴 수 있습니다. 상태 줄은 세션을 여는 순간 그려지고 작업 폴더의 슬롯을 따라가므로, 폴더마다 그 폴더의 캐릭터가 뜹니다. `~/.claude/settings.json` 에 아래를 넣습니다.
+
+```json
+"statusLine": {"type": "command", "command": "python3 <docs-suit 경로>/suit.py status"}
+```
+
+이미 쓰는 상태 줄 스크립트가 있으면 바꾸지 말고, 스크립트가 받은 JSON 을 그대로 넘기는 줄을 끝에 더합니다. 예를 들어 `input=$(cat)` 으로 받는 스크립트라면 `printf '%s' "$input" | python3 <docs-suit 경로>/suit.py status` 입니다. 기본은 얼굴과 칭호, 레벨을 일곱 줄로 그리고, `--size line` 은 글 한 줄, `--size full` 은 온몸입니다. 슬롯이 없거나 캐릭터 키우기를 끈 폴더에서는 아무것도 그리지 않습니다.
+
+Antigravity CLI 도 `~/.gemini/antigravity-cli/settings.json` 의 `statusLine` 에 같은 명령을 걸 수 있다고 문서에 나와 있지만 아직 직접 확인하지 않았습니다. Codex CLI 는 상태 줄에 외부 명령을 걸 수 없어서, 터미널 옆 칸에 띄우는 캐릭터 창을 따로 만들 예정입니다.
+
 ## 테마 조합과 승급 키
 
 테마 조합은 축 기본값과 독자별 값을 한 묶음으로 남긴 것입니다. 게임의 스킬 조합처럼 다른 사람이 기여한 조합을 내 슬롯에 입힐 수 있고, 처음 캐릭터를 만들 때 추천 조합으로 시작할 수도 있습니다. 조합은 `themes/ko/presets/` 에 있습니다.

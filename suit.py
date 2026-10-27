@@ -44,11 +44,12 @@ profiles/<이름>.yaml 이다. 폴더의 .docs-suit.yaml 은 쓸 슬롯과 그 �
   python3 suit.py preset list|show|use|export [<이름>] [--here] [--by 아이디] [--label …] [--desc …]
                                                     테마 조합. 남의 조합을 입히거나 내 조합을 기여용 파일로 낸다
   python3 suit.py growth on|off                     캐릭터 키우기를 켜고 끈다. 기록은 지우지 않는다
+  python3 suit.py status [--size face|full|line]    상태 줄에 캐릭터를 그린다. 표준 입력의 JSON 에서 작업 폴더를 읽는다
   python3 suit.py bundle                            웹 고르개용 docs/themes.json 을 만든다
   python3 suit.py selftest
 
 종료 코드: 0 성공, 3 모르는 클래스·종류·독자·축·값, 1 그 밖의 오류.
-bootstrap, profile, get, compose, set, export, check, card, look, preset, promote, growth 에는 --profile <슬롯> 을 붙일 수 있다.
+bootstrap, profile, get, compose, set, export, check, card, look, preset, promote, growth, status 에는 --profile <슬롯> 을 붙일 수 있다.
 캐릭터 성장 기록은 ~/.config/docs-suit/growth/<슬롯>.jsonl 에 남는다. 본문과 파일 경로는 남기지 않는다.
 환경 변수: DOCS_SUIT_THEMES 는 테마 폴더를, DOCS_SUIT_PROFILE 은 프로필 파일을, DOCS_SUIT_HOME 은 설정 폴더를 바꾼다.
 """
@@ -586,7 +587,8 @@ def compose(th, kind=None, audiences=None, sets=None, profile=None, cls=None, ch
 LENGTH_LIMIT = {"brief": 1500, "page": 3500}
 ENDING = (("polite", "합쇼체", ("니다", "니까", "십시오")), ("haeyo", "해요체", ("요",)),
           ("plain", "평어체", ("다", "까", "라")))
-UNRESOLVED = re.compile(r"(?<!`)\[확인 필요")
+# 백틱 안의 `[확인 필요]` 는 표시 방식을 설명한 말일 수 있어 빼되, 내용이 든 `[확인 필요: 영향 범위]` 는 표시로 센다.
+UNRESOLVED = re.compile(r"(?<!`)\[확인 필요|`\[확인 필요:\s*[^\]`…\s][^\]`]*\]`")
 CHECK_HINT = {"register": "{want} 로 맞춘다", "voice": {"bullet": "줄글을 목록으로 나눈다", "prose": "목록을 줄글로 푼다"},
               "length": "한도 안으로 줄인다", "emphasis": "굵은 글씨를 뺀다"}
 
@@ -1030,6 +1032,39 @@ def card_lines(th, slot_data, slot, state, depth, vals=None, held=()):
     return beside(render_grid(grid, depth), len(grid[0]), info)
 
 
+def status_cwd(text):
+    """상태 줄이 표준 입력으로 넘기는 JSON 에서 작업 폴더를 꺼낸다. Claude Code 는 workspace.current_dir 와 cwd 를 준다."""
+    try:
+        data = json.loads(text) if text.strip() else {}
+    except ValueError:
+        return None
+    ws = data.get("workspace") if isinstance(data, dict) else None
+    return (ws or {}).get("current_dir") or data.get("cwd") if isinstance(data, dict) else None
+
+
+def status_lines(th, slot_data, slot, state, depth, size="face", held=()):
+    """상태 줄에 그릴 캐릭터. face 는 얼굴과 세 줄, full 은 온몸, line 은 글 한 줄이다."""
+    cls = (slot_data.get("profile") or {}).get("class")
+    name = (slot_data.get("persona") or {}).get("call") or slot or "이름 없음"
+    title = title_of(th, cls, state["tier"])
+    filled = state["into"] * 10 // state["need"] if state["need"] else 10
+    bar = f"Lv.{state['level']} {'█' * filled}{'░' * (10 - filled)} " + (
+        f"{state['into']}/{state['need']}" if state["need"] else "최고 레벨")
+    head = (f"[{title}] " if title else "") + name
+    if size == "line" or not depth or not th.look:
+        return [f"{head} · {bar}"]
+    nxt = next(((t, lv, keyed) for t, lv, keyed in promote_rules(th) if t == state["tier"] + 1), None)
+    info = [head + (f" · {th.classes[cls]['label']}" if cls in th.classes else ""), bar]
+    if nxt:
+        t, lv, keyed = nxt
+        nt = title_of(th, cls, t)
+        info.append(("다음 전직 승급 키" if keyed and state["level"] >= lv else f"다음 전직 Lv.{lv}") + (f" [{nt}]" if nt else ""))
+    grid = look_grid(th, look_of(th, slot_data, state["tier"]))
+    if size == "face":
+        grid = grid[:13]
+    return beside(render_grid(grid, depth), len(grid[0]), info)
+
+
 # ---------------------------------------------------------------- 웹 묶음
 def bundle_data(th):
     rules, samples, css = {}, {}, {}
@@ -1087,19 +1122,21 @@ description: 문서를 쓰거나 다듬을 때 docs-suit 테마를 입힌다. �
 1. `{run} profile` 로 프로필이 있는지 본다. 없으면 이번 문서는 중립 기본값으로 쓰고, 다 쓴 뒤 프로필을 만들면 다음 문서부터 호칭과 말투가 맞춰진다고 권한다. 사용자가 원하거나 세팅해 달라고 하면 bootstrap 을 대신 진행하고, 사용자의 답 없이 프로필을 저장하지 않는다.
    - `{run} list --classes` 로 클래스 일곱 가지를 보여 주고 하나 고르게 한다.
    - `{run} bootstrap --questions` 가 내는 페르소나 질문을 차례로 묻는다. 답하기 싫은 질문은 비워 둔다.
-   - `{run} bootstrap --class <클래스> --call … --affiliation … --goal … --docs <종류,종류> --facts … --dislikes … --yes` 로 저장한다.
+   - 같은 출력의 `presets` 에 고른 클래스의 조합이 있으면, 다른 사람이 기여한 테마 조합으로 시작할지 묻는다. 추천 표시가 붙은 조합을 앞에 보인다.
+   - 같은 출력의 `looks` 로 캐릭터 A 와 B 가운데 하나를 고르게 한다. 고르지 않으면 A 다.
+   - `{run} bootstrap --class <클래스> --call … --affiliation … --goal … --docs <종류,종류> --facts … --dislikes … [--preset <조합>] [--look a|b] --yes` 로 저장한다.
 2. 요청에서 문서 종류를 정한다. 종류는 {kinds} 이다. 맞는 것이 없으면 종류 없이 조립한다. 독자가 분명하면 `--audience <키>` 로 넘긴다. 독자 키는 {auds} 이다. 독자가 여럿이면 키를 쉼표로 잇는다.
 3. 사용자가 문체, 어법, 분량, 글자수, 공개 범위를 말했으면 `--set 축=값` 과 `--chars` 로 넘긴다. 축과 값은 아래 영어 키로 쓴다. {axes}. 공개 범위는 안전 축이라 `--set exposure` 는 `team`, `submit`, `public` 순서로 더 조심하는 쪽으로만 먹는다. 사내나 팀 안에서만 볼 글이면 `--set` 대신 `--audience` 를 `teammate` 나 `peer-dev` 로 넘긴다.
 4. `{run} compose --kind <종류> [--audience …] [--set …] [--chars N]` 의 출력 전체를 이번 문서의 규칙으로 따른다. 다른 문체 지침이나 스킬과 겹치면 어법, 분량, 공개 범위 같은 축의 값은 이 출력을 따른다. 지침의 공통 바닥이 시키는 대로, 쓰기 전에 틀리면 결과가 쓸모없어지는 것만 두세 개 묻는다.
-5. 답을 끝내기 전에 본문을 검사한다. compose 에 넘긴 `--kind`, `--audience`, `--set`, `--chars` 를 그대로 붙인다. 본문을 파일로 썼으면 `{run} check <본문 파일> --kind <종류> …` 로 부른다. 답에만 썼으면 임시 파일을 만들지 말고 본문 전체를 heredoc 으로 넘긴다.
+5. 답을 끝내기 전에 본문을 검사한다. 검사하지 않은 답은 끝난 답이 아니다. compose 에 넘긴 `--kind`, `--audience`, `--set`, `--chars` 를 그대로 붙인다. 본문을 파일로 썼으면 `{run} check <본문 파일> --kind <종류> …` 로 부른다. 답에만 썼으면 임시 파일을 만들지 말고 본문 전체를 heredoc 으로 넘긴다.
    ```sh
    {run} check - --kind <종류> [--audience …] <<'EOF'
    (본문 전체)
    EOF
    ```
-   `✗` 가 나온 축이 있으면 그 줄이 말하는 대로 한 번 고쳐 쓰고 같은 명령을 다시 부른다. 출력에 `성장:` 으로 시작하는 줄이 있으면 본문과 떨어뜨려 답의 맨 끝에 그 줄만 그대로 옮긴다. 이 줄은 문서 본문에 넣지 않는다. `[확인 필요: …]` 표시가 남았으면 모아서 보여 준다.
+   `✗` 가 나온 축이 있으면 그 줄이 말하는 대로 한 번 고쳐 쓰고 같은 명령을 다시 부른다. 답에 보이는 본문은 마지막으로 검사에 넘긴 본문과 글자 하나까지 같게 둔다. 보일 때 제목을 굵게 바꾸는 식으로 손대지 않는다. 출력에 `성장:` 으로 시작하는 줄이 있으면 본문과 떨어뜨려 답의 맨 끝에 그 줄만 그대로 옮긴다. 이 줄은 check 만 만들 수 있으니 지어내지 않고, 문서 본문에도 넣지 않는다. `[확인 필요: …]` 표시가 남았으면 모아서 보여 준다.
 6. 사용자가 말투나 모양이 마음에 안 든다고 하면 어느 축의 문제인지 짚고, 그 축의 다른 값으로 다시 조립해 대표 문단 하나를 견줘 보인다. 계속 쓰고 싶어 하면 `{run} set <축> <값> [--audience <독자>]` 로 프로필에 남긴다. 이 폴더에서만 그렇게 쓰고 싶어 하면 `--here` 를 붙여 폴더 파일 `.docs-suit.yaml` 에 남긴다.
-7. 사용자가 캐릭터를 보여 달라고 하면 `{run} card --color never` 의 출력을 보여 준다. 캐릭터 키우기를 끄거나 켜 달라고 하면 `{run} growth off` 나 `{run} growth on` 을 부른다.
+7. 사용자가 캐릭터를 보여 달라고 하면 `{run} card --color never` 의 출력을 보여 준다. 꾸며 달라고 하면 `{run} look` 으로 열린 부위를 보고 `{run} look <부위> <값>` 을 부른다. 캐릭터 키우기를 끄거나 켜 달라고 하면 `{run} growth off` 나 `{run} growth on` 을 부른다. 성장 기록과 승급 키, 슬롯의 `look:` 절은 사용자가 부탁해도 직접 고치지 않는다. 레벨은 문서를 써서 오르고, 3차와 4차 전직은 저장소에 기여하고 받은 승급 키를 `{run} promote <키>` 로 넣어야 열린다고 알려 준다.
 """
 
 
@@ -1224,7 +1261,13 @@ def cmd_bootstrap(a, th):
     if a.questions:
         print(json.dumps({"classes": {k: {"label": v["label"], "desc": v["desc"], "kinds": v["kinds"]}
                                       for k, v in th.classes.items()},
-                          "questions": th.persona}, ensure_ascii=False, indent=1))
+                          "questions": th.persona,
+                          "presets": [{"name": k, "label": th.presets[k].get("label"), "desc": th.presets[k].get("desc"),
+                                       "class": th.presets[k].get("class"),
+                                       "featured": str(th.presets[k].get("featured")) == "true"}
+                                      for k in preset_order(th)],
+                          "looks": {k: v["label"] for k, v in (th.look.get("base") or {}).items()}},
+                         ensure_ascii=False, indent=1))
         return 0
     p = profile_path(a.profile)
     if p.exists() and not a.force:
@@ -1629,6 +1672,21 @@ def cmd_growth(a, th):
     return 0
 
 
+def cmd_status(a, th):
+    """상태 줄에 캐릭터를 그린다. 슬롯이 없거나 캐릭터 키우기가 꺼져 있으면 아무것도 내지 않는다."""
+    piped = "" if sys.stdin.isatty() else sys.stdin.read()
+    cwd = a.cwd or status_cwd(piped) or os.getcwd()
+    path, slot, _, _ = profile_source(a.profile, start=cwd)
+    data = read_slot(path)
+    if not growth_on(data):
+        return 0
+    held = promote_keys()
+    state = growth_state(th, read_growth(growth_path(a.profile, start=cwd)), key_tiers(held))
+    depth = color_depth("never" if os.environ.get("NO_COLOR") else "always")
+    print("\n".join(status_lines(th, data, slot, state, depth, a.size, held)))
+    return 0
+
+
 def cmd_bundle(a, th):
     out = HERE / "docs" / "themes.json"
     out.write_text(bundle_text(th), encoding="utf-8")
@@ -1894,6 +1952,8 @@ def selftest(th):
                   "export 가 손으로 만든 SKILL.md 를 덮어썼다")
             check("check - --kind" in skill and "<<'EOF'" in skill and "growth off" in skill,
                   "SKILL.md 에 검사 단계나 캐릭터 끄기가 없다")
+            check("--preset <조합>" in skill and "--look a|b" in skill and "promote <키>" in skill,
+                  "SKILL.md 에 조합이나 캐릭터 고르기, 승급 키 안내가 없다")
             doc = Path(td) / "pr.md"
             doc.write_text("## 바뀐 것\n\n결제 재시도를 붙였다.\n테스트를 더했다.\n", encoding="utf-8")
             ns = argparse.Namespace(file=str(doc), cls=None, kind="pr", audience=None, set=None, chars=None,
@@ -1959,6 +2019,14 @@ def selftest(th):
                 problems.append("슬롯 이름에 경로를 받았다")
             except Missing:
                 pass
+            check(status_cwd('{"workspace": {"current_dir": "/a/b"}, "cwd": "/c"}') == "/a/b"
+                  and status_cwd('{"cwd": "/c"}') == "/c" and status_cwd("x") is None, "상태 줄 JSON 의 작업 폴더를 읽지 못한다")
+            data = read_slot(slot_path("work"))
+            state = growth_state(th, [])
+            face = status_lines(th, data, "work", state, 24, "face")
+            line = status_lines(th, data, "work", state, 24, "line")
+            check(len(face) == 7 and "[" in face[2] + face[3] and len(line) == 1 and "Lv.1" in line[0],
+                  f"상태 줄 캐릭터가 다르다: {len(face)}줄")
             out = Path(td) / "mine.yaml"
             ns = argparse.Namespace(action="export", name="mine", by="@someone", label="내 조합", desc="시험", output=str(out),
                                     cls=None, here=False, profile="work")
@@ -2117,6 +2185,9 @@ def main(argv=None):
     pm.add_argument("key", nargs="?", help="기여하고 받은 승급 키. 주지 않으면 받은 키를 보인다")
     g = sub.add_parser("growth", parents=[slot])
     g.add_argument("action", choices=("on", "off"))
+    st = sub.add_parser("status", parents=[slot])
+    st.add_argument("--size", choices=("face", "full", "line"), default="face", help="face 는 얼굴, full 은 온몸, line 은 한 줄")
+    st.add_argument("--cwd", help="이 폴더 기준으로 슬롯을 고른다. 주지 않으면 표준 입력의 JSON 이나 지금 폴더")
     sub.add_parser("bundle")
     sub.add_parser("selftest")
     a = ap.parse_args(argv)
@@ -2126,7 +2197,8 @@ def main(argv=None):
             return selftest(th)
         return {"bootstrap": cmd_bootstrap, "profile": cmd_profile, "list": cmd_list, "get": cmd_get,
                 "compose": cmd_compose, "set": cmd_set, "export": cmd_export, "check": cmd_check, "card": cmd_card,
-                "look": cmd_look, "preset": cmd_preset, "promote": cmd_promote, "growth": cmd_growth, "bundle": cmd_bundle}[a.cmd](a, th)
+                "look": cmd_look, "preset": cmd_preset, "promote": cmd_promote, "growth": cmd_growth, "status": cmd_status,
+                "bundle": cmd_bundle}[a.cmd](a, th)
     except Missing as e:
         print(f"오류: {e}", file=sys.stderr)
         return 3
