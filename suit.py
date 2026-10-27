@@ -25,7 +25,7 @@ profiles/<이름>.yaml 이다. 폴더의 .docs-suit.yaml 은 쓸 슬롯과 그 �
 사용
   python3 suit.py bootstrap                             처음 세팅. 클래스와 페르소나를 묻고 프로필을 만든다
   python3 suit.py bootstrap --class C [--call …] [--affiliation …] [--goal …] [--docs a,b]
-                            [--facts …] [--dislikes …] [--agents a,b] --yes [--force]
+                            [--facts …] [--dislikes …] [--agents a,b] [--look a|b] --yes [--force]
   python3 suit.py bootstrap --questions                 에이전트가 대신 물을 때 쓸 질문 목록
   python3 suit.py profile [show|list]                   지금 쓰는 프로필 보기, 슬롯 목록
   python3 suit.py profile use <슬롯> [--here]           기본 슬롯을 바꾼다. --here 는 지금 폴더에 적는다
@@ -36,19 +36,27 @@ profiles/<이름>.yaml 이다. 폴더의 .docs-suit.yaml 은 쓸 슬롯과 그 �
   python3 suit.py set <축> <값> [--audience A] [--here]   프로필에 쓴다. --here 는 지금 폴더의 폴더 파일에 쓴다
   python3 suit.py set <축> --unset [--audience A] [--here]
   python3 suit.py export --agent claude,agents,antigravity,cursor,grok,web|all [--dest 폴더] [--dry-run]
+  python3 suit.py check <파일|-> [--kind K] [--audience A] [--set 축=값]... [--chars N] [--no-record] [--json]
+                                                    다 쓴 본문을 조립한 값대로 재고 성장 기록에 남긴다
+  python3 suit.py card [--json] [--color auto|always|never]   캐릭터 카드
+  python3 suit.py look [<부위> <값>] [--json]        꾸미기. 부위는 base, color, hair, prop, top
+  python3 suit.py growth on|off                     캐릭터 키우기를 켜고 끈다. 기록은 지우지 않는다
   python3 suit.py bundle                            웹 고르개용 docs/themes.json 을 만든다
   python3 suit.py selftest
 
 종료 코드: 0 성공, 3 모르는 클래스·종류·독자·축·값, 1 그 밖의 오류.
-bootstrap, profile, get, compose, set, export 에는 --profile <슬롯> 을 붙일 수 있다.
+bootstrap, profile, get, compose, set, export, check, card, look, growth 에는 --profile <슬롯> 을 붙일 수 있다.
+캐릭터 성장 기록은 ~/.config/docs-suit/growth/<슬롯>.jsonl 에 남는다. 본문과 파일 경로는 남기지 않는다.
 환경 변수: DOCS_SUIT_THEMES 는 테마 폴더를, DOCS_SUIT_PROFILE 은 프로필 파일을, DOCS_SUIT_HOME 은 설정 폴더를 바꾼다.
 """
 import argparse
+import hashlib
 import json
 import os
 import re
 import sys
 import tempfile
+from datetime import datetime
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -224,9 +232,18 @@ class Themes:
             f = Path(stem)
             meta = c.get("class", {})
             self.classes[f.stem] = {"label": meta.get("label", f.stem), "desc": meta.get("desc", ""),
-                                    "kinds": meta.get("kinds", []), "defaults": c.get("defaults", {})}
+                                    "kinds": meta.get("kinds", []), "titles": meta.get("titles", []),
+                                    "defaults": c.get("defaults", {})}
         pq = self.root / "persona.yaml"
         self.persona = parse_yaml(pq.read_text(encoding="utf-8")).get("questions", {}) if pq.exists() else {}
+        gr = self.root / "growth.yaml"
+        self.growth = parse_yaml(gr.read_text(encoding="utf-8")) if gr.exists() else {}
+        lk = self.root / "look.yaml"
+        self.look = parse_yaml(lk.read_text(encoding="utf-8")) if lk.exists() else {}
+
+    def part_path(self, part, name):
+        """캐릭터 그림 한 장. part 는 base, top, hair, prop 이다."""
+        return self.root / "sprites" / part / f"{name}.txt"
 
     def rule_path(self, axis, value):
         if value == TEMPLATE:
@@ -539,6 +556,338 @@ def compose(th, kind=None, audiences=None, sets=None, profile=None, cls=None, ch
     return text, vals
 
 
+# ---------------------------------------------------------------- 본문 검사
+# 조립된 값대로 썼는지 어림 기준으로 잰다. 기준은 대략값이라 틀림이 나오면 본문을 직접 읽어 확인한다.
+LENGTH_LIMIT = {"brief": 1500, "page": 3500}
+ENDING = (("polite", "합쇼체", ("니다", "니까", "십시오")), ("haeyo", "해요체", ("요",)),
+          ("plain", "평어체", ("다", "까", "라")))
+UNRESOLVED = re.compile(r"(?<!`)\[확인 필요")
+CHECK_HINT = {"register": "{want} 로 맞춘다", "voice": {"bullet": "줄글을 목록으로 나눈다", "prose": "목록을 줄글로 푼다"},
+              "length": "한도 안으로 줄인다", "emphasis": "굵은 글씨를 뺀다"}
+
+
+def body_lines(doc):
+    return [ln.strip() for ln in doc.splitlines()
+            if ln.strip() and not ln.lstrip().startswith(("#", "|", "```", "---", ">"))]
+
+
+def endings(lines):
+    count = {k: 0 for k, _, _ in ENDING}
+    for ln in lines:
+        for sent in re.split(r"(?<=[.!?])\s+", re.sub(r"^([-*+]|\d+[.)])\s+", "", ln)):
+            if sent.rstrip(" *`\"'”’)").endswith("?"):
+                continue  # 질문 문장은 본문에 실린 예상 질문일 수 있어 어법을 세지 않는다
+            tail = re.sub(r"(\[[^\]]*\]|\([^)]*\)|[\s.!?\"'”’*`:])+$", "", sent)
+            if tail.endswith("세요"):
+                continue  # "알려 주세요", "안녕하세요" 는 합쇼체 글에도 들어가서 어법을 가르지 못한다
+            for name, _, ends in ENDING:
+                if tail.endswith(ends):
+                    count[name] += 1
+                    break
+    return count
+
+
+def check_doc(doc, vals, chars, kind=None):
+    """[(축, 맞았나, 잰 값)]. 잴 거리가 모자라면 그 축은 빼고 낸다."""
+    out = []
+    lines = body_lines(doc)
+    count = endings(lines)
+    total = sum(count.values())
+    want = vals["register"][0]
+    if total >= 3:
+        out.append(("register", count[want] >= 0.6 * total,
+                    " · ".join(f"{label} {count[k]}" for k, label, _ in ENDING if count[k])))
+    # 틀이 정한 문서는 골격 규칙이 문체 규칙보다 앞서서 문체를 재지 않는다.
+    if len(lines) >= 4 and vals["skeleton"][0] != TEMPLATE:
+        ratio = sum(1 for ln in lines if re.match(r"([-*+]|\d+[.)])\s", ln)) / len(lines)
+        ok = ratio >= 0.3 if vals["voice"][0] == "bullet" else ratio <= 0.5
+        out.append(("voice", ok, f"목록 줄 {ratio:.0%}"))
+    size = len("\n".join(lines))
+    limit = int(chars * 1.1) if chars else None if kind == "slides" else LENGTH_LIMIT.get(vals["length"][0])
+    if limit:
+        out.append(("length", size <= limit, f"{size}자, 한도 {limit}자"))
+    if vals["emphasis"][0] == "none":
+        out.append(("emphasis", "**" not in doc, "굵은 글씨 있음" if "**" in doc else "없음"))
+    return out
+
+
+def check_hint(th, axis, vals):
+    hint = CHECK_HINT[axis]
+    if isinstance(hint, dict):
+        return hint[vals[axis][0]]
+    return hint.format(want=th.label(axis, vals[axis][0]))
+
+
+# ---------------------------------------------------------------- 캐릭터와 성장
+# 슬롯이 캐릭터다. check 가 문서 한 건마다 기록 한 줄을 남기고, 경험치와 레벨은 기록에서 매번 다시 계산한다.
+def growth_path(name=None, start=None):
+    """슬롯의 성장 기록 파일. 환경 변수로 프로필 파일을 정했으면 그 파일 옆에 둔다."""
+    path, slot, _, _ = profile_source(name, start)
+    if slot is None:
+        return path.with_name(path.stem + ".growth.jsonl")
+    return config_dir() / "growth" / f"{slot}.jsonl"
+
+
+def growth_on(slot_data):
+    """슬롯이 있고 growth 를 끄지 않았으면 켜져 있다. set 으로만 만든 슬롯에는 profile 절이 없을 수 있다."""
+    if not slot_data:
+        return False
+    meta = slot_data.get("profile")
+    return not (isinstance(meta, dict) and str(meta.get("growth")) == "off")
+
+
+def read_growth(path, warn=lambda m: None):
+    if not path.exists():
+        return []
+    out = []
+    for n, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+        if not line.strip():
+            continue
+        try:
+            e = json.loads(line)
+        except ValueError:
+            warn(f"성장 기록 {n}행을 읽지 못해 건너뛴다: {path}")
+            continue
+        if isinstance(e, dict) and e.get("doc"):
+            out.append(e)
+    return out
+
+
+def doc_key(src, text):
+    """같은 문서를 다시 검사했는지 가리는 지문. 경로나 본문 대신 해시만 남긴다."""
+    key = f"file:{Path(src).expanduser().resolve()}" if src != "-" else f"text:{text}"
+    return hashlib.sha1(key.encode("utf-8")).hexdigest()[:12]
+
+
+def level_of(th, exp):
+    """(레벨, 이번 레벨에서 쌓은 경험치, 다음 레벨까지 드는 경험치)."""
+    base, step = int(th.growth["level"]["base"]), int(th.growth["level"]["step"])
+    level, need = 1, base
+    while exp >= need:
+        exp -= need
+        level += 1
+        need = base + step * (level - 1)
+    return level, exp, need
+
+
+def growth_state(th, entries):
+    """기록에서 경험치와 레벨, 문서 종류별 건수를 계산한다. 같은 문서는 가장 좋은 기록 하나로 센다.
+    resolved 는 앞선 기록에 [확인 필요] 가 있던 문서를 다시 검사해 0 이 됐을 때만 준다. 처음부터 표시가 없는
+    문서에 주면 모르는 곳을 [이름] 처럼 맨 괄호로 숨긴 글이 점수를 받는다."""
+    pts = {k: int(v["points"]) for k, v in th.growth["exp"].items()}
+    cap = int(th.growth["limit"]["daily-kind"])
+    docs = {}
+    for e in entries:
+        d = docs.setdefault(e["doc"], {"day": str(e.get("at", ""))[:10], "kind": None, "best": [], "marked": False})
+        d["kind"] = e.get("kind") or d["kind"]
+        parts = ["done"] + (["clean"] if all((e.get("checks") or {}).values()) else []) \
+            + (["resolved"] if d["marked"] and not e.get("unresolved") else [])
+        d["marked"] = d["marked"] or bool(e.get("unresolved"))
+        if sum(pts[p] for p in parts) > sum(pts[p] for p in d["best"]):
+            d["best"] = parts
+    exp, kinds, per_day, gains = 0, {}, {}, {}
+    for key, d in docs.items():
+        day = (d["day"], d["kind"])
+        per_day[day] = per_day.get(day, 0) + 1
+        parts = list(d["best"]) if per_day[day] <= cap else []
+        if parts and d["kind"] and d["kind"] not in kinds:
+            parts.append("new-kind")
+        if d["kind"]:
+            kinds[d["kind"]] = kinds.get(d["kind"], 0) + 1
+        gains[key] = parts
+        exp += sum(pts[p] for p in parts)
+    level, into, need = level_of(th, exp)
+    return {"exp": exp, "level": level, "into": into, "need": need, "tier": tier_of(th, level), "docs": len(docs),
+            "kinds": kinds, "gains": gains}
+
+
+def tier_of(th, level):
+    """전직 차수. 0 은 전직 전이다. 진급 퀘스트를 정하기 전까지는 레벨만 본다."""
+    return sum(1 for lv in (th.growth.get("promote") or {}).values() if level >= int(lv))
+
+
+def title_of(th, cls, tier):
+    titles = th.classes.get(cls, {}).get("titles") or []
+    return titles[min(tier, len(titles) - 1)] if titles else None
+
+
+def opened_at(th, tier):
+    """이 차수에서 새로 여는 꾸미기 부위의 이름들."""
+    return [v["label"] for v in (th.look.get("unlock") or {}).values() if int(v["at"]) == tier]
+
+
+def growth_line(th, before, after, key, kind, cls=None):
+    """기록 한 건을 남긴 뒤 에이전트가 답 끝에 옮길 한 줄. 전직했으면 새 칭호와 새로 열린 꾸미기를 붙인다."""
+    exp = th.growth["exp"]
+    old = before["gains"].get(key)
+    new = after["gains"][key]
+    shown = [p for p in new if old is None or p not in old]
+    label = th.kinds[kind]["label"] if kind else "일반 글"
+    head = f"{label} {'다시 검사 ' if old is not None else ''}+{after['exp'] - before['exp']}"
+    if shown:
+        head += " (" + ", ".join(f"{exp[p]['label']} {exp[p]['points']}" for p in shown) + ")"
+    elif old is None:
+        head += f" (같은 날 같은 종류는 {th.growth['limit']['daily-kind']}건까지 센다)"
+    lv = f"Lv.{after['level']}" if after["level"] == before["level"] else f"Lv.{before['level']} → Lv.{after['level']}"
+    for tier in range(before["tier"] + 1, after["tier"] + 1):
+        title = title_of(th, cls, tier)
+        lv += f" · 전직 [{title}]" if title else f" · {tier}차 전직"
+        lv += "".join(f" · {label} 열림" for label in opened_at(th, tier))
+    return f"성장: {head} · {lv} · 다음 레벨까지 {after['need'] - after['into']}"
+
+
+def record_check(th, name, src, text, kind, checks, left, warn=lambda m: None):
+    """캐릭터 키우기가 켜져 있으면 기록 한 줄을 남기고 성장 줄을 돌려준다. 꺼져 있거나 슬롯이 없으면 None."""
+    slot_data = read_slot(profile_path(name), warn)
+    if not growth_on(slot_data):
+        return None
+    path = growth_path(name)
+    entries = read_growth(path, warn)
+    entry = {"v": 1, "at": datetime.now().isoformat(timespec="minutes"), "doc": doc_key(src, text), "kind": kind,
+             "checks": {axis: ok for axis, ok, _ in checks}, "unresolved": left,
+             "chars": len("\n".join(body_lines(text)))}
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with open(path, "a", encoding="utf-8") as f:
+        f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+    return growth_line(th, growth_state(th, entries), growth_state(th, entries + [entry]), entry["doc"], kind,
+                       (slot_data.get("profile") or {}).get("class"))
+
+
+# ---------------------------------------------------------------- 도트 그림
+def read_sprite(path):
+    """(팔레트, 픽셀 줄). 팔레트는 글자마다 {color, label, custom}."""
+    pal, rows, part = {}, [], None
+    for raw in path.read_text(encoding="utf-8").splitlines():
+        line = raw.rstrip()
+        if not line or line.startswith("#"):
+            continue
+        if line in ("palette", "pixels"):
+            part = line
+            continue
+        if part == "palette":
+            ch, color, *name = line.split()
+            label = " ".join(name)
+            pal[ch] = {"color": color, "label": label.rstrip(" *"), "custom": label.endswith("*")}
+        elif part == "pixels":
+            rows.append(line)
+    return pal, rows
+
+
+def color_depth(mode="auto"):
+    """0 은 색 없음, 8 은 256색, 24 는 트루컬러."""
+    if mode == "never" or (mode == "auto" and (os.environ.get("NO_COLOR") or not sys.stdout.isatty())):
+        return 0
+    return 24 if os.environ.get("COLORTERM", "").lower() in ("truecolor", "24bit") else 8
+
+
+def _ansi(color, ground, depth):
+    r, g, b = (int(color[i:i + 2], 16) for i in (1, 3, 5))
+    if depth == 24:
+        return f"\033[{ground};2;{r};{g};{b}m"
+    steps = (0, 95, 135, 175, 215, 255)
+    near = [min(range(6), key=lambda i: abs(steps[i] - v)) for v in (r, g, b)]
+    return f"\033[{ground};5;{16 + 36 * near[0] + 6 * near[1] + near[2]}m"
+
+
+def sprite_grid(path, custom=None):
+    """그림 한 장을 색 격자로 읽는다. 빈칸은 None. custom 을 주면 * 가 붙은 색을 그 색으로 바꾼다."""
+    pal, rows = read_sprite(path)
+    colors = {ch: p["color"] for ch, p in pal.items()}
+    if custom:
+        colors.update({ch: custom for ch, p in pal.items() if p["custom"]})
+    return [[colors.get(ch) for ch in row] for row in rows]
+
+
+LOOK_LAYERS = ("top", "hair", "prop")  # 기본 몸 위에 이 순서로 겹친다
+
+
+def look_of(th, slot_data, warn=lambda m: None):
+    """슬롯의 look 절에 기본값을 채운다. 모르는 값은 기본값으로 돌린다. 손으로 고친 값은 열렸는지 따지지 않는다."""
+    have = (slot_data or {}).get("look") or {}
+    have = have if isinstance(have, dict) else {}
+    bases = th.look.get("base") or {}
+    base = have.get("base") if have.get("base") in bases else next(iter(bases), "a")
+    look = {"base": base, "top": "shirt", "hair": bases.get(base, {}).get("hair"), "prop": None, "color": None}
+    for part, table in (("top", th.look.get("top")), ("hair", th.look.get("hair")), ("prop", th.look.get("prop")),
+                        ("color", th.look.get("colors"))):
+        val = have.get(part)
+        if val and val in (table or {}):
+            look[part] = val
+        elif val:
+            warn(f"프로필의 look.{part}={val} 는 모르는 값이라 기본값을 쓴다")
+    return look
+
+
+def look_grid(th, look):
+    """기본 몸 위에 옷, 머리, 소품을 겹친 색 격자."""
+    grid = sprite_grid(th.part_path("base", look["base"]))
+    color = (th.look.get("colors") or {}).get(look["color"], {}).get("color") if look["color"] else None
+    for part in LOOK_LAYERS:
+        if not look[part]:
+            continue
+        layer = sprite_grid(th.part_path(part, look[part]), color if part == "top" else None)
+        for y, row in enumerate(layer):
+            for x, c in enumerate(row):
+                if c:
+                    grid[y][x] = c
+    return grid
+
+
+def render_grid(grid, depth=24):
+    """반 칸 블록 하나에 위아래 픽셀 두 개를 그린다. 위는 글자색, 아래는 배경색이다."""
+    if len(grid) % 2:
+        grid = grid + [[None] * len(grid[0])]
+    out = []
+    for top, bot in zip(grid[::2], grid[1::2]):
+        line = ""
+        for ca, cb in zip(top, bot):
+            if ca and cb:
+                line += _ansi(ca, 38, depth) + _ansi(cb, 48, depth) + "▀"
+            elif ca or cb:
+                line += "\033[0m" + _ansi(ca or cb, 38, depth) + ("▀" if ca else "▄")
+            else:
+                line += "\033[0m "
+        out.append(line + "\033[0m")
+    return out
+
+
+def beside(art, width, info):
+    """그림 오른쪽에 글 줄을 세로 가운데로 놓는다."""
+    pad = max(0, (len(art) - len(info)) // 2)
+    rows = max(len(art), len(info) + pad)
+    return [(art[i] if i < len(art) else " " * width) + "   " + (info[i - pad] if 0 <= i - pad < len(info) else "")
+            for i in range(rows)]
+
+
+def card_lines(th, slot_data, slot, state, depth, vals=None):
+    """캐릭터 카드. 색을 쓸 수 있으면 왼쪽에 도트 그림을 그리고 오른쪽에 글을 놓는다."""
+    cls = (slot_data.get("profile") or {}).get("class")
+    name = (slot_data.get("persona") or {}).get("call") or slot or "이름 없음"
+    title = title_of(th, cls, state["tier"])
+    filled = state["into"] * 10 // state["need"]
+    tops = sorted(state["kinds"].items(), key=lambda kv: -kv[1])[:3]
+    promote = th.growth.get("promote") or {}
+    nxt = state["tier"] + 1
+    info = [(f"[{title}] " if title else "") + f"{name} · {th.classes[cls]['label'] if cls in th.classes else '클래스 없음'}",
+            f"Lv.{state['level']}  {'█' * filled}{'░' * (10 - filled)}  {state['into']}/{state['need']}",
+            f"문서 {state['docs']}건 · 도감 {len(state['kinds'])}/{len(th.kinds)} 종류",
+            "많이 쓴 문서 " + (" · ".join(f"{th.kinds[k]['label']} {n}" for k, n in tops if k in th.kinds) or "아직 없음")]
+    if str(nxt) in promote:
+        nt = title_of(th, cls, nxt)
+        info.append(f"다음 전직 Lv.{promote[str(nxt)]}" + (f" [{nt}]" if nt else "")
+                    + "".join(f" · {label} 열림" for label in opened_at(th, nxt)))
+    else:
+        info.append("전직을 모두 마쳤다")
+    if vals:
+        info.append("지금 테마 " + " · ".join(th.label(ax, vals[ax][0]) for ax in ("register", "voice", "length")))
+    if not growth_on(slot_data):
+        info.append("캐릭터 키우기가 꺼져 있다. 켜려면 suit.py growth on")
+    if not depth or not th.look:
+        return info
+    grid = look_grid(th, look_of(th, slot_data))
+    return beside(render_grid(grid, depth), len(grid[0]), info)
+
+
 # ---------------------------------------------------------------- 웹 묶음
 def bundle_data(th):
     rules, samples, css = {}, {}, {}
@@ -600,8 +949,15 @@ description: 문서를 쓰거나 다듬을 때 docs-suit 테마를 입힌다. �
 2. 요청에서 문서 종류를 정한다. 종류는 {kinds} 이다. 맞는 것이 없으면 종류 없이 조립한다. 독자가 분명하면 `--audience <키>` 로 넘긴다. 독자 키는 {auds} 이다. 독자가 여럿이면 키를 쉼표로 잇는다.
 3. 사용자가 문체, 어법, 분량, 글자수, 공개 범위를 말했으면 `--set 축=값` 과 `--chars` 로 넘긴다. 축과 값은 아래 영어 키로 쓴다. {axes}. 공개 범위는 안전 축이라 `--set exposure` 는 `team`, `submit`, `public` 순서로 더 조심하는 쪽으로만 먹는다. 사내나 팀 안에서만 볼 글이면 `--set` 대신 `--audience` 를 `teammate` 나 `peer-dev` 로 넘긴다.
 4. `{run} compose --kind <종류> [--audience …] [--set …] [--chars N]` 의 출력 전체를 이번 문서의 규칙으로 따른다. 다른 문체 지침이나 스킬과 겹치면 어법, 분량, 공개 범위 같은 축의 값은 이 출력을 따른다. 지침의 공통 바닥이 시키는 대로, 쓰기 전에 틀리면 결과가 쓸모없어지는 것만 두세 개 묻는다.
-5. 다 쓴 뒤 `[확인 필요: …]` 표시가 남았으면 모아서 보여 준다.
+5. 답을 끝내기 전에 본문을 검사한다. compose 에 넘긴 `--kind`, `--audience`, `--set`, `--chars` 를 그대로 붙인다. 본문을 파일로 썼으면 `{run} check <본문 파일> --kind <종류> …` 로 부른다. 답에만 썼으면 임시 파일을 만들지 말고 본문 전체를 heredoc 으로 넘긴다.
+   ```sh
+   {run} check - --kind <종류> [--audience …] <<'EOF'
+   (본문 전체)
+   EOF
+   ```
+   `✗` 가 나온 축이 있으면 그 줄이 말하는 대로 한 번 고쳐 쓰고 같은 명령을 다시 부른다. 출력에 `성장:` 으로 시작하는 줄이 있으면 본문과 떨어뜨려 답의 맨 끝에 그 줄만 그대로 옮긴다. 이 줄은 문서 본문에 넣지 않는다. `[확인 필요: …]` 표시가 남았으면 모아서 보여 준다.
 6. 사용자가 말투나 모양이 마음에 안 든다고 하면 어느 축의 문제인지 짚고, 그 축의 다른 값으로 다시 조립해 대표 문단 하나를 견줘 보인다. 계속 쓰고 싶어 하면 `{run} set <축> <값> [--audience <독자>]` 로 프로필에 남긴다. 이 폴더에서만 그렇게 쓰고 싶어 하면 `--here` 를 붙여 폴더 파일 `.docs-suit.yaml` 에 남긴다.
+7. 사용자가 캐릭터를 보여 달라고 하면 `{run} card --color never` 의 출력을 보여 준다. 캐릭터 키우기를 끄거나 켜 달라고 하면 `{run} growth off` 나 `{run} growth on` 을 부른다.
 """
 
 
@@ -697,7 +1053,18 @@ def bootstrap_interactive(th):
     for i, n in enumerate(names, 1):
         print(f"  {i}. {labels[n]}")
     agents = _pick_numbers(_ask("\n번호를 쉼표로 이어 고른다: "), names)
-    return cls, persona, agents
+    print("\n4단계. 캐릭터. 문서를 쓸수록 자라고, 전직하면 칭호와 꾸미기 거리가 열린다.\n")
+    bases = list(th.look.get("base") or {})
+    depth = color_depth()
+    if depth and bases:
+        grids = [look_grid(th, look_of(th, {"look": {"base": b}})) for b in bases]
+        arts = [render_grid(g, depth) for g in grids]
+        for row in zip(*arts):
+            print("  " + "    ".join(row))
+    for i, b in enumerate(bases, 1):
+        print(f"  {i}. {th.look['base'][b]['label']}")
+    picked = _pick_numbers(_ask("\n번호를 고른다. Enter 면 1번: "), bases)
+    return cls, persona, agents, (picked[0] if picked else None)
 
 
 def cmd_bootstrap(a, th):
@@ -724,12 +1091,17 @@ def cmd_bootstrap(a, th):
                     raise Missing(f"모르는 문서 종류: {d}")
             persona["docs"] = docs
         agents = [x.strip() for x in a.agents.split(",") if x.strip()] if a.agents else []
+        base = a.look
     else:
         if not sys.stdin.isatty():
             raise Missing("대화형 입력을 받을 수 없다. --class 와 --yes 로 진행한다")
-        cls, persona, agents = bootstrap_interactive(th)
+        cls, persona, agents, base = bootstrap_interactive(th)
     expand_agents(agents)
+    if base and base not in (th.look.get("base") or {}):
+        raise Missing(f"모르는 캐릭터: {base}. 고를 수 있는 것은 {', '.join(th.look.get('base') or {})}")
     data = {"profile": {"class": cls, "lang": DEFAULT_LANG}, "persona": persona}
+    if base:
+        data["look"] = {"base": base}
     if agents:
         data["profile"]["agents"] = agents
     if p.exists():
@@ -833,7 +1205,7 @@ def cmd_profile(a, th):
     for f in reversed(folder):
         print(f"\n# 폴더 파일 {f} 이 얹는 값. 아래 파일일수록 앞선다\n")
         print(f.read_text(encoding="utf-8"))
-    return 0 if path.exists() else 3
+    return 0  # 프로필이 없는 것은 오류가 아니다. 에이전트가 && 로 이은 다음 명령이 끊기지 않게 한다
 
 
 def cmd_get(a, th):
@@ -899,6 +1271,114 @@ def cmd_export(a, th):
     return 0
 
 
+def cmd_check(a, th):
+    text = sys.stdin.read() if a.file == "-" else Path(a.file).expanduser().read_text(encoding="utf-8")
+    if not text.strip():
+        print("오류: 본문이 비어 있다. 파일 경로를 주거나, - 를 쓰고 본문 전체를 heredoc 으로 넘긴다: "
+              "check - --kind <종류> <<'EOF' … EOF", file=sys.stderr)
+        return 1
+    vals, auds, _ = resolve(th, a.kind, _auds(a.audience), _sets(a.set), load_profile(warn_stderr, a.profile), a.cls,
+                            warn_stderr)
+    checks = check_doc(text, vals, a.chars, a.kind)
+    left = len(UNRESOLVED.findall(text))
+    line = None if a.no_record else record_check(th, a.profile, a.file, text, a.kind, checks, left, warn_stderr)
+    if a.json:
+        print(json.dumps({"checks": [{"axis": ax, "ok": ok, "got": got} for ax, ok, got in checks],
+                          "unresolved": left, "growth": line}, ensure_ascii=False, indent=1))
+        return 0
+    kind_label = th.kinds[a.kind]["label"] if a.kind else "일반 글"
+    print(f"검사 · {kind_label} · 독자 {', '.join(th.audiences[x]['label'] for x in auds) or '정하지 않음'}")
+    for ax, ok, got in checks:
+        print(f"{'✓' if ok else '✗'} {th.axes[ax]['label']}: {got}" + ("" if ok else f". {check_hint(th, ax, vals)}"))
+    if not checks:
+        print("· 잴 거리가 없다")
+    if left:
+        print(f"· [확인 필요] {left}곳이 남았다")
+    if line:
+        print(line)
+    return 0
+
+
+def cmd_card(a, th):
+    path, slot, _, _ = profile_source(a.profile)
+    data = read_slot(path, warn_stderr)
+    if not data:
+        print(f"프로필이 없다: {path}\n`python3 suit.py bootstrap` 으로 캐릭터를 만든다")
+        return 3
+    state = growth_state(th, read_growth(growth_path(a.profile), warn_stderr))
+    if a.json:
+        cls = (data.get("profile") or {}).get("class")
+        print(json.dumps({"slot": slot, "name": (data.get("persona") or {}).get("call") or slot, "class": cls,
+                          "title": title_of(th, cls, state["tier"]), "look": look_of(th, data), "on": growth_on(data),
+                          **{k: v for k, v in state.items() if k != "gains"}}, ensure_ascii=False, indent=1))
+        return 0
+    vals = resolve(th, profile=load_profile(warn_stderr, a.profile), warn=warn_stderr)[0]
+    print("\n".join(card_lines(th, data, slot, state, color_depth(a.color), vals)))
+    return 0
+
+
+def cmd_look(a, th):
+    """꾸미기를 보거나 바꾼다. 캐릭터 A, B 는 언제든, 나머지는 전직해서 연 부위만 바꾼다."""
+    path, slot, _, _ = profile_source(a.profile)
+    data = read_slot(path, warn_stderr)
+    if not data:
+        print(f"프로필이 없다: {path}\n`python3 suit.py bootstrap` 으로 캐릭터를 만든다")
+        return 3
+    tier = growth_state(th, read_growth(growth_path(a.profile), warn_stderr))["tier"]
+    look = look_of(th, data, warn_stderr)
+    unlock = th.look.get("unlock") or {}
+    tables = {"base": {k: v["label"] for k, v in th.look["base"].items()}, "top": th.look["top"],
+              "hair": th.look["hair"], "prop": th.look["prop"],
+              "color": {k: v["label"] for k, v in th.look["colors"].items()}}
+    labels = {"base": "캐릭터", **{k: v["label"] for k, v in unlock.items()}}
+    is_open = {k: k == "base" or tier >= int(unlock[k]["at"]) for k in tables}
+    if a.json:
+        print(json.dumps({"look": look, "tier": tier, "open": is_open, "options": tables}, ensure_ascii=False, indent=1))
+        return 0
+    if not a.part:
+        print(("아직 전직 전이다" if not tier else f"{tier}차 전직까지 마쳤다") + ". 바꾸려면 suit.py look <부위> <값>")
+        for part in ("base", "color", "hair", "prop", "top"):
+            now = tables[part].get(look[part]) if look[part] else ("기본" if part == "color" else "없음")
+            if is_open[part]:
+                opts = ", ".join(f"{k} {v}" for k, v in tables[part].items())
+                print(f"- {labels[part]} ({part}): 지금 {now}. 고를 수 있는 값 {opts}")
+            else:
+                print(f"- {labels[part]} ({part}): 지금 {now}. {unlock[part]['at']}차 전직에서 열린다")
+        return 0
+    if a.part not in tables:
+        raise Missing(f"모르는 부위: {a.part}. 부위는 {', '.join(tables)}")
+    if not is_open[a.part]:
+        print(f"{labels[a.part]}: {unlock[a.part]['at']}차 전직에서 열린다. 지금은 {tier}차다")
+        return 1
+    if not a.value:
+        raise Missing(f"값을 준다: suit.py look {a.part} <값>. 고를 수 있는 값은 {', '.join(tables[a.part])}")
+    want = dict(data.get("look") or {}) if isinstance(data.get("look"), dict) else {}
+    if a.value == "none" and a.part in ("prop", "color"):
+        want.pop(a.part, None)
+    elif a.value not in tables[a.part]:
+        raise Missing(f"모르는 값: {a.part}={a.value}. 고를 수 있는 값은 {', '.join(tables[a.part])}")
+    else:
+        want[a.part] = a.value
+    data["look"] = want
+    write_profile(data, a.profile)
+    print(f"바꿨다: {labels[a.part]} → {tables[a.part].get(a.value, '없음')}. suit.py card 로 본다")
+    return 0
+
+
+def cmd_growth(a, th):
+    path = profile_path(a.profile)
+    data = read_slot(path, warn_stderr)
+    if not data:
+        print(f"프로필이 없다: {path}\n`python3 suit.py bootstrap` 으로 캐릭터를 만든다")
+        return 3
+    meta = data.get("profile") if isinstance(data.get("profile"), dict) else {}
+    meta["growth"] = a.action
+    data["profile"] = meta
+    write_profile(data, a.profile)
+    print(f"캐릭터 키우기를 {'켰다' if a.action == 'on' else '껐다'}: {path}. 지난 기록은 그대로 둔다")
+    return 0
+
+
 def cmd_bundle(a, th):
     out = HERE / "docs" / "themes.json"
     out.write_text(bundle_text(th), encoding="utf-8")
@@ -915,12 +1395,13 @@ def selftest(th):
             problems.append(msg)
 
     def quiet(fn, *args):
-        old, sys.stdout = sys.stdout, open(os.devnull, "w")
+        old = sys.stdout, sys.stderr
+        sys.stdout = sys.stderr = open(os.devnull, "w")
         try:
             return fn(*args)
         finally:
             sys.stdout.close()
-            sys.stdout = old
+            sys.stdout, sys.stderr = old
 
     # 데이터 정합
     for axis in AXES_ORDER:
@@ -981,6 +1462,80 @@ def selftest(th):
     check(covered == set(th.kinds), f"어느 클래스의 주력에도 없는 종류: {sorted(set(th.kinds) - covered)}")
     for key in PERSONA_IN_PROMPT + ("docs",):
         check(key in th.persona, f"persona.yaml 에 질문 {key} 가 없다")
+    gr = th.growth
+    for k in ("done", "clean", "resolved", "new-kind"):
+        spec = (gr.get("exp") or {}).get(k)
+        check(isinstance(spec, dict) and str(spec.get("points", "")).isdigit() and spec.get("label"),
+              f"growth.yaml 의 exp.{k} 에 points 나 label 이 없다")
+    check(str((gr.get("limit") or {}).get("daily-kind", "")).isdigit(), "growth.yaml 의 limit.daily-kind 가 없다")
+    check(all(str((gr.get("level") or {}).get(k, "")).isdigit() for k in ("base", "step"))
+          and int((gr.get("level") or {}).get("base", 0) or 0) > 0, "growth.yaml 의 level 이 없거나 base 가 0 이다")
+    promote = gr.get("promote") or {}
+    check(list(promote) == ["1", "2", "3", "4"] and all(str(v).isdigit() for v in promote.values())
+          and [int(v) for v in promote.values()] == sorted({int(v) for v in promote.values()}),
+          "growth.yaml 의 promote 는 1차부터 4차까지 커지는 레벨이어야 한다")
+    for k, v in th.classes.items():
+        check(len(v["titles"]) == len(promote) + 1, f"클래스 {k} 의 칭호는 기본과 전직 차수만큼 {len(promote) + 1}개다")
+
+    # 캐릭터 그림과 꾸미기. 모든 그림은 기본 몸과 같은 크기라야 겹쳐 그릴 수 있다.
+    lk = th.look
+    check(lk.get("base") and all(v.get("hair") in (lk.get("hair") or {}) for v in lk["base"].values()),
+          "look.yaml 의 base 가 없거나 처음 머리 모양을 모른다")
+    check(set(lk.get("unlock") or {}) == {"color", "hair", "prop", "top"}
+          and all(str(v.get("at", "")).isdigit() and v.get("label") for v in lk["unlock"].values()),
+          "look.yaml 의 unlock 에 color, hair, prop, top 의 at 과 label 이 있어야 한다")
+    check("shirt" in (lk.get("top") or {}), "look.yaml 의 top 에 기본 옷 shirt 가 없다")
+    for k, v in (lk.get("colors") or {}).items():
+        check(re.match(r"^#[0-9a-fA-F]{6}$", str(v.get("color", ""))) and v.get("label"), f"look.yaml 의 색 {k} 이 다르다")
+    listed = {("base", k) for k in lk.get("base") or {}} | {(part, k) for part in LOOK_LAYERS for k in lk.get(part) or {}}
+    found = {(f.parent.name, f.stem) for f in (th.root / "sprites").glob("*/*.txt")}
+    check(listed == found, f"look.yaml 과 sprites 폴더가 다르다. 그림 없음 {sorted(listed - found)}, 목록에 없음 {sorted(found - listed)}")
+    size = None
+    for part, name in sorted(found):
+        f = th.part_path(part, name)
+        pal, rows = read_sprite(f)
+        here = (len(rows), len(rows[0]) if rows else 0)
+        size = size or here
+        check(rows and len({len(r) for r in rows}) == 1 and here == size, f"그림 크기가 다르다: sprites/{part}/{name}.txt")
+        bad = sorted({ch for r in rows for ch in r if ch != "." and ch not in pal})
+        check(not bad, f"팔레트에 없는 글자 {bad}: sprites/{part}/{name}.txt")
+        check(all(re.match(r"^#[0-9a-fA-F]{6}$", x["color"]) for x in pal.values()), f"색은 #rrggbb 로 쓴다: sprites/{part}/{name}.txt")
+        mine = sum(1 for x in pal.values() if x["custom"])
+        check(mine == (1 if part == "top" else 0), f"* 는 옷에만 하나 둔다: sprites/{part}/{name}.txt")
+    if lk.get("colors") and not problems:
+        grid = look_grid(th, look_of(th, {"look": {"base": "b", "top": "suit", "prop": "tie", "color": "wine"}}))
+        check(any(lk["colors"]["wine"]["color"] in row for row in grid), "옷 색 바꾸기가 그림에 먹지 않는다")
+        check(look_of(th, {"look": {"top": "nope"}})["top"] == "shirt", "모르는 옷을 기본 옷으로 돌리지 않는다")
+
+    # 본문 검사와 경험치 계약. 경험치 숫자는 growth.yaml 과 상관없이 고정한 규칙으로 잰다.
+    vals = {"register": ("polite", ""), "skeleton": ("bluf", ""), "voice": ("prose", ""), "length": ("brief", ""),
+            "emphasis": ("none", "")}
+    got = {ax: ok for ax, ok, _ in check_doc("보고드립니다.\n확인했습니다.\n**진행합니다.**\n", vals, None)}
+    check(got.get("register") is True and got.get("emphasis") is False and got.get("length") is True,
+          f"본문 검사가 어법, 강조, 분량을 다르게 잰다: {got}")
+    got = {ax: ok for ax, ok, _ in check_doc("간다. 본다. 한다. 쓴다.\n" * 40, vals, 100)}
+    check(got.get("register") is False and got.get("length") is False, f"본문 검사가 어법이나 글자수 한도를 놓친다: {got}")
+    rules = argparse.Namespace(growth={
+        "exp": {k: {"points": p, "label": k} for k, p in (("done", "10"), ("clean", "10"), ("resolved", "5"), ("new-kind", "20"))},
+        "limit": {"daily-kind": "2"}, "level": {"base": "50", "step": "25"}})
+    day1, day2 = "2026-01-01T09:00", "2026-01-02T09:00"
+    log = [{"doc": "a", "at": day1, "kind": "email", "checks": {"emphasis": False}, "unresolved": 1},
+           {"doc": "a", "at": day1, "kind": "email", "checks": {"emphasis": True}, "unresolved": 0},
+           {"doc": "b", "at": day1, "kind": "email", "checks": {}, "unresolved": 0},
+           {"doc": "c", "at": day1, "kind": "email", "checks": {}, "unresolved": 0},
+           {"doc": "d", "at": day2, "kind": "email", "checks": {}, "unresolved": 0}]
+    st = growth_state(rules, log)
+    check((st["exp"], st["level"], st["into"], st["need"], st["docs"]) == (85, 2, 35, 75, 4),
+          f"경험치 계산이 다르다. 같은 문서는 가장 좋은 기록, 같은 날 같은 종류는 두 건까지다: {st}")
+    check(st["gains"]["a"] == ["done", "clean", "resolved", "new-kind"] and st["gains"]["b"] == ["done", "clean"],
+          f"[확인 필요] 를 채운 문서만 resolved 를 받아야 한다: {st['gains']}")
+    st = growth_state(rules, log + [{"doc": "a", "at": day2, "kind": "email", "checks": {"emphasis": False}, "unresolved": 3}])
+    check(st["exp"] == 85, "다시 검사해 나빠진 기록이 경험치를 깎았다")
+    check(level_of(rules, 50 + 75) == (3, 0, 100), "레벨 문턱 계산이 다르다")
+    check([tier_of(th, lv) for lv in (1, 2, 3, 7, 12, 17, 18, 40)] == [0, 0, 1, 2, 3, 3, 4, 4]
+          if list(promote.values()) == ["3", "7", "12", "18"] else True, "전직 차수 계산이 다르다")
+    check(title_of(th, "office", 0) == th.classes["office"]["titles"][0]
+          and title_of(th, "office", 9) == th.classes["office"]["titles"][-1], "칭호를 차수로 고르지 못한다")
 
     # 값 정하기 계약
     try:
@@ -1035,10 +1590,11 @@ def selftest(th):
         try:
             ns = argparse.Namespace(questions=False, force=False, cls="developer", yes=True, profile=None,
                                     call='민수 "님"', affiliation="백엔드, 2년 차: 결제", goal=None,
-                                    facts="#1 은 지도 시각화", dislikes=None, docs="pr,design-doc", agents="")
+                                    facts="#1 은 지도 시각화", dislikes=None, docs="pr,design-doc", agents="", look="b")
             quiet(cmd_bootstrap, ns, th)
             prof = load_profile(start=td)
             check(prof.get("profile", {}).get("class") == "developer", "bootstrap 이 클래스를 남기지 않았다")
+            check(prof.get("look") == {"base": "b"}, "bootstrap 이 캐릭터를 남기지 않았다")
             per = prof.get("persona", {})
             check(per.get("affiliation") == "백엔드, 2년 차: 결제" and per.get("facts") == "#1 은 지도 시각화"
                   and per.get("docs") == ["pr", "design-doc"] and "”" in per.get("call", ""),
@@ -1063,6 +1619,39 @@ def selftest(th):
             quiet(export, th, ["gemini"], str(out), False, None)
             check((out / "antigravity" / "SKILL.md").read_text(encoding="utf-8") == "내가 만든 스킬",
                   "export 가 손으로 만든 SKILL.md 를 덮어썼다")
+            check("check - --kind" in skill and "<<'EOF'" in skill and "growth off" in skill,
+                  "SKILL.md 에 검사 단계나 캐릭터 끄기가 없다")
+            doc = Path(td) / "pr.md"
+            doc.write_text("## 바뀐 것\n\n결제 재시도를 붙였다.\n테스트를 더했다.\n", encoding="utf-8")
+            ns = argparse.Namespace(file=str(doc), cls=None, kind="pr", audience=None, set=None, chars=None,
+                                    no_record=False, json=True, profile=None)
+            grow = growth_path()
+            quiet(cmd_check, ns, th)
+            quiet(cmd_check, ns, th)
+            check(grow == Path(td) / "profile.growth.jsonl" and len(read_growth(grow)) == 2,
+                  "환경 변수로 정한 프로필 옆에 성장 기록이 남지 않는다")
+            entry = read_growth(grow)[0]
+            check(set(entry) == {"v", "at", "doc", "kind", "checks", "unresolved", "chars"} and str(td) not in json.dumps(entry),
+                  f"성장 기록에 본문이나 경로가 남는다: {entry}")
+            check(growth_state(th, read_growth(grow))["docs"] == 1, "같은 파일을 다시 검사했는데 문서가 두 건으로 셌다")
+            empty = Path(td) / "empty.md"
+            empty.write_text("\n", encoding="utf-8")
+            code = quiet(cmd_check, argparse.Namespace(**{**vars(ns), "file": str(empty)}), th)
+            check(code == 1 and len(read_growth(grow)) == 2, "빈 본문을 검사해 통과시키거나 기록했다")
+            quiet(cmd_check, argparse.Namespace(**{**vars(ns), "no_record": True}), th)
+            check(len(read_growth(grow)) == 2, "--no-record 인데 기록이 남았다")
+            look_ns = argparse.Namespace(part="color", value="navy", json=False, profile=None)
+            check(quiet(cmd_look, look_ns, th) == 1 and "color" not in (read_slot(profile_path()).get("look") or {}),
+                  "전직 전인데 옷 색을 바꿨다")
+            quiet(cmd_look, argparse.Namespace(part="base", value="a", json=False, profile=None), th)
+            check(read_slot(profile_path()).get("look") == {"base": "a"}
+                  and read_slot(profile_path()).get("persona", {}).get("affiliation") == "백엔드, 2년 차: 결제",
+                  "look 이 캐릭터를 바꾸지 못하거나 프로필을 망가뜨렸다")
+            quiet(cmd_growth, argparse.Namespace(action="off", profile=None), th)
+            quiet(cmd_check, ns, th)
+            check(len(read_growth(grow)) == 2 and not growth_on(read_slot(profile_path())), "캐릭터 키우기를 껐는데 기록이 남는다")
+            check(load_profile(start=td).get("persona", {}).get("affiliation") == "백엔드, 2년 차: 결제",
+                  "growth off 가 프로필을 망가뜨렸다")
         finally:
             if old is None:
                 os.environ.pop("DOCS_SUIT_PROFILE", None)
@@ -1132,6 +1721,7 @@ def main(argv=None):
         b.add_argument(f"--{k}")
     b.add_argument("--docs", help="자주 쓰는 문서 종류. 쉼표로 잇는다")
     b.add_argument("--agents", help="스킬을 설치할 도구. 쉼표로 잇는다")
+    b.add_argument("--look", help="캐릭터 a 나 b. 주지 않으면 a")
     b.add_argument("--yes", action="store_true", help="묻지 않고 진행한다")
     b.add_argument("--force", action="store_true", help="있는 프로필을 .bak 으로 남기고 새로 만든다")
     b.add_argument("--questions", action="store_true", help="클래스와 페르소나 질문 목록을 JSON 으로 낸다")
@@ -1165,6 +1755,25 @@ def main(argv=None):
     e.add_argument("--agent", required=True, help="claude, agents, codex, antigravity, cursor, grok, web, all")
     e.add_argument("--dest", help="에이전트별 하위 폴더로 이 폴더 아래에 쓴다. 시험용")
     e.add_argument("--dry-run", action="store_true")
+    c = sub.add_parser("check", parents=[slot])
+    c.add_argument("file", help="검사할 본문 파일. - 이면 표준 입력에서 읽는다")
+    c.add_argument("--class", dest="cls")
+    c.add_argument("--kind")
+    c.add_argument("--audience")
+    c.add_argument("--set", action="append", metavar="축=값")
+    c.add_argument("--chars", type=int)
+    c.add_argument("--no-record", action="store_true", help="재기만 하고 성장 기록에 남기지 않는다")
+    c.add_argument("--json", action="store_true")
+    ca = sub.add_parser("card", parents=[slot])
+    ca.add_argument("--json", action="store_true")
+    ca.add_argument("--color", choices=("auto", "always", "never"), default="auto",
+                    help="auto 는 터미널일 때만 도트 그림을 그린다")
+    lo = sub.add_parser("look", parents=[slot])
+    lo.add_argument("part", nargs="?", help="base, color, hair, prop, top")
+    lo.add_argument("value", nargs="?", help="고를 값. prop 과 color 는 none 으로 지운다")
+    lo.add_argument("--json", action="store_true")
+    g = sub.add_parser("growth", parents=[slot])
+    g.add_argument("action", choices=("on", "off"))
     sub.add_parser("bundle")
     sub.add_parser("selftest")
     a = ap.parse_args(argv)
@@ -1173,7 +1782,8 @@ def main(argv=None):
         if a.cmd == "selftest":
             return selftest(th)
         return {"bootstrap": cmd_bootstrap, "profile": cmd_profile, "list": cmd_list, "get": cmd_get,
-                "compose": cmd_compose, "set": cmd_set, "export": cmd_export, "bundle": cmd_bundle}[a.cmd](a, th)
+                "compose": cmd_compose, "set": cmd_set, "export": cmd_export, "check": cmd_check, "card": cmd_card,
+                "look": cmd_look, "growth": cmd_growth, "bundle": cmd_bundle}[a.cmd](a, th)
     except Missing as e:
         print(f"오류: {e}", file=sys.stderr)
         return 3

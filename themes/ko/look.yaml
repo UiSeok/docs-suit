@@ -1,0 +1,51 @@
+# 캐릭터 꾸미기. 기본 캐릭터 두 가지와 전직할 때마다 여는 꾸미기 거리.
+# 그림은 sprites/<부위>/<값>.txt 에 있고, 기본 몸 위에 옷, 머리, 소품 순으로 겹쳐 그린다.
+# 부품을 더하면 아래 목록에 한 줄을 더한다. 환생이나 추가 전직의 보상도 같은 방법으로 늘린다.
+
+# 기본 캐릭터. hair 는 처음 머리 모양이다.
+base:
+  a: {label: 캐릭터 A, hair: short}
+  b: {label: 캐릭터 B, hair: bob}
+
+# 몇 차 전직에서 여는지. 전직 전에는 흰 셔츠에 기본 머리다. 캐릭터 A, B 는 언제든 바꾼다.
+unlock:
+  color: {at: 1, label: 옷 색}
+  hair: {at: 2, label: 머리 모양}
+  prop: {at: 3, label: 소품}
+  top: {at: 4, label: 옷 모양}
+
+top:
+  shirt: 흰 셔츠
+  suit: 정장
+  blazer: 검은 정장
+  hoodie: 후드티
+  zip-hoodie: 지퍼 후드
+  coat: 흰 가운
+  turtleneck: 터틀넥
+  stripe: 줄무늬 티
+
+hair:
+  short: 짧은 머리
+  bob: 단발
+  bangs: 앞머리
+  side: 가르마
+  messy: 부스스한 머리
+
+prop:
+  tie: 넥타이
+  glasses: 안경
+  headphones: 헤드폰
+  lanyard: 사원증
+  backpack: 가방끈
+  beret: 베레모
+
+# 옷 색. 옷 그림에서 * 가 붙은 색을 바꾼다.
+colors:
+  navy: {label: 남색, color: "#34507f"}
+  green: {label: 초록, color: "#4f8a5b"}
+  charcoal: {label: 먹색, color: "#3c4150"}
+  mustard: {label: 겨자색, color: "#c8962e"}
+  wine: {label: 와인색, color: "#8e3b46"}
+  sky: {label: 하늘색, color: "#6f9fd1"}
+  pink: {label: 분홍, color: "#d98ca0"}
+  ivory: {label: 아이보리, color: "#f2efe7"}

@@ -3,6 +3,7 @@ class:
   label: 크리에이터
   desc: 블로그와 뉴스레터, SNS 로 독자를 만나는 사람
   kinds: [blog, newsletter, sns]
+  titles: [새내기 작가, 연재 작가, 단골 작가, 인기 작가, 베스트셀러 작가]  # 기본, 1차, 2차, 3차, 4차 전직 칭호
 
 defaults:
   voice: prose

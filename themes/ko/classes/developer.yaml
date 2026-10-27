@@ -3,6 +3,7 @@ class:
   label: 개발자
   desc: 설계 문서와 PR, 장애 회고, 기술 글을 쓰는 사람
   kinds: [design-doc, pr, postmortem, blog]
+  titles: [인턴, 주니어, 시니어, 테크 리드, 아키텍트]  # 기본, 1차, 2차, 3차, 4차 전직 칭호
 
 defaults:
   visual-deck: contrast

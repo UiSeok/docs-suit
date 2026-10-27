@@ -3,6 +3,7 @@ class:
   label: 기획자·PM
   desc: 기획서와 회의록, 진행 보고로 사람들을 한 방향으로 모으는 사람
   kinds: [spec, minutes, work-report, slides]
+  titles: [기획 보조, 기획자, 선임 기획자, PM, 프로덕트 리드]  # 기본, 1차, 2차, 3차, 4차 전직 칭호
 
 defaults:
   voice: bullet

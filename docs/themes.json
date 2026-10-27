@@ -445,6 +445,13 @@
     "minutes",
     "email"
    ],
+   "titles": [
+    "새내기",
+    "모범생",
+    "우등생",
+    "장학생",
+    "수석"
+   ],
    "defaults": {
     "visual-deck": "paper",
     "register": "plain",
@@ -461,6 +468,13 @@
     "portfolio",
     "interview"
    ],
+   "titles": [
+    "지원자",
+    "서류 합격",
+    "면접 합격",
+    "최종 합격",
+    "신입 사원"
+   ],
    "defaults": {
     "register": "polite",
     "voice": "bullet",
@@ -476,6 +490,13 @@
     "proposal",
     "report",
     "slides"
+   ],
+   "titles": [
+    "대학원생",
+    "석사",
+    "박사",
+    "박사후연구원",
+    "예비교수"
    ],
    "defaults": {
     "visual-deck": "paper",
@@ -494,6 +515,13 @@
     "postmortem",
     "blog"
    ],
+   "titles": [
+    "인턴",
+    "주니어",
+    "시니어",
+    "테크 리드",
+    "아키텍트"
+   ],
    "defaults": {
     "visual-deck": "contrast",
     "voice": "bullet",
@@ -509,6 +537,13 @@
     "minutes",
     "work-report",
     "slides"
+   ],
+   "titles": [
+    "기획 보조",
+    "기획자",
+    "선임 기획자",
+    "PM",
+    "프로덕트 리드"
    ],
    "defaults": {
     "voice": "bullet",
@@ -526,6 +561,13 @@
     "minutes",
     "slides"
    ],
+   "titles": [
+    "사원",
+    "대리",
+    "과장",
+    "차장",
+    "부장"
+   ],
    "defaults": {
     "voice": "bullet",
     "register": "polite",
@@ -541,6 +583,13 @@
     "blog",
     "newsletter",
     "sns"
+   ],
+   "titles": [
+    "새내기 작가",
+    "연재 작가",
+    "단골 작가",
+    "인기 작가",
+    "베스트셀러 작가"
    ],
    "defaults": {
     "voice": "prose",

@@ -1,0 +1,37 @@
+# 캐릭터 B. 기본 몸. 머리카락과 윗옷 없이 그리고, 그 위에 옷, 머리, 소품을 겹쳐 그린다.
+# palette 아래 줄은 `글자 색 이름` 이고, pixels 아래는 한 글자가 한 픽셀이다. . 은 빈칸이다.
+
+palette
+k #2b1d16 윤곽
+s #f3c9a0 피부
+c #ef9f86 볼
+e #fdf8ef 눈 반짝임
+m #c0505a 입
+p #2c303b 바지
+f #3d2a20 구두
+
+pixels
+................
+....kkkkkkkk....
+...kssssssssk...
+..kssssssssssk..
+..kssssssssssk..
+.kssssssssssssk.
+.kssssssssssssk.
+.kssssssssssssk.
+.kssskesseksssk.
+.kssskksskksssk.
+.kscskksskkscsk.
+..kssssmmssssk..
+...kkkkkkkkkk...
+..kssssssssssk..
+.kssssssssssssk.
+kssssssssssssssk
+kssssssssssssssk
+kssssssssssssssk
+kssksssssssskssk
+.kkkppppppppkkk.
+...kpppkkpppk...
+...kpppkkpppk...
+...kfffkkfffk...
+...kkkk..kkkk...

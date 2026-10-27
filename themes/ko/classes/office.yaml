@@ -3,6 +3,7 @@ class:
   label: 직장인
   desc: 업무 보고와 메일, 회의록을 매일 쓰는 사람
   kinds: [work-report, email, minutes, slides]
+  titles: [사원, 대리, 과장, 차장, 부장]  # 기본, 1차, 2차, 3차, 4차 전직 칭호
 
 defaults:
   voice: bullet

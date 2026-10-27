@@ -208,11 +208,9 @@ def grade(case, calls):
 
 
 # ---------------------------------------------------------------- 본문 검사
-# 조립된 값대로 썼는지 어림 기준으로 잰다. 기준은 대략값이라 틀림이 나오면 본문을 직접 읽어 확인한다.
-LENGTH_LIMIT = {"brief": 1500, "page": 3500}
+# 잴 때는 엔진의 suit.check_doc 을 쓴다. 에이전트가 check 로 스스로 고친 뒤의 본문을 같은 기준으로 다시 잰다.
 # 자료가 모자라 질문만 하고 멈추면 실제 사용자처럼 한 번 더 재촉해 본문을 받는다. 고르기 채점은 첫 턴 기록만 쓴다.
 FOLLOWUP = "더 줄 정보는 없어. 모르는 곳은 [확인 필요]로 비워 두고 지금 써 줘."
-ENDING = (("polite", ("니다", "니까", "십시오")), ("haeyo", ("요",)), ("plain", ("다", "까", "라")))
 
 
 def doc_text(reply, proj):
@@ -239,56 +237,12 @@ def doc_text(reply, proj):
     return reply
 
 
-def body_lines(doc):
-    return [ln.strip() for ln in doc.splitlines()
-            if ln.strip() and not ln.lstrip().startswith(("#", "|", "```", "---", ">"))]
-
-
-def endings(lines):
-    count = {k: 0 for k, _ in ENDING}
-    for ln in lines:
-        for sent in re.split(r"(?<=[.!?])\s+", re.sub(r"^([-*+]|\d+[.)])\s+", "", ln)):
-            if sent.rstrip(" *`\"'”’)").endswith("?"):
-                continue  # 질문 문장은 본문에 실린 예상 질문일 수 있어 어법을 세지 않는다
-            tail = re.sub(r"(\[[^\]]*\]|\([^)]*\)|[\s.!?\"'”’*`:])+$", "", sent)
-            if tail.endswith("세요"):
-                continue  # "알려 주세요", "안녕하세요" 는 합쇼체 글에도 들어가서 어법을 가르지 못한다
-            for name, ends in ENDING:
-                if tail.endswith(ends):
-                    count[name] += 1
-                    break
-    return count
-
-
-def check_doc(doc, vals, chars, kind=None):
-    """[(축, 맞았나, 잰 값)]. 잴 거리가 모자라면 그 축은 빼고 낸다."""
-    out = []
-    lines = body_lines(doc)
-    count = endings(lines)
-    total = sum(count.values())
-    want = vals["register"][0]
-    if total >= 3:
-        out.append(("어법", count[want] >= 0.6 * total, " · ".join(f"{k} {n}" for k, n in count.items() if n)))
-    # 틀이 정한 문서는 골격 규칙이 문체 규칙보다 앞서서 문체를 재지 않는다.
-    if len(lines) >= 4 and vals["skeleton"][0] != suit.TEMPLATE:
-        ratio = sum(1 for ln in lines if re.match(r"([-*+]|\d+[.)])\s", ln)) / len(lines)
-        ok = ratio >= 0.3 if vals["voice"][0] == "bullet" else ratio <= 0.5
-        out.append(("문체", ok, f"목록 줄 {ratio:.0%}"))
-    size = len("\n".join(lines))
-    limit = int(chars * 1.1) if chars else None if kind == "slides" else LENGTH_LIMIT.get(vals["length"][0])
-    if limit:
-        out.append(("분량", size <= limit, f"{size}자, 한도 {limit}자"))
-    if vals["emphasis"][0] == "none":
-        out.append(("강조", "**" not in doc, "굵은 글씨 있음" if "**" in doc else "없음"))
-    return out
-
-
 def doc_summary(checks):
     if checks is None:
         return "본문 없음"
     if not checks:
         return "잴 거리 없음"
-    bad = [f"{name} ({got})" for name, ok, got in checks if not ok]
+    bad = [f"{th.axes[axis]['label']} ({got})" for axis, ok, got in checks if not ok]
     return "맞음" if not bad else "틀림: " + ", ".join(bad)
 
 
@@ -317,12 +271,13 @@ def prepare(agent, item, base, glob):
         prof.write_text(suit.dump_yaml(PROFILE), encoding="utf-8")
     if item.get("folder"):
         suit.write_folder(item["folder"], proj)
-    env = dict(os.environ, DOCS_SUIT_PROFILE=str(prof), DOCS_SUIT_LOG=str(tmp / "calls.jsonl"))
+    env = dict(os.environ, DOCS_SUIT_PROFILE=str(prof), DOCS_SUIT_HOME=str(tmp / "conf"),
+               DOCS_SUIT_LOG=str(tmp / "calls.jsonl"))
     return tmp, proj, env
 
 
-def read_calls(tmp):
-    log = tmp / "calls.jsonl"
+def read_calls(tmp, name="calls.jsonl"):
+    log = tmp / name
     return [json.loads(x)["argv"] for x in log.read_text(encoding="utf-8").splitlines()] if log.exists() else []
 
 
@@ -351,7 +306,12 @@ def load_case(agent, case, base):
     meta["followup"] = len(transcripts) > 1
     doc = doc_text(meta["reply"], tmp / "proj") if vals else ""
     kind = compose_args(next(c for c in reversed(read_calls(tmp)) if c[:1] == ["compose"] and "--help" not in c)).kind if vals else None
-    meta["doc"] = None if not vals else check_doc(doc, vals, chars, kind) if doc else None
+    meta["doc"] = None if not vals else suit.check_doc(doc, vals, chars, kind) if doc else None
+    # 본문을 다 쓴 뒤 check 로 성장 기록을 남겼는지는 기록 파일로 본다. 빈 본문으로 부른 check 는 기록을 남기지 않는다.
+    # 프로필 없이 시작한 케이스는 슬롯이 없어 기록이 남지 않으므로 호출만 본다. 재촉한 턴의 호출은 calls-2.jsonl 에 있다.
+    calls = read_calls(tmp) + read_calls(tmp, "calls-2.jsonl")
+    meta["checked"] = (bool(suit.read_growth(tmp / "profile.growth.jsonl")) if case.get("profile", True)
+                       else any(c[:1] == ["check"] for c in calls))
     return case, ok, shown, why, meta
 
 
@@ -460,6 +420,7 @@ def report(agent, results, flows, version, model=None, glob=False):
     models = sorted({m["model"] for *_, m in every if m["model"]}) or ([model] if model else [])
     unmeasured = sum(1 for *_, m in results if m["unmeasured"])
     docs = [m["doc"] for *_, m in results if m.get("doc")]
+    written = [m for *_, m in results if m.get("doc") is not None]
     doc_ok = sum(1 for d in docs if all(ok for _, ok, _ in d))
     flow_unmeasured = sum(1 for *_, m in flows if m["unmeasured"])
     cost = sum(m["cost"] for *_, m in every)
@@ -473,6 +434,7 @@ def report(agent, results, flows, version, model=None, glob=False):
              f"- 고르기: {sum(1 for _, ok, *_ in results if ok)}/{len(results) - unmeasured} 맞음"
              + (f" (재지 못한 {unmeasured}건 제외)" if unmeasured else ""),
              f"- 본문 검사: {doc_ok}/{len(docs)} 맞음. 어법, 문체, 분량, 강조를 어림 기준으로 잰다",
+             f"- 검사 기록: 본문을 쓴 {len(written)}건 가운데 {sum(1 for m in written if m.get('checked'))}건이 check 로 성장 기록을 남겼다",
              *([f"- 여러 턴 흐름: {sum(1 for _, ok, *_ in flows if ok)}/{len(flows) - flow_unmeasured} 맞음"
                 + (f" (재지 못한 {flow_unmeasured}건 제외)" if flow_unmeasured else "")] if flows else []),
              f"- 사용료: {cost:.2f}달러" if cost else "- 사용료: 에이전트가 알려 주지 않음",
@@ -494,7 +456,8 @@ def note(m):
     others = sorted({s for s in m["skills"] if s and s != "docs-suit"})
     return ", ".join(([f"같이 불린 스킬 {', '.join(others)}"] if others else [])
                      + ([f"거절된 도구 {m['denied']}건"] if m["denied"] else [])
-                     + (["먼저 질문해 한 번 더 재촉함"] if m.get("followup") else []))
+                     + (["먼저 질문해 한 번 더 재촉함"] if m.get("followup") else [])
+                     + (["check 를 부르지 않음"] if m.get("doc") is not None and not m.get("checked") else []))
 
 
 def main():
