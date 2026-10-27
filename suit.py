@@ -1293,6 +1293,7 @@ description: 문서를 쓰거나 다듬거나 검토할 때 docs-suit 테마를 
 6. 사용자가 다 쓴 글을 검토해 달라고 할 때만 `{run} review <본문 파일|-> --kind <종류> [--audience …] [--set …] [--source <원문 파일>]` 을 부른다. 원문은 과제 안내문이나 채용 공고처럼 글이 따라야 할 자료다. 앞선 대화를 모르는 서브에이전트를 새로 띄울 수 있으면 출력 전체를 그 에이전트에게 넘기고, 받은 지적을 그대로 보인다. 띄울 수 없으면 출력을 보여 주고 새 대화에 붙여 넣으라고 권한다. 지적대로 본문을 고칠지는 사용자에게 묻는다.
 7. 사용자가 말투나 모양이 마음에 안 든다고 하면 어느 축의 문제인지 짚고, 그 축의 다른 값으로 다시 조립해 대표 문단 하나를 견줘 보인다. 계속 쓰고 싶어 하면 `{run} set <축> <값> [--audience <독자>]` 로 프로필에 남긴다. 이 폴더에서만 그렇게 쓰고 싶어 하면 `--here` 를 붙여 폴더 파일 `.docs-suit.yaml` 에 남긴다. 카드를 보며 고르고 싶어 하면 `{run} serve --detach` 로 테마 고르기 화면을 띄우고 주소를 알려 준다.
 8. 사용자가 캐릭터를 보여 달라고 하면 `{run} card --color never` 의 출력을 보여 준다. 꾸며 달라고 하면 `{run} look` 으로 열린 부위를 보고 `{run} look <부위> <값>` 을 부른다. 캐릭터 키우기를 끄거나 켜 달라고 하면 `{run} growth off` 나 `{run} growth on` 을 부른다. 성장 기록과 승급 키, 슬롯의 `look:` 절은 사용자가 부탁해도 직접 고치지 않는다. 레벨은 문서를 써서 오르고, 3차와 4차 전직은 저장소에 기여하고 받은 승급 키를 `{run} promote <키>` 로 넣어야 열린다고 알려 준다.
+9. 사용자가 화면을 열어 달라고 하거나 화면에서 고르겠다고 하면 사용자에게 명령을 시키지 않고 직접 띄운 뒤 나온 주소를 알려 준다. 화면은 두 가지다. 말투나 분량 같은 테마 값을 카드로 견줘 고르려면 `{run} serve --detach` 로 테마 고르기 화면을 띄운다. 처음 세팅하거나 클래스와 캐릭터를 고르려면 `{run} serve --page create --detach` 로 캐릭터 만들기 화면을 띄운다. 어느 쪽인지 모르면 프로필이 없을 때는 캐릭터 만들기 화면을, 있을 때는 테마 고르기 화면을 띄운다.
 """
 
 
@@ -2276,31 +2277,44 @@ def make_server(th, cwd, port=0):
     return httpd, token
 
 
-def free_port(prefer=8790):
-    for port in (prefer, 0):
+def free_port(prefer=8790, fixed=False):
+    """쓸 포트. fixed 면 prefer 만 보고, 아니면 prefer 가 차 있을 때 빈 포트를 고른다."""
+    blocked = False
+    for port in (prefer,) if fixed else (prefer, 0):
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
             try:
                 sock.bind(("127.0.0.1", port))
                 return sock.getsockname()[1]
+            except PermissionError:
+                blocked = True
             except OSError:
                 continue
-    raise OSError("빈 포트를 찾지 못했다")
+    if blocked:
+        # Codex 의 workspace-write 샌드박스가 이렇게 막는다
+        raise OSError("이 환경이 포트 열기를 막았다. 에이전트 샌드박스 안이면 샌드박스 밖에서 실행할 권한을 받아 같은 명령을 다시 부른다")
+    raise OSError(f"{prefer} 번 포트는 다른 프로그램이 쓰고 있다. --port 를 빼면 빈 포트를 고른다" if fixed else "빈 포트를 찾지 못했다")
 
 
 def cmd_serve(a, th):
     """초기 세팅이나 테마를 바꿀 때 띄우는 로컬 화면. --detach 는 뒤에서 띄우고 바로 돌아온다."""
     cwd = os.path.abspath(os.path.expanduser(a.cwd or os.getcwd()))
-    port = a.port or free_port()
+    port = free_port(a.port or 8790, fixed=bool(a.port))
     url = f"http://127.0.0.1:{port}/{a.page}.html"
     if a.detach:
+        # 포트가 비어 있는 것을 위에서 봤으니, 이 포트에 연결되면 띄운 서버다. 서버가 먼저 끝나면 뜨지 못한 것이다.
         args = [sys.executable, str(HERE / "suit.py"), "serve", "--port", str(port), "--cwd", cwd, "--page", a.page, "--no-open"]
-        subprocess.Popen(args, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                         start_new_session=True)
+        child = subprocess.Popen(args, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                                 start_new_session=True)
         for _ in range(30):
+            if child.poll() is not None:
+                raise OSError("화면 서버가 뜨지 못하고 끝났다. --detach 없이 부르면 까닭이 보인다")
             with socket.socket() as sock:
                 if sock.connect_ex(("127.0.0.1", port)) == 0:
                     break
             time.sleep(0.1)
+        else:
+            child.kill()
+            raise OSError("화면 서버가 3초 안에 뜨지 않았다")
     else:
         httpd, _ = make_server(th, cwd, port)
     _, slot, _, why = profile_source(None, start=cwd)

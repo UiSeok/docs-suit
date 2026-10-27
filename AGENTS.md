@@ -55,7 +55,7 @@ SKILL.md 문구나 문서 종류, 독자를 바꿨으면 돌리고 `--record` �
 
 실행기는 홈 폴더의 스킬과 프로필을 건드리지 않는다. 케이스마다 임시 폴더에 프로젝트 단위 스킬과 시험 프로필을 두고, `DOCS_SUIT_LOG` 로 suit.py 호출 인자를 모아 채점한다. Claude Code 는 사용자 설정과 개인 스킬, MCP 를 끄고 돌려서 처음 설치한 사람과 조건을 맞춘다.
 
-Antigravity CLI 는 한 번 실행 모드에서 확인 창을 띄우지 못해 명령을 거절하고, 작업 폴더 단위 설정이 없다. 그래서 `~/.gemini/antigravity-cli/settings.json` 의 `permissions.allow` 에 `command(python3 <suit.py 절대 경로>)` 를 더한 뒤 돌린다. Codex CLI 는 exec 모드가 샌드박스 안에서 확인 없이 돌아서 따로 설정하지 않는다.
+Antigravity CLI 는 한 번 실행 모드에서 확인 창을 띄우지 못해 명령을 거절하고, 작업 폴더 단위 설정이 없다. 그래서 `~/.gemini/antigravity-cli/settings.json` 의 `permissions.allow` 에 `command(python3 <suit.py 절대 경로>)` 를 더한 뒤 돌린다. Codex CLI 는 exec 모드가 샌드박스 안에서 확인 없이 돌아서 따로 설정하지 않는다. 다만 이 샌드박스는 포트 열기를 막아 화면 케이스에서 서버가 뜨지 않으므로, 화면 케이스는 알맞은 화면을 `--detach` 로 불렀는지만 잰다.
 
 무료 요금제로 돌리면 사용 한도에 걸릴 수 있다. 한도나 연결 실패로 답 없이 끝난 건은 틀림이 아니라 재지 못함으로 표에 남고, 맞은 비율에서도 뺀다. 결과 머리의 SKILL.md 지문으로 어느 판의 SKILL.md 로 돌렸는지 가린다.
 

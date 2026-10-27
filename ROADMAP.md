@@ -12,7 +12,7 @@
    - 출력 형식 축 `markup`
    - 문서 종류 세 가지: 가이드·README·위키, 공지, 발표 원고
    - 다듬기 `--revise` 와 검토 지침 `review`
-   Claude Code 와 Codex 는 바로 재고, Antigravity 는 무료 한도가 풀리는 11월 3일 무렵 잰다. 새 케이스는 guide, notice, script, set-markup, revise-email 다섯 건이고, 화면에서 세팅해 달라는 케이스를 하나 더한다. Antigravity 는 이어서 `--global` 로 전역 자리를 확인해 `AGENT_TARGETS` 의 `checked` 를 갱신하고, 상태 줄에 캐릭터가 뜨는지도 본다.
+   Claude Code 와 Codex 는 바로 재고, Antigravity 는 무료 한도가 풀리는 11월 3일 무렵 잰다. 새 케이스는 guide, notice, script, set-markup, revise-email 다섯 건과, 화면을 열어 달라는 screen-theme, screen-setup 두 건이다. 화면 케이스는 에이전트가 `serve --detach` 로 알맞은 화면을 띄우는지 본다. 2026-10-28 에 Claude Code 와 Codex 모두 두 건을 맞혔다. Codex 의 기본 샌드박스는 포트 열기를 막아서, 대화형 Codex 에서 샌드박스 밖 실행을 승인받아 화면이 뜨는지는 아직 확인하지 않았다. Antigravity 는 이어서 `--global` 로 전역 자리를 확인해 `AGENT_TARGETS` 의 `checked` 를 갱신하고, 상태 줄에 캐릭터가 뜨는지도 본다.
 3. **종류 없는 글의 문체.** 결혼식 축사처럼 종류가 없는 글이 직장인 클래스의 개조식을 그대로 물려받아 본문 검사에서 틀림이 나왔다. 종류가 없을 때 클래스의 문체 기본값을 덜 따르게 할지 정한다.
 4. **본문 검사에서 나온 경향.** 강조를 쓰지 않는 메일에 굵은 글씨를 쓰고, 짧게 쓸 설계 문서를 2천 자 넘게 쓰는 경향이 있었다. 에이전트가 check 로 스스로 고치게 한 뒤 Claude Code 는 26건 모두 맞았다. 다음 측정에서도 남는지 본다.
 5. **폴더별 프로필 시범 사용.** hersg 폴더에서 써 보며 대화로 슬롯을 만드는 흐름과 `--here` 로 남기는 흐름의 불편을 모아 고친다.

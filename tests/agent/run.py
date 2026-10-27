@@ -187,6 +187,18 @@ def grade(case, calls):
         return not calls, shown, "" if not calls else "문서 요청이 아닌데 suit.py 를 불렀다", None, None
     if any(c[:1] == ["bootstrap"] and "--yes" in c for c in calls):
         return False, shown, "사용자의 답 없이 프로필을 저장했다", None, None
+    if expect == "serve":
+        # --detach 는 뒤에서 도는 서버로 suit.py serve 를 다시 불러 그 호출도 기록에 남는다. 에이전트가 부른 것만 본다.
+        serves = [c for i, c in enumerate(calls) if c[:1] == ["serve"]
+                  and not (i and "--detach" in calls[i - 1] and "--cwd" in c and "--no-open" in c and "--detach" not in c)]
+        if not serves:
+            return False, shown, "serve 를 부르지 않았다", None, None
+        p = argparse.ArgumentParser(add_help=False)
+        p.add_argument("--page", default="index")
+        p.add_argument("--detach", action="store_true")
+        a, _ = p.parse_known_args(serves[-1][1:])
+        why = ([] if a.detach else ["--detach 없이 띄웠다"]) + ([] if a.page == case["page"] else [f"화면이 {a.page} 이다"])
+        return not why, "; ".join(describe(c) for c in serves), ", ".join(why), None, None
     if not composes:
         return False, shown, "compose 를 부르지 않았다", None, None
     a = compose_args(composes[-1])
@@ -274,9 +286,17 @@ def prepare(agent, item, base, glob):
         prof.write_text(suit.dump_yaml(PROFILE), encoding="utf-8")
     if item.get("folder"):
         suit.write_folder(item["folder"], proj)
+    # serve 가 브라우저를 열면 돌리는 사람 화면에 탭이 뜬다. webbrowser 는 BROWSER 의 명령을 먼저 쓰므로 true 로 막는다.
     env = dict(os.environ, DOCS_SUIT_PROFILE=str(prof), DOCS_SUIT_HOME=str(tmp / "conf"),
-               DOCS_SUIT_LOG=str(tmp / "calls.jsonl"))
+               DOCS_SUIT_LOG=str(tmp / "calls.jsonl"), BROWSER="true")
     return tmp, proj, env
+
+
+def stop_servers(proj):
+    """에이전트가 --detach 로 띄운 화면 서버를 끈다. 뒤에서 도는 서버는 --cwd 에 작업 폴더의 절대 경로를 받는다.
+    macOS 는 임시 폴더 앞에 /private 가 붙기도 해서 기록 폴더 이름부터 맞춘다."""
+    tail = "/".join(proj.parts[-3:])
+    subprocess.run(["pkill", "-f", f"suit.py serve .*{tail}"], capture_output=True)
 
 
 def read_calls(tmp, name="calls.jsonl"):
@@ -324,6 +344,7 @@ def run_case(agent, case, base, model, glob=False):
     tmp, proj, env = prepare(agent, case, base, glob)
     t0 = time.time()
     out, err = invoke(agent, case["ask"], tmp, proj, env, model, keep=True)
+    stop_servers(proj)
     (tmp / "transcript.jsonl").write_text(out, encoding="utf-8")
     (tmp / "stderr.txt").write_text(err or "", encoding="utf-8")
     first = AGENTS[agent]["meta"](out)
@@ -399,7 +420,9 @@ def expected(case):
     expect = case.get("expect", "compose")
     if expect == "skip":
         return "부르지 않음"
-    kinds = case["kind"] if isinstance(case["kind"], list) else [case["kind"]]
+    if expect == "serve":
+        return f"serve --detach, 화면 {case['page']}"
+    kinds =case["kind"] if isinstance(case["kind"], list) else [case["kind"]]
     parts = [" 또는 ".join(k or "종류 없음" for k in kinds)]
     if case.get("audience"):
         parts.append(f"독자 {case['audience']}")
@@ -451,7 +474,7 @@ def report(agent, results, flows, version, model=None, glob=False):
                   "|---|---|---|---|---|---|---|"]
         for case, ok, shown, why, m in results:
             lines.append(f"| {case['id']} | {expected(case)} | `{shown}` | {verdict(ok, why, m)} | "
-                         f"{doc_summary(m['doc']) if ok and case.get('expect') != 'skip' else '-'} | {note(m)} | {m['sec']} |")
+                         f"{doc_summary(m['doc']) if ok and case.get('expect', 'compose') == 'compose' else '-'} | {note(m)} | {m['sec']} |")
     if flows:
         lines += ["", "## 여러 턴 흐름", "", "| 흐름 | 기대 | 에이전트가 부른 것 | 판정 | 비고 | 초 |", "|---|---|---|---|---|---|"]
         for flow, ok, shown, why, m in flows:

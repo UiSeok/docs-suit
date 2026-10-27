@@ -1,7 +1,8 @@
 """동작 테스트 케이스. tests/agent/run.py 가 읽는다.
 
 expect 가 compose 이면 에이전트가 suit.py compose 를 불러야 한다. kind 는 기대하는 문서 종류이고, 여럿을 허용하면
-목록으로, 종류 없이 조립해야 하면 빈 문자열로 쓴다. want 는 조립 결과에서 이 값이어야 하는 축이다. audience 는 실제로
+목록으로, 종류 없이 조립해야 하면 빈 문자열로 쓴다. expect 가 serve 이면 suit.py serve 를 --detach 로 불러 page 화면을
+띄워야 한다. want 는 조립 결과에서 이 값이어야 하는 축이다. audience 는 실제로
 쓰인 독자에 들어 있어야 하는 키다. revise 가 True 면 --revise 를 붙여야 하고, 아니면 붙이지 않아야 한다. expect 가 skip 이면 suit.py 를 부르지 않아야 한다. profile 이 False 이면 프로필 없이
 시작한다. folder 는 작업 폴더에 둘 .docs-suit.yaml 이다. 어느 케이스든 사용자의 답 없이 bootstrap 으로 프로필을 저장하면
 틀린다.
@@ -91,6 +92,12 @@ CASES = [
      "ask": "정류장 대기 시간을 영어로 뭐라고 해?"},
     {"id": "no-profile", "kind": "work-report", "profile": False,
      "ask": "팀장님께 올릴 주간 업무 보고 써 줘. 이번 주에는 로그인 오류를 고쳤어."},
+
+    # 화면. 사용자가 화면에서 고르겠다고 하면 에이전트가 serve --detach 로 띄워 준다
+    {"id": "screen-theme", "expect": "serve", "page": "index",
+     "ask": "docs-suit 테마를 카드 보면서 직접 고르고 싶어. 화면 열어 줘."},
+    {"id": "screen-setup", "expect": "serve", "page": "create", "profile": False,
+     "ask": "docs-suit 세팅해 줘. 질문에 하나씩 답하는 건 번거로우니까 화면에서 고를게."},
 ]
 
 # 여러 턴 흐름. 턴마다 같은 세션을 이어 가고, 끝난 뒤 프로필과 폴더 파일에 남은 값을 본다.
