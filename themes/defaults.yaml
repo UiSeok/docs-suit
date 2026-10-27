@@ -1,0 +1,50 @@
+# 기본 프리셋(대학생)과 독자, 문서 종류. theme.py 와 웹 고르개가 읽는다.
+# 형식은 YAML 의 부분집합이다. 맨 앞 칸에 절 이름, 들여 쓴 줄에 키 하나와 값 하나.
+# 값은 낱말이거나 `[a, b]` 목록이거나 `{키: 값, …}` 한 줄 묶음이다. 묶음 안에 묶음을 넣지 않는다.
+#
+# 값을 정하는 순서 (위가 이긴다)
+#   1. 문서 종류가 고정한 축      kinds
+#   2. 명령 인자                  --set 축=값
+#   3. 개인 설정의 독자 프로필     ~/.config/geulot/themes.yaml 의 audiences
+#   4. 문서 종류가 권하는 값       prefer
+#   5. 개인 설정의 기본값          개인 설정의 defaults
+#   6. 독자 프로필                audiences
+#   7. 기본 프리셋 (대학생)       defaults
+# 공개 범위(exposure)는 안전 축이다. 인자와 개인 설정은 더 좁힐 때만 이긴다. 좁은 순서는 public, submit, team 이다.
+# 독자를 말하지 않으면 문서 종류의 audience 를 쓴다.
+
+defaults:
+  visual-doc: sakura
+  visual-deck: paper
+  voice: prose
+  register: plain
+  terms: explained
+  skeleton: bluf
+  length: page
+  emphasis: bold
+  diagram: table
+  sources: footnote
+  exposure: public
+  ai-disclosure: footnote
+
+# 독자 프로필. label 은 사람이 부르는 이름이고 나머지 키는 축이다.
+audiences:
+  professor: {label: 교수·조교, voice: prose, register: plain, terms: major, length: full, exposure: submit, ai-disclosure: footnote}
+  teammate: {label: 팀원, voice: bullet, register: haeyo, terms: explained, length: page, exposure: team, ai-disclosure: none}
+  recruiter: {label: 채용 담당·면접관, voice: bullet, register: polite, terms: explained, length: page, exposure: submit, ai-disclosure: none}
+  listener: {label: 발표 청중, voice: bullet, register: polite, terms: everyday, length: brief, exposure: public}
+  reader: {label: 인터넷 독자, voice: prose, register: haeyo, terms: explained, length: page, exposure: public, sources: link}
+
+# 문서 종류. audience 는 독자를 말하지 않을 때 쓰는 기본 독자이고, 나머지 축 키는 그 종류가 고정하는 값이다.
+kinds:
+  resume: {label: 이력서, audience: [recruiter], skeleton: template, ai-disclosure: none}
+  slides: {label: 발표 PPT, audience: [listener], skeleton: template, voice: bullet}
+  report: {label: 보고서·레포트, audience: [professor]}
+  teamwork: {label: 팀플 공유자료, audience: [teammate], skeleton: template}
+
+# 문서 종류가 권하는 값. 고정은 아니라서 인자와 개인 독자 프로필이 바꿀 수 있다.
+prefer:
+  resume: {voice: bullet, diagram: none, emphasis: bold}
+  slides: {length: brief, diagram: table}
+  report: {skeleton: imrad, sources: footnote}
+  teamwork: {diagram: table, length: brief}

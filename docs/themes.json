@@ -1,0 +1,332 @@
+{
+ "axesOrder": [
+  "visual-doc",
+  "visual-deck",
+  "voice",
+  "register",
+  "terms",
+  "skeleton",
+  "length",
+  "emphasis",
+  "diagram",
+  "sources",
+  "exposure",
+  "ai-disclosure"
+ ],
+ "composeOrder": [
+  "exposure",
+  "skeleton",
+  "voice",
+  "register",
+  "terms",
+  "length",
+  "sources",
+  "ai-disclosure",
+  "diagram",
+  "emphasis",
+  "visual-deck",
+  "visual-doc"
+ ],
+ "exposureStrict": [
+  "public",
+  "submit",
+  "team"
+ ],
+ "termsPlain": [
+  "everyday",
+  "explained",
+  "major"
+ ],
+ "axes": {
+  "visual-doc": {
+   "label": "디자인 · 문서",
+   "values": {
+    "sakura": "Sakura",
+    "newcss": "new.css"
+   }
+  },
+  "visual-deck": {
+   "label": "디자인 · 발표",
+   "values": {
+    "paper": "종이 톤",
+    "contrast": "어두운 고대비",
+    "minimal": "흰 바탕 한 색"
+   }
+  },
+  "voice": {
+   "label": "문체",
+   "values": {
+    "prose": "줄글",
+    "bullet": "개조식"
+   }
+  },
+  "register": {
+   "label": "어법",
+   "values": {
+    "plain": "평어체 (-다)",
+    "polite": "합쇼체 (-습니다)",
+    "haeyo": "해요체 (-요)"
+   }
+  },
+  "terms": {
+   "label": "용어 수준",
+   "values": {
+    "everyday": "일상어",
+    "explained": "풀어 쓰고 전공어 곁들임",
+    "major": "전공 용어 그대로"
+   }
+  },
+  "skeleton": {
+   "label": "골격",
+   "values": {
+    "bluf": "결론 먼저",
+    "chrono": "시간순",
+    "pcs": "문제 · 원인 · 대책",
+    "imrad": "목적 · 방법 · 결과 · 고찰",
+    "psr": "문제 · 해결 · 효과"
+   }
+  },
+  "length": {
+   "label": "분량",
+   "values": {
+    "brief": "짧게",
+    "page": "한 쪽",
+    "full": "상세"
+   }
+  },
+  "emphasis": {
+   "label": "강조",
+   "values": {
+    "bold": "굵은 글씨",
+    "none": "쓰지 않음"
+   }
+  },
+  "diagram": {
+   "label": "그림",
+   "values": {
+    "table": "표 먼저",
+    "mermaid": "mermaid",
+    "none": "그리지 않음"
+   }
+  },
+  "sources": {
+   "label": "출처 표기",
+   "values": {
+    "footnote": "각주",
+    "apa": "참고문헌 (APA)",
+    "link": "본문 링크"
+   }
+  },
+  "exposure": {
+   "label": "공개 범위",
+   "values": {
+    "public": "인터넷 공개",
+    "submit": "제출용",
+    "team": "팀 내부"
+   }
+  },
+  "ai-disclosure": {
+   "label": "AI 사용 고지",
+   "values": {
+    "footnote": "각주로 밝힘",
+    "appendix": "부록으로 밝힘",
+    "none": "밝히지 않음"
+   }
+  }
+ },
+ "defaults": {
+  "visual-doc": "sakura",
+  "visual-deck": "paper",
+  "voice": "prose",
+  "register": "plain",
+  "terms": "explained",
+  "skeleton": "bluf",
+  "length": "page",
+  "emphasis": "bold",
+  "diagram": "table",
+  "sources": "footnote",
+  "exposure": "public",
+  "ai-disclosure": "footnote"
+ },
+ "audiences": {
+  "professor": {
+   "label": "교수·조교",
+   "voice": "prose",
+   "register": "plain",
+   "terms": "major",
+   "length": "full",
+   "exposure": "submit",
+   "ai-disclosure": "footnote"
+  },
+  "teammate": {
+   "label": "팀원",
+   "voice": "bullet",
+   "register": "haeyo",
+   "terms": "explained",
+   "length": "page",
+   "exposure": "team",
+   "ai-disclosure": "none"
+  },
+  "recruiter": {
+   "label": "채용 담당·면접관",
+   "voice": "bullet",
+   "register": "polite",
+   "terms": "explained",
+   "length": "page",
+   "exposure": "submit",
+   "ai-disclosure": "none"
+  },
+  "listener": {
+   "label": "발표 청중",
+   "voice": "bullet",
+   "register": "polite",
+   "terms": "everyday",
+   "length": "brief",
+   "exposure": "public"
+  },
+  "reader": {
+   "label": "인터넷 독자",
+   "voice": "prose",
+   "register": "haeyo",
+   "terms": "explained",
+   "length": "page",
+   "exposure": "public",
+   "sources": "link"
+  }
+ },
+ "kinds": {
+  "resume": {
+   "label": "이력서",
+   "audience": [
+    "recruiter"
+   ],
+   "skeleton": "template",
+   "ai-disclosure": "none"
+  },
+  "slides": {
+   "label": "발표 PPT",
+   "audience": [
+    "listener"
+   ],
+   "skeleton": "template",
+   "voice": "bullet"
+  },
+  "report": {
+   "label": "보고서·레포트",
+   "audience": [
+    "professor"
+   ]
+  },
+  "teamwork": {
+   "label": "팀플 공유자료",
+   "audience": [
+    "teammate"
+   ],
+   "skeleton": "template"
+  }
+ },
+ "prefer": {
+  "resume": {
+   "voice": "bullet",
+   "diagram": "none",
+   "emphasis": "bold"
+  },
+  "slides": {
+   "length": "brief",
+   "diagram": "table"
+  },
+  "report": {
+   "skeleton": "imrad",
+   "sources": "footnote"
+  },
+  "teamwork": {
+   "diagram": "table",
+   "length": "brief"
+  }
+ },
+ "base": "어떤 테마를 골라도 지키는 규칙이다.\n\n- 모르면 지어내지 않는다. 근거가 없는 자리는 `[확인 필요: 무엇을]` 으로 남기고, 글을 마칠 때 이 표시를 모아 보여 준다.\n- 확인한 사실과 추정을 같은 문장에 섞지 않는다. 추정은 추정이라고 적는다.\n- 수치는 받은 자료에 있는 그대로 쓴다. 반올림하거나 그럴듯한 숫자를 만들지 않는다.\n- 쓰기 전에, 틀리면 결과가 쓸모없어지는 것만 두세 개 묻는다. 받은 자료로 알 수 있는 것은 묻지 않는다. 답이 없으면 가정을 밝히고 진행한다.\n- 개수는 \"세 가지가 있다\", \"네 군데다\" 처럼 단위 명사로 센다. \"셋이다\", \"넷입니다\" 처럼 수사를 서술어로 세우지 않는다.\n- \"다양한\", \"효율적인\", \"혁신적인\" 처럼 정보가 없는 수식어 대신 구체적인 명사와 수치를 쓴다.",
+ "kindText": {
+  "resume": "채용 담당자가 30초 안에 \"이 사람이 무엇을 해결해 봤는가\"를 알게 하는 문서다.\n\n쓰기 전에 받을 것\n- 지원 회사와 직무, 채용 공고 원문 전체. 요약본이 아니라 원문이어야 공고의 요구 기술과 인재상을 놓치지 않는다.\n- 프로젝트 기록 원문. 트러블슈팅 메모, 회고, README 를 그대로 받는다.\n\n골격\n- 맨 위 요약은 세 줄 안쪽이다. 지원 직무, 가장 강한 경험 하나, 최근 동향에 맞는 경험을 쓴다. 요즘은 AI 를 써서 무언가를 해 본 경험을 반긴다.\n- 프로젝트마다 경험을 세 개에서 네 개 고른다. 경험 하나는 문제 상황, 해결 방법, 효과의 세 줄이다.\n  - 문제 상황: 어떤 문제가 생겼는가.\n  - 해결 방법: 어떤 근거로 어떻게 풀었는가. 다른 대안이 있었다면 왜 이것을 골랐는가.\n  - 효과: 개선 결과를 수치로 쓴다. 수치가 없으면 지어내지 말고 `[확인 필요: 측정값]` 으로 남긴다.\n- 경험마다 자세한 기록으로 가는 링크를 단다. 세 줄로는 읽는 사람이 다 이해하지 못한다.\n- 공고의 요구 기술과 인재상에 맞는 경험을 위로 올린다.\n\n하지 않는 것\n- 기능 개발 나열. \"로그인 기능 구현\" 은 누구나 쓴다. 그 기능을 만들다 부딪힌 문제를 쓴다.\n- 면접에서 설명할 수 없는 문장. 면접관은 이력서에 적힌 것으로 묻는다.\n\n다 쓴 뒤에 할 것\n- 이 이력서로 면접관이 물을 꼬리 질문을 경험마다 세 개씩 뽑아 준다. 답은 사람이 자기 말로 연습한다.",
+  "slides": "청중이 발표가 끝나고 한 문장을 기억하게 만드는 자료다.\n\n쓰기 전에 받을 것\n- 발표 자리와 시간, 청중. 몇 분짜리이고 누가 듣는가.\n- 발표 내용의 원문 자료. 보고서, 조사 메모, 데이터를 요약하지 않은 채로 받는다.\n\n골격\n- 장 수는 발표 시간의 분 수 안팎으로 잡는다. 10분이면 10장 안팎이다.\n- 첫 장에는 제목과 발표자를 쓰고, 둘째 장에는 청중에게 던질 질문이나 문제를 하나 둔다.\n- 한 장에는 메시지 하나만 담는다. 장 제목은 그 메시지를 주장하는 문장이다. \"실험 결과\" 가 아니라 \"비 오는 날 배달은 1.4배 늦었다\" 다.\n- 화면 글은 키워드와 숫자만 둔다. 말할 내용은 발표자 노트로 따로 쓴다.\n- 화면에 나가는 숫자는 모두 맨 끝 \"근거 표\" 에 출처와 함께 모은다. 근거 표에 없는 숫자는 화면에 올리지 않는다.\n- 마지막 장은 청중이 할 행동 하나나 기억할 문장 하나로 끝낸다.\n\n출력 형식\n- 장마다 `장 번호 · 제목 · 화면 · 노트` 를 나눠 쓴다. PowerPoint, Google Slides, Canva 어디에든 옮기기 쉽게 한다.",
+  "report": "수업 과제로 내는 글이다. 읽는 사람은 대개 교수와 조교다.\n\n쓰기 전에 받을 것\n- 과제 안내문 원문 전체. 분량, 형식, 마감, 평가 기준, AI 사용 규정이 들어 있다.\n- 내가 모은 자료와 실험 데이터, 메모 원문.\n\n지킬 것\n- 표지에는 과목명, 과제명, 학번, 이름, 제출일을 쓴다. 공개 범위가 인터넷 공개면 학번은 뺀다.\n- 맨 앞에 요약 한 문단을 둔다. 무엇을 했고 무엇을 알아냈는지다.\n- 과제 안내문이 요구한 항목을 빠짐없이 다뤘는지 끝에서 표로 대조한다. 열은 \"요구 항목, 다룬 절\" 이다.\n- 결론에는 한계와 다음에 바꿀 점을 쓴다.",
+  "teamwork": "팀원이 1분 안에 읽고 자기 할 일을 아는 문서다. 회의록, 역할 분담표, 진행 공유가 여기 든다.\n\n골격\n- 첫 줄은 이번에 정해진 것 한 문장이다.\n- 다음은 결정 표다. 열은 \"정한 것, 담당, 기한\" 이다. 담당 칸에는 사람 이름을 쓴다. \"다 같이\" 는 아무도 안 한다는 뜻이다.\n- 그다음 \"아직 못 정한 것\" 을 따로 모은다. 누가 언제까지 답을 가져올지 붙인다.\n- 마지막 줄은 다음 모임 날짜와 그때까지 할 일이다.\n\n하지 않는 것\n- 회의에서 오간 말을 시간순으로 다 옮겨 적기. 결정과 할 일만 남긴다.\n- 누구 탓인지 쓰기. 무엇이 막혔고 어떻게 풀지를 쓴다."
+ },
+ "rules": {
+  "visual-doc/sakura": "웹 문서나 마크다운을 HTML 로 볼 때 쓰는 차분한 문서 스타일이다. CSS 는 `sakura/theme.css` 이고 MIT 라이선스다.\n\n- 본문 폭을 좁게 두고 줄 간격을 넉넉히 둔다. 긴 보고서를 화면에서 읽기 좋다.\n- 제목과 본문 글꼴을 따로 고르지 않는다. CSS 가 정한 글꼴을 쓴다.\n- HTML 로 내보낼 때는 `<link rel=\"stylesheet\" href=\"theme.css\">` 한 줄로 붙인다.",
+  "visual-doc/newcss": "클래스 없이 HTML 태그만으로 꾸며지는 문서 스타일이다. CSS 는 `newcss/theme.css` 이고 MIT 라이선스다.\n\n- 머리말과 표, 인용, 코드 블록이 기본으로 꾸며진다. 팀플 공유 페이지처럼 빨리 띄울 문서에 맞다.\n- 클래스 이름을 쓰지 않는다. 태그를 의미대로만 쓴다.",
+  "visual-deck/paper": "밝은 종이 색 바탕에 세리프 제목을 쓰는 강의형 발표 스타일이다. PowerPoint, Google Slides, Canva 어디서든 아래 값만 맞추면 된다.\n\n- 바탕은 따뜻한 미색(#FAFAF8), 글자는 먹색(#1C1917), 강조색은 청록(#0F766E) 한 가지만 쓴다.\n- 제목은 명조 계열(Noto Serif KR), 본문은 고딕 계열(Pretendard 또는 Noto Sans KR)이다.\n- 한 장에 강조색은 한 곳에만 쓴다. 경고나 반대 사례만 버건디(#9F1239)를 쓴다.\n- 장식 도형과 그림자를 쓰지 않는다. 여백으로 나눈다.",
+  "visual-deck/contrast": "어두운 바탕에 밝은 글자를 쓰는 발표 스타일이다. 강의실 프로젝터가 어둡거나 코드와 숫자를 크게 보일 때 맞다.\n\n- 바탕은 거의 검정(#111315), 글자는 밝은 회색(#E7E5E4), 강조색은 형광 초록(#4ADE80) 한 가지만 쓴다.\n- 제목과 본문 모두 고딕 계열을 쓰고, 숫자와 코드는 고정폭 글꼴(D2Coding 등)로 쓴다.\n- 글자 크기는 본문 24pt 아래로 내리지 않는다. 어두운 바탕은 작은 글자가 먼저 뭉개진다.",
+  "visual-deck/minimal": "흰 바탕에 색 하나로만 강조하는 가장 단순한 발표 스타일이다. 템플릿을 고르기 어려울 때 기본으로 쓴다.\n\n- 바탕은 흰색, 글자는 검정, 강조색은 학교나 팀의 대표색 하나만 쓴다.\n- 한 장에 글꼴은 하나, 굵기는 두 가지까지만 쓴다.\n- 그림이 없는 장은 큰 글자 한 문장으로 채운다. 빈 곳을 클립아트로 메우지 않는다.",
+  "voice/prose": "문단으로 이어 쓰는 문체다.\n\n- 한 문장에는 한 맥락만 담는다. 같은 맥락은 쉼표와 연결어미로 잇고, 맥락이 바뀌면 마침표를 찍는다.\n- 한 문장이 80자를 넘으면 맥락이 둘 이상 들어간 것이니 나눈다. 20자 안팎 문장이 세 개 이어지면 같은 맥락을 잘게 끊은 것이니 잇는다.\n- 대시(—)로 문장을 잇지 않는다. 괄호는 문단에 하나까지만 쓰고, 괄호 안에 문장을 넣지 않는다.\n- 같은 층위의 항목이 네 개 이상이면 줄글로 늘어놓지 말고 목록으로 뺀다.",
+  "voice/bullet": "목록 위주로 쓰는 문체다.\n\n- 항목 하나에 사실 하나를 담는다. 항목 끝은 명사나 명사형으로 끝낸다. 예: \"주문 조회 속도 40% 개선\".\n- 원인과 결과처럼 이어져야 하는 내용은 목록으로 끊지 않는다. 그 항목만 한 문장으로 쓴다.\n- 목록 깊이는 두 단계까지만 쓴다.\n- 목록 앞에는 이 목록이 무엇인지 한 줄로 밝힌다.",
+  "register/plain": "- 문장은 `-다` 로 끝낸다. `-한다`, `-이다`, `-하지 않는다` 꼴이다.\n- 존댓말과 권유형을 섞지 않는다. \"권장한다\" 대신 해야 하면 `-한다`, 아니면 쓰지 않는다.\n- 표 칸과 개조식 항목은 명사로 끝내도 된다.",
+  "register/polite": "- 문장은 `-습니다`, `-ㅂ니다` 로 끝낸다.\n- 한 글 안에서 `-요` 와 섞지 않는다.\n- \"~할 수 있습니다\", \"~가 중요합니다\" 같은 빈 문장 대신 \"~합니다\", \"~해야 합니다\" 로 판정한다.",
+  "register/haeyo": "- 문장은 `-요` 로 끝낸다. 팀원끼리 공유하는 글이나 인터넷 글에 쓴다.\n- 반말과 섞지 않는다. 같은 글에서 `-습니다` 와도 섞지 않는다.\n- 부드럽게 쓰되 판정은 흐리지 않는다. \"~인 것 같아요\" 는 정말 모를 때만 쓴다.",
+  "terms/everyday": "전공이 다른 사람도 막히지 않게 쓴다.\n\n- 전공 용어는 쓰지 않거나, 쓰면 바로 뒤에 일상어로 풀어 준다.\n- 약어를 만들지 않는다.\n- 숫자에는 비교할 거리를 붙인다. 예: \"3초에서 0.5초로, 여섯 배 빨라졌다\".",
+  "terms/explained": "다른 학과 학생이나 처음 보는 사람도 읽을 수 있게 쓴다.\n\n- 전공 용어는 처음 나올 때 우리말로 풀고 원어를 괄호로 곁들인다. 예: \"좌표계를 바꾸는 일(좌표 변환, reprojection)\".\n- 다음부터는 우리말 이름으로 부른다.\n- 문서 안에서 세 번 넘게 나오지 않는 약어는 만들지 않는다.",
+  "terms/major": "같은 전공의 교수와 학생이 읽는 글이다.\n\n- 전공 용어와 약어를 풀지 않고 그대로 쓴다. 다만 문서에서 처음 쓰는 약어는 한 번 풀어 쓴다.\n- 일상어로 바꾸면 뜻이 흐려지는 용어는 바꾸지 않는다.",
+  "skeleton/bluf": "- 문서의 첫 문단에 결론과 독자가 할 일을 쓴다. 근거는 그 뒤에 둔다.\n- 절도 첫 문장이 그 절의 결론이다.\n- 제목은 \"개요\", \"결론\" 같은 명사 라벨 대신 주장으로 쓴다. 예: \"배달 시간은 비 오는 날 1.4배 길었다\".",
+  "skeleton/chrono": "일어난 순서대로 쓴다. 회의록, 활동 보고, 회고에 맞다.\n\n- 첫 문단에 전체를 한 문장으로 요약한 뒤 시간순으로 들어간다.\n- 날짜는 `2026-10-27` 꼴로 통일한다.\n- 단계마다 무엇을 했는지와 그 결과를 같이 쓴다. 한 일만 늘어놓지 않는다.",
+  "skeleton/pcs": "무엇이 잘못됐고 어떻게 고칠지 쓰는 골격이다. 팀플 문제 정리나 개선 제안에 맞다.\n\n- 절의 순서는 문제, 원인, 대책, 남은 문제다.\n- 문제 절은 누가 어떤 불편을 겪었는지 수치로 쓴다.\n- 원인 절은 확인한 원인과 추정을 나눠 쓴다. 추정은 추정이라고 적는다.\n- 대책 절은 대책마다 어느 원인을 막는지 이어 붙인다.",
+  "skeleton/imrad": "실험 보고서와 연구 레포트의 골격이다.\n\n- 절의 순서는 목적, 방법, 결과, 고찰, 참고문헌이다. 맨 앞에 요약 한 문단을 둔다.\n- 방법 절은 다른 사람이 같은 실험을 다시 할 수 있을 만큼 쓴다. 장비, 데이터, 절차, 조건이다.\n- 결과 절에는 해석을 넣지 않는다. 숫자와 표, 그림만 쓴다.\n- 고찰 절에서 결과를 해석하고, 한계와 다음에 바꿀 점을 쓴다.",
+  "skeleton/psr": "내가 겪은 경험을 하나씩 쓰는 골격이다. 이력서, 포트폴리오, 프로젝트 회고에 맞다.\n\n- 경험 하나는 문제 상황, 해결 방법, 효과의 세 줄로 쓴다.\n- 해결 방법에는 어떤 대안이 있었고 왜 이것을 골랐는지를 쓴다.\n- 효과는 수치로 쓴다. 수치가 없으면 \"측정하지 않았다\"고 쓰고 지어내지 않는다.\n- 기능을 만들었다는 나열은 쓰지 않는다. 기능은 누구나 만든다.",
+  "length/brief": "- 핵심만 쓴다. 문서 전체를 화면 한 번 안에 읽을 수 있게 한다.\n- 배경 설명은 한 문장까지만 쓴다.\n- 자세한 근거는 링크나 부록으로 뺀다.",
+  "length/page": "- 본문은 A4 한 쪽 안팎으로 쓴다. 넘치는 근거와 표는 부록으로 뺀다.\n- 맨 앞에 요약 한 문장을 둔다.",
+  "length/full": "- 분량을 줄이려고 근거와 과정을 빼지 않는다.\n- 절마다 첫 문장을 결론으로 두어, 길어도 훑어 읽을 수 있게 한다.\n- 표와 그림에는 번호와 제목을 단다. 예: \"표 2. 시간대별 이용량\".",
+  "emphasis/bold": "- 굵은 글씨는 판정과 꼭 지킬 조건에만 쓴다. 한 문단에 한 곳까지다.\n- 이모지와 색 글씨로 강조하지 않는다.",
+  "emphasis/none": "- 굵은 글씨와 기울임, 이모지를 쓰지 않는다. 문장의 순서로 중요도를 보인다.",
+  "diagram/table": "- 비교와 나열은 그림보다 표로 먼저 정리한다.\n- 표의 첫 열은 비교 대상, 첫 행은 비교 기준이다.\n- 흐름이나 관계처럼 표로 안 되는 것만 그림으로 그리고, 그림 아래에 한 문장으로 무엇을 보여 주는지 쓴다.",
+  "diagram/mermaid": "- 흐름과 관계는 mermaid 코드 블록으로 그린다. GitHub, Notion, Obsidian 에서 바로 그림이 된다.\n- 상자 하나에 낱말 다섯 개를 넘기지 않는다.\n- 그림 아래에 한 문장으로 무엇을 보여 주는지 쓴다.",
+  "diagram/none": "- 그림을 그리지 않는다. 필요한 비교는 표나 문장으로 쓴다.",
+  "sources/footnote": "- 근거가 필요한 문장 끝에 `[1]` 을 붙이고, 문서 끝 \"각주\" 절에 `[1] 근거 설명.` 꼴로 적는다.\n- 출처를 본문 문장으로 쓰지 않는다. \"2026년 통계청 자료에 따르면\" 대신 각주로 뺀다.\n- 수치에는 단위와 비교 기준을 붙인다. 예: \"340ms → 88ms\", \"전년 대비\".\n- 직접 열어 보지 않은 출처는 달지 않는다. AI 가 알려 준 논문과 기사는 직접 찾아 확인한 뒤에만 단다.",
+  "sources/apa": "- 본문에는 (저자, 연도) 꼴로 단다. 예: (김철수, 2025).\n- 문서 끝 \"참고문헌\" 절에 APA 7판 형식으로 저자 가나다순, 알파벳순으로 모은다.\n- 웹 자료는 접속일과 URL 을 같이 적는다.\n- 직접 열어 보지 않은 출처는 달지 않는다. AI 가 지어낸 논문이 섞이기 쉬운 자리라 하나씩 검색해 확인한다.",
+  "sources/link": "- 근거는 본문 낱말에 링크로 건다. 인터넷 글과 팀 공유 문서에 맞다.\n- 링크 글자는 내용을 말하게 쓴다. \"여기\"나 \"링크\" 를 링크 글자로 쓰지 않는다.",
+  "exposure/public": "누구나 볼 수 있는 곳에 올리는 글이다. 블로그, GitHub, 공개 포트폴리오다.\n\n- 본인과 팀원의 연락처, 학번, 주소, 성적을 쓰지 않는다.\n- 팀원 이름은 본인 동의를 받은 경우만 쓴다. 아니면 \"팀원 A\" 처럼 쓴다.\n- 수업 자료와 교수 강의안, 시험 문제를 옮기지 않는다.\n- 인턴이나 아르바이트에서 본 회사 내부 정보, 고객 정보를 쓰지 않는다.",
+  "exposure/submit": "교수나 회사처럼 정해진 사람에게 내는 글이다.\n\n- 본인 정보는 제출처가 요구한 만큼만 쓴다.\n- 팀원 정보는 역할과 기여만 쓴다.\n- 인턴이나 아르바이트에서 본 회사 내부 정보와 고객 정보는 쓰지 않는다.",
+  "exposure/team": "같은 팀원끼리만 보는 글이다.\n\n- 팀원 이름과 역할은 그대로 쓴다.\n- 비밀번호와 API 키, 개인 연락처는 문서에 적지 않고 따로 전한다. 공유 문서는 생각보다 멀리 퍼진다.",
+  "ai-disclosure/footnote": "- 문서 끝 각주나 \"작성 방법\" 한 줄에 AI 를 어디에 썼는지 밝힌다. 예: \"자료 조사와 문장 다듬기에 Claude 를 썼고, 수치와 출처는 직접 확인했다.\"\n- 수업마다 AI 허용 범위가 다르다. 강의계획서와 과제 안내를 먼저 확인하고, 금지된 곳에는 쓰지 않는다.",
+  "ai-disclosure/appendix": "- 문서 끝 부록에 AI 사용 내역을 표로 남긴다. 열은 \"단계, 쓴 도구, 맡긴 일, 내가 고치거나 확인한 것\" 이다.\n- 핵심 프롬프트는 원문 그대로 붙인다.\n- 수업마다 AI 허용 범위가 다르다. 강의계획서와 과제 안내를 먼저 확인한다.",
+  "ai-disclosure/none": "- 문서 안에 AI 사용을 따로 적지 않는다. 이력서와 팀 내부 문서처럼 고지가 필요 없는 글에 쓴다.\n- 다만 면접이나 질문에서 물으면 쓴 만큼 그대로 말한다. 설명할 수 없는 문장은 처음부터 쓰지 않는다."
+ },
+ "samples": {
+  "visual-doc/sakura": "웹 고르개는 이 값의 CSS 로 예문 문서를 그려 보인다.",
+  "visual-doc/newcss": "웹 고르개는 이 값의 CSS 로 예문 문서를 그려 보인다.",
+  "visual-deck/paper": "```json\n{\"bg\": \"#FAFAF8\", \"ink\": \"#1C1917\", \"accent\": \"#0F766E\", \"muted\": \"#78716C\", \"head\": \"serif\"}\n```",
+  "visual-deck/contrast": "```json\n{\"bg\": \"#111315\", \"ink\": \"#E7E5E4\", \"accent\": \"#4ADE80\", \"muted\": \"#A8A29E\", \"head\": \"sans\"}\n```",
+  "visual-deck/minimal": "```json\n{\"bg\": \"#FFFFFF\", \"ink\": \"#111111\", \"accent\": \"#2563EB\", \"muted\": \"#6B7280\", \"head\": \"sans\"}\n```",
+  "voice/prose": "학교 앞 정류장의 출근 시간대 평균 대기 시간은 12분으로, 다른 시간대의 두 배였다. 배차 간격은 그대로인데 승객이 몰렸기 때문이다.",
+  "voice/bullet": "- 출근 시간대 평균 대기 12분, 다른 시간대의 2배\n- 원인: 배차 간격은 그대로, 승객 집중\n- 제안: 8시대 1회 증차",
+  "register/plain": "출근 시간대 평균 대기 시간은 12분이었다. 다른 시간대의 두 배다.",
+  "register/polite": "출근 시간대 평균 대기 시간은 12분이었습니다. 다른 시간대의 두 배입니다.",
+  "register/haeyo": "출근 시간대 평균 대기 시간은 12분이었어요. 다른 시간대의 두 배예요.",
+  "terms/everyday": "정류장마다 버스를 기다린 시간을 지도에 찍어 보니, 정문 앞이 가장 오래 기다리는 곳이었다.",
+  "terms/explained": "정류장 위치와 대기 기록을 지도에서 합치는 공간 결합(spatial join)을 해 보니, 정문 앞이 가장 오래 기다리는 곳이었다.",
+  "terms/major": "정류장 포인트에 승차 로그를 spatial join 하고 커널 밀도를 추정하니 정문 앞 핫스팟이 뚜렷했다.",
+  "skeleton/bluf": "**8시대 버스를 한 대 늘리면 대기 시간이 절반으로 준다.**\n\n근거는 7일 관찰이다. 출근 시간대 평균 대기는 12분으로 다른 시간대의 두 배였고, 배차 간격은 같았다.",
+  "skeleton/chrono": "- 10-01 조사 계획\n- 10-08 ~ 10-14 정류장 세 곳 관찰\n- 10-20 분석: 출근 시간대 대기 12분\n- 10-27 제안: 8시대 증차",
+  "skeleton/pcs": "### 문제\n출근 시간대 대기 12분, 다른 시간대의 2배\n### 원인\n확인: 배차 간격은 같음. 추정: 수업 시작 시각이 몰림\n### 대책\n8시대 1회 증차. 수업 시작 시각이 몰리는 원인을 막는다",
+  "skeleton/imrad": "### 목적\n정류장 대기 시간의 시간대별 차이 확인\n### 방법\n정류장 세 곳, 7일, 30분 단위 관찰\n### 결과\n출근 시간대 평균 12분 (표 1)\n### 고찰\n표본이 7일이라 계절 차이는 보지 못했다",
+  "skeleton/psr": "- 문제: 출근 시간대 정류장 대기 12분\n- 해결: 7일 관찰로 시간대별 대기를 재고, 증차와 노선 변경 중 비용이 적은 증차를 골라 제안\n- 효과: 시뮬레이션상 대기 12분 → 6분",
+  "length/brief": "8시대 버스 한 대 증차를 제안한다. 대기 시간이 절반으로 준다.\n\n`화면 한 번에 읽힘`",
+  "length/page": "**요약** 8시대 증차로 대기 시간을 절반으로 줄일 수 있다.\n\n조사 배경과 방법, 결과, 제안을 네 문단으로 쓰고 자세한 표는 부록으로 뺀다.\n\n`A4 한 쪽 안팎`",
+  "length/full": "**요약** 8시대 증차로 대기 시간을 절반으로 줄일 수 있다.\n\n배경, 방법, 결과, 고찰, 한계를 절마다 첫 문장을 결론으로 두고 모두 쓴다. 표 1, 그림 1 처럼 번호를 단다.\n\n`분량 제한 없음`",
+  "emphasis/bold": "세 가지 대책 중 **8시대 증차가 가장 효과가 크다.** 나머지 두 가지는 비용이 더 든다.",
+  "emphasis/none": "세 가지 대책 중 8시대 증차가 가장 효과가 크다. 나머지 두 가지는 비용이 더 든다.",
+  "diagram/table": "| 시간대 | 평균 대기 | 배차 간격 |\n|---|---|---|\n| 8시대 | 12분 | 10분 |\n| 14시대 | 6분 | 10분 |",
+  "diagram/mermaid": "```mermaid\nflowchart LR\n  수업시작몰림 --> 승객집중 --> 대기12분\n```",
+  "diagram/none": "8시대는 수업 시작이 몰려 승객이 집중되고, 그래서 대기 시간이 12분까지 늘었다.",
+  "sources/footnote": "출근 시간대 평균 대기는 12분이었다.[1]\n\n[1] 정류장 세 곳 직접 관찰, 2026-10-08 ~ 10-14.",
+  "sources/apa": "버스 이용은 수업 시작 시각에 몰린다(김민수, 2025).\n\n**참고문헌**\n김민수. (2025). 대학가 통학 패턴 연구. 교통연구, 12(3), 45–60.",
+  "sources/link": "시간대별 배차 간격은 [시 버스 정보 시스템의 노선 시간표](https://example.com)에서 확인했다.",
+  "exposure/public": "관찰은 팀원 A, 분석은 팀원 B 가 맡았다.",
+  "exposure/submit": "관찰: 김민수 (자료 수집) · 분석: 이서연 (통계)",
+  "exposure/team": "민수 님 관찰 데이터 정리, 금요일까지. 공유 폴더 비밀번호는 단톡방 공지 참고.",
+  "ai-disclosure/footnote": "...대기 시간이 절반으로 준다.[2]\n\n[2] 자료 정리와 문장 다듬기에 Claude 를 썼고, 수치와 출처는 직접 확인했다.",
+  "ai-disclosure/appendix": "**부록 B. AI 사용 내역**\n\n| 단계 | 도구 | 맡긴 일 | 내가 확인한 것 |\n|---|---|---|---|\n| 분석 | ChatGPT | 표 정리 | 수치 원본 대조 |",
+  "ai-disclosure/none": "`문서 안에 AI 사용을 따로 적지 않는다`"
+ },
+ "css": {
+  "sakura": "/* Sakura.css v1.5.0\n * ================\n * Minimal css theme.\n * Project: https://github.com/oxalorg/sakura/\n */\n/* Body */\nhtml {\n  font-size: 62.5%;\n  font-family: -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, \"Helvetica Neue\", Arial, \"Noto Sans\", sans-serif;\n}\n\nbody {\n  font-size: 1.8rem;\n  line-height: 1.618;\n  max-width: 38em;\n  margin: auto;\n  color: #4a4a4a;\n  background-color: #f9f9f9;\n  padding: 13px;\n}\n\n@media (max-width: 684px) {\n  body {\n    font-size: 1.53rem;\n  }\n}\n@media (max-width: 382px) {\n  body {\n    font-size: 1.35rem;\n  }\n}\nh1, h2, h3, h4, h5, h6 {\n  line-height: 1.1;\n  font-family: -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, \"Helvetica Neue\", Arial, \"Noto Sans\", sans-serif;\n  font-weight: 700;\n  margin-top: 3rem;\n  margin-bottom: 1.5rem;\n  overflow-wrap: break-word;\n  word-wrap: break-word;\n  -ms-word-break: break-all;\n  word-break: break-word;\n}\n\nh1 {\n  font-size: 2.35em;\n}\n\nh2 {\n  font-size: 2em;\n}\n\nh3 {\n  font-size: 1.75em;\n}\n\nh4 {\n  font-size: 1.5em;\n}\n\nh5 {\n  font-size: 1.25em;\n}\n\nh6 {\n  font-size: 1em;\n}\n\np {\n  margin-top: 0px;\n  margin-bottom: 2.5rem;\n}\n\nsmall, sub, sup {\n  font-size: 75%;\n}\n\nhr {\n  border-color: #1d7484;\n}\n\na {\n  text-decoration: none;\n  color: #1d7484;\n}\na:visited {\n  color: #144f5a;\n}\na:hover {\n  color: #982c61;\n  border-bottom: 2px solid #4a4a4a;\n}\n\nul {\n  padding-left: 1.4em;\n  margin-top: 0px;\n  margin-bottom: 2.5rem;\n}\n\nli {\n  margin-bottom: 0.4em;\n}\n\nblockquote {\n  margin-left: 0px;\n  margin-right: 0px;\n  padding-left: 1em;\n  padding-top: 0.8em;\n  padding-bottom: 0.8em;\n  padding-right: 0.8em;\n  border-left: 5px solid #1d7484;\n  margin-bottom: 2.5rem;\n  background-color: #f1f1f1;\n}\n\nblockquote p {\n  margin-bottom: 0;\n}\n\nimg, video {\n  height: auto;\n  max-width: 100%;\n  margin-top: 0px;\n  margin-bottom: 2.5rem;\n}\n\n/* Pre and Code */\npre {\n  background-color: #f1f1f1;\n  display: block;\n  padding: 1em;\n  overflow-x: auto;\n  margin-top: 0px;\n  margin-bottom: 2.5rem;\n  font-size: 0.9em;\n}\n\ncode, kbd, samp {\n  font-size: 0.9em;\n  padding: 0 0.5em;\n  background-color: #f1f1f1;\n  white-space: pre-wrap;\n}\n\npre > code {\n  padding: 0;\n  background-color: transparent;\n  white-space: pre;\n  font-size: 1em;\n}\n\n/* Tables */\ntable {\n  text-align: justify;\n  width: 100%;\n  border-collapse: collapse;\n  margin-bottom: 2rem;\n}\n\ntd, th {\n  padding: 0.5em;\n  border-bottom: 1px solid #f1f1f1;\n}\n\n/* Buttons, forms and input */\ninput, textarea {\n  border: 1px solid #4a4a4a;\n}\ninput:focus, textarea:focus {\n  border: 1px solid #1d7484;\n}\n\ntextarea {\n  width: 100%;\n}\n\n.button, button, input[type=submit], input[type=reset], input[type=button], input[type=file]::file-selector-button {\n  display: inline-block;\n  padding: 5px 10px;\n  text-align: center;\n  text-decoration: none;\n  white-space: nowrap;\n  background-color: #1d7484;\n  color: #f9f9f9;\n  border-radius: 1px;\n  border: 1px solid #1d7484;\n  cursor: pointer;\n  box-sizing: border-box;\n}\n.button[disabled], button[disabled], input[type=submit][disabled], input[type=reset][disabled], input[type=button][disabled], input[type=file]::file-selector-button[disabled] {\n  cursor: default;\n  opacity: 0.5;\n}\n.button:hover, button:hover, input[type=submit]:hover, input[type=reset]:hover, input[type=button]:hover, input[type=file]::file-selector-button:hover {\n  background-color: #982c61;\n  color: #f9f9f9;\n  outline: 0;\n}\n.button:focus-visible, button:focus-visible, input[type=submit]:focus-visible, input[type=reset]:focus-visible, input[type=button]:focus-visible, input[type=file]::file-selector-button:focus-visible {\n  outline-style: solid;\n  outline-width: 2px;\n}\n\ntextarea, select, input {\n  color: #4a4a4a;\n  padding: 6px 10px; /* The 6px vertically centers text on FF, ignored by Webkit */\n  margin-bottom: 10px;\n  background-color: #f1f1f1;\n  border: 1px solid #f1f1f1;\n  border-radius: 4px;\n  box-shadow: none;\n  box-sizing: border-box;\n}\ntextarea:focus, select:focus, input:focus {\n  border: 1px solid #1d7484;\n  outline: 0;\n}\n\ninput[type=checkbox]:focus {\n  outline: 1px dotted #1d7484;\n}\n\nlabel, legend, fieldset {\n  display: block;\n  margin-bottom: 0.5rem;\n  font-weight: 600;\n}\n",
+  "newcss": ":root {\n\t--nc-font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif, \"Apple Color Emoji\", \"Segoe UI Emoji\", \"Segoe UI Symbol\";\n\t--nc-font-mono: Consolas, monaco, 'Ubuntu Mono', 'Liberation Mono', 'Courier New', Courier, monospace;\n\t--nc-tx-1: #000000;\n\t--nc-tx-2: #1A1A1A;\n\t--nc-bg-1: #FFFFFF;\n\t--nc-bg-2: #F6F8FA;\n\t--nc-bg-3: #E5E7EB;\n\t--nc-lk-1: #0070F3;\n\t--nc-lk-2: #0366D6;\n\t--nc-lk-tx: #FFFFFF;\n\t--nc-ac-1: #79FFE1;\n    --nc-ac-tx: #0C4047;\n}\n\n@media (prefers-color-scheme: dark) {\n\t:root {\n\t\t--nc-tx-1: #ffffff;\n\t\t--nc-tx-2: #eeeeee;\n\t\t--nc-bg-1: #000000;\n\t\t--nc-bg-2: #111111;\n\t\t--nc-bg-3: #222222;\n\t\t--nc-lk-1: #3291FF;\n\t\t--nc-lk-2: #0070F3;\n\t\t--nc-lk-tx: #FFFFFF;\n\t\t--nc-ac-1: #7928CA;\n\t\t--nc-ac-tx: #FFFFFF;\n\t}\n}\n\n* {\n\t/* Reset margins and padding */\n\tmargin: 0;\n\tpadding: 0;\n}\n\naddress,\narea,\narticle,\naside,\naudio,\nblockquote,\ndatalist,\ndetails,\ndl,\nfieldset,\nfigure,\nform,\ninput,\niframe,\nimg,\nmeter,\nnav,\nol,\noptgroup,\noption,\noutput,\np,\npre,\nprogress,\nruby,\nsection,\ntable,\ntextarea,\nul,\nvideo {\n\t/* Margins for most elements */\n\tmargin-bottom: 1rem;\n}\n\nhtml,input,select,button {\n\t/* Set body font family and some finicky elements */\n\tfont-family: var(--nc-font-sans);\n}\n\nbody {\n\t/* Center body in page */\n\tmargin: 0 auto;\n\tmax-width: 750px;\n\tpadding: 2rem;\n\tborder-radius: 6px;\n\toverflow-x: hidden;\n\tword-break: break-word;\n\toverflow-wrap: break-word;\n\tbackground: var(--nc-bg-1);\n\n\t/* Main body text */\n\tcolor: var(--nc-tx-2);\n\tfont-size: 1.03rem;\n\tline-height: 1.5;\n}\n\n::selection {\n\t/* Set background color for selected text */\n\tbackground: var(--nc-ac-1);\n\tcolor: var(--nc-ac-tx);\n}\n\nh1,h2,h3,h4,h5,h6 {\n\tline-height: 1;\n\tcolor: var(--nc-tx-1);\n\tpadding-top: .875rem;\n}\n\nh1,\nh2,\nh3 {\n\tcolor: var(--nc-tx-1);\n\tpadding-bottom: 2px;\n\tmargin-bottom: 8px;\n\tborder-bottom: 1px solid var(--nc-bg-2);\n}\n\nh4,\nh5,\nh6 {\n\tmargin-bottom: .3rem;\n}\n\nh1 {\n\tfont-size: 2.25rem;\n}\n\nh2 {\n\tfont-size: 1.85rem;\n}\n\nh3 {\n\tfont-size: 1.55rem;\n}\n\nh4 {\n\tfont-size: 1.25rem;\n}\n\nh5 {\n\tfont-size: 1rem;\n}\n\nh6 {\n\tfont-size: .875rem;\n}\n\na {\n\tcolor: var(--nc-lk-1);\n}\n\na:hover {\n\tcolor: var(--nc-lk-2);\n}\n\nabbr:hover {\n\t/* Set the '?' cursor while hovering an abbreviation */\n\tcursor: help;\n}\n\nblockquote {\n\tpadding: 1.5rem;\n\tbackground: var(--nc-bg-2);\n\tborder-left: 5px solid var(--nc-bg-3);\n}\n\nabbr {\n\tcursor: help;\n}\n\nblockquote *:last-child {\n\tpadding-bottom: 0;\n\tmargin-bottom: 0;\n}\n\nheader {\n\tbackground: var(--nc-bg-2);\n\tborder-bottom: 1px solid var(--nc-bg-3);\n\tpadding: 2rem 1.5rem;\n\t\n\t/* This sets the right and left margins to cancel out the body's margins. It's width is still the same, but the background stretches across the page's width. */\n\n\tmargin: -2rem calc(0px - (50vw - 50%)) 2rem;\n\n\t/* Shorthand for:\n\n\tmargin-top: -2rem;\n\tmargin-bottom: 2rem;\n\n\tmargin-left: calc(0px - (50vw - 50%));\n\tmargin-right: calc(0px - (50vw - 50%)); */\n\t\n\tpadding-left: calc(50vw - 50%);\n\tpadding-right: calc(50vw - 50%);\n}\n\nheader h1,\nheader h2,\nheader h3 {\n\tpadding-bottom: 0;\n\tborder-bottom: 0;\n}\n\nheader > *:first-child {\n\tmargin-top: 0;\n\tpadding-top: 0;\n}\n\nheader > *:last-child {\n\tmargin-bottom: 0;\n}\n\na button,\nbutton,\ninput[type=\"submit\"],\ninput[type=\"reset\"],\ninput[type=\"button\"] {\n\tfont-size: 1rem;\n\tdisplay: inline-block;\n\tpadding: 6px 12px;\n\ttext-align: center;\n\ttext-decoration: none;\n\twhite-space: nowrap;\n\tbackground: var(--nc-lk-1);\n\tcolor: var(--nc-lk-tx);\n\tborder: 0;\n\tborder-radius: 4px;\n\tbox-sizing: border-box;\n\tcursor: pointer;\n\tcolor: var(--nc-lk-tx);\n}\n\na button[disabled],\nbutton[disabled],\ninput[type=\"submit\"][disabled],\ninput[type=\"reset\"][disabled],\ninput[type=\"button\"][disabled] {\n\tcursor: default;\n\topacity: .5;\n\n\t/* Set the [X] cursor while hovering a disabled link */\n\tcursor: not-allowed;\n}\n\n.button:focus,\n.button:hover,\nbutton:focus,\nbutton:hover,\ninput[type=\"submit\"]:focus,\ninput[type=\"submit\"]:hover,\ninput[type=\"reset\"]:focus,\ninput[type=\"reset\"]:hover,\ninput[type=\"button\"]:focus,\ninput[type=\"button\"]:hover {\n\tbackground: var(--nc-lk-2);\n}\n\ncode,\npre,\nkbd,\nsamp {\n\t/* Set the font family for monospaced elements */\n\tfont-family: var(--nc-font-mono);\n}\n\ncode,\nsamp,\nkbd,\npre {\n\t/* The main preformatted style. This is changed slightly across different cases. */\n\tbackground: var(--nc-bg-2);\n\tborder: 1px solid var(--nc-bg-3);\n\tborder-radius: 4px;\n\tpadding: 3px 6px;\n\tfont-size: 0.9rem;\n}\n\nkbd {\n\t/* Makes the kbd element look like a keyboard key */\n\tborder-bottom: 3px solid var(--nc-bg-3);\n}\n\npre {\n\tpadding: 1rem 1.4rem;\n\tmax-width: 100%;\n\toverflow: auto;\n}\n\npre code {\n\t/* When <code> is in a <pre>, reset it's formatting to blend in */\n\tbackground: inherit;\n\tfont-size: inherit;\n\tcolor: inherit;\n\tborder: 0;\n\tpadding: 0;\n\tmargin: 0;\n}\n\ncode pre {\n\t/* When <pre> is in a <code>, reset it's formatting to blend in */\n\tdisplay: inline;\n\tbackground: inherit;\n\tfont-size: inherit;\n\tcolor: inherit;\n\tborder: 0;\n\tpadding: 0;\n\tmargin: 0;\n}\n\ndetails {\n\t/* Make the <details> look more \"clickable\" */\n\tpadding: .6rem 1rem;\n\tbackground: var(--nc-bg-2);\n\tborder: 1px solid var(--nc-bg-3);\n\tborder-radius: 4px;\n}\n\nsummary {\n\t/* Makes the <summary> look more like a \"clickable\" link with the pointer cursor */\n\tcursor: pointer;\n\tfont-weight: bold;\n}\n\ndetails[open] {\n\t/* Adjust the <details> padding while open */\n\tpadding-bottom: .75rem;\n}\n\ndetails[open] summary {\n\t/* Adjust the <details> padding while open */\n\tmargin-bottom: 6px;\n}\n\ndetails[open]>*:last-child {\n\t/* Resets the bottom margin of the last element in the <details> while <details> is opened. This prevents double margins/paddings. */\n\tmargin-bottom: 0;\n}\n\ndt {\n\tfont-weight: bold;\n}\n\ndd::before {\n\t/* Add an arrow to data table definitions */\n\tcontent: '→ ';\n}\n\nhr {\n\t/* Reset the border of the <hr> separator, then set a better line */\n\tborder: 0;\n\tborder-bottom: 1px solid var(--nc-bg-3);\n\tmargin: 1rem auto;\n}\n\nfieldset {\n\tmargin-top: 1rem;\n\tpadding: 2rem;\n\tborder: 1px solid var(--nc-bg-3);\n\tborder-radius: 4px;\n}\n\nlegend {\n\tpadding: auto .5rem;\n}\n\ntable {\n\t/* border-collapse sets the table's elements to share borders, rather than floating as separate \"boxes\". */\n\tborder-collapse: collapse;\n\twidth: 100%\n}\n\ntd,\nth {\n\tborder: 1px solid var(--nc-bg-3);\n\ttext-align: left;\n\tpadding: .5rem;\n}\n\nth {\n\tbackground: var(--nc-bg-2);\n}\n\ntr:nth-child(even) {\n\t/* Set every other cell slightly darker. Improves readability. */\n\tbackground: var(--nc-bg-2);\n}\n\ntable caption {\n\tfont-weight: bold;\n\tmargin-bottom: .5rem;\n}\n\ntextarea {\n\t/* Don't let the <textarea> extend off the screen naturally or when dragged by the user */\n\tmax-width: 100%;\n}\n\nol,\nul {\n\t/* Replace the browser default padding */\n\tpadding-left: 2rem;\n}\n\nli {\n\tmargin-top: .4rem;\n}\n\nul ul,\nol ul,\nul ol,\nol ol {\n\tmargin-bottom: 0;\n}\n\nmark {\n\tpadding: 3px 6px;\n\tbackground: var(--nc-ac-1);\n\tcolor: var(--nc-ac-tx);\n}\n\ntextarea,\nselect,\ninput {\n\tpadding: 6px 12px;\n\tmargin-bottom: .5rem;\n\tbackground: var(--nc-bg-2);\n\tcolor: var(--nc-tx-2);\n\tborder: 1px solid var(--nc-bg-3);\n\tborder-radius: 4px;\n\tbox-shadow: none;\n\tbox-sizing: border-box;\n}\n\nimg {\n\tmax-width: 100%;\n}"
+ }
+}
