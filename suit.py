@@ -222,7 +222,7 @@ class Themes:
 
     def known(self, axis, value, allow_template=False):
         if axis not in self.axes:
-            raise Missing(f"모르는 축: {axis}")
+            raise Missing(f"모르는 축: {axis}. 고를 수 있는 축은 {', '.join(self.axes)}")
         if value == TEMPLATE:
             if allow_template:
                 return
@@ -468,6 +468,8 @@ def skill_text(th):
     run = f"python3 {suit}"
     kinds = ", ".join(f"`{k}` {v['label']}" for k, v in th.kinds.items())
     auds = ", ".join(f"`{k}` {v['label']}" for k, v in th.audiences.items())
+    axes = "; ".join(f"`{a}` {th.axes[a]['label']}: " + ", ".join(f"`{v}` {lab}" for v, lab in th.axes[a]["values"].items())
+                     for a in COMPOSE_ORDER)
     return f"""---
 name: docs-suit
 description: 문서를 쓰거나 다듬을 때 docs-suit 테마를 입힌다. 보고서, 발표 자료, 회의록, 메일, 이력서, 자기소개서, 포트폴리오, 논문 초록, 설계 문서, PR 설명, 기획서, 업무 보고, 블로그, 뉴스레터, SNS 글을 써 달라는 요청을 받으면 쓰기 전에 이 스킬로 규칙을 조립해 따른다.
@@ -483,7 +485,7 @@ description: 문서를 쓰거나 다듬을 때 docs-suit 테마를 입힌다. �
    - `{run} bootstrap --questions` 가 내는 페르소나 질문을 차례로 묻는다. 답하기 싫은 질문은 비워 둔다.
    - `{run} bootstrap --class <클래스> --call … --affiliation … --goal … --docs <종류,종류> --facts … --dislikes … --yes` 로 저장한다.
 2. 요청에서 문서 종류를 정한다. 종류는 {kinds} 이다. 맞는 것이 없으면 종류 없이 조립한다. 독자가 분명하면 `--audience <키>` 로 넘긴다. 독자 키는 {auds} 이다. 독자가 여럿이면 키를 쉼표로 잇는다.
-3. 사용자가 문체, 어법, 분량, 글자수, 공개 범위를 말했으면 `--set 축=값` 과 `--chars` 로 넘긴다. 축과 값은 `{run} list` 로 본다.
+3. 사용자가 문체, 어법, 분량, 글자수, 공개 범위를 말했으면 `--set 축=값` 과 `--chars` 로 넘긴다. 축과 값은 아래 영어 키로 쓴다. {axes}. 공개 범위는 안전 축이라 `--set exposure` 는 `team`, `submit`, `public` 순서로 더 조심하는 쪽으로만 먹는다. 사내나 팀 안에서만 볼 글이면 `--set` 대신 `--audience` 를 `teammate` 나 `peer-dev` 로 넘긴다.
 4. `{run} compose --kind <종류> [--audience …] [--set …] [--chars N]` 의 출력 전체를 이번 문서의 규칙으로 따른다. 다른 문체 지침이나 스킬과 겹치면 어법, 분량, 공개 범위 같은 축의 값은 이 출력을 따른다. 지침의 공통 바닥이 시키는 대로, 쓰기 전에 틀리면 결과가 쓸모없어지는 것만 두세 개 묻는다.
 5. 다 쓴 뒤 `[확인 필요: …]` 표시가 남았으면 모아서 보여 준다.
 6. 사용자가 말투나 모양이 마음에 안 든다고 하면 어느 축의 문제인지 짚고, 그 축의 다른 값으로 다시 조립해 대표 문단 하나를 견줘 보인다. 계속 쓰고 싶어 하면 `{run} set <축> <값> [--audience <독자>]` 로 프로필에 남긴다.
@@ -905,8 +907,8 @@ def selftest(th):
             skill = (out / "claude" / "SKILL.md").read_text(encoding="utf-8")
             check(skill.startswith("---\nname: docs-suit") and EXPORT_MARK in skill and str(HERE / "suit.py") in skill,
                   "SKILL.md 머리나 엔진 경로가 다르다")
-            check(all(f"`{k}`" in skill for k in list(th.kinds) + list(th.audiences)),
-                  "SKILL.md 에 빠진 문서 종류나 독자 키가 있다")
+            check(all(f"`{k}`" in skill for k in list(th.kinds) + list(th.audiences) + list(th.axes)),
+                  "SKILL.md 에 빠진 문서 종류나 독자, 축 키가 있다")
             web = (out / "web" / "prompt.md").read_text(encoding="utf-8")
             check("- 클래스: 개발자" in web, "웹 지침에 쓰는 사람 절이 없다")
             (out / "antigravity" / "SKILL.md").write_text("내가 만든 스킬", encoding="utf-8")

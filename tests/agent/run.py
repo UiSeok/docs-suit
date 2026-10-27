@@ -10,6 +10,7 @@ DOCS_SUIT_LOG 로 suit.py 호출 인자를 모은다. Claude Code 는 사용자 
 """
 import argparse
 import base64
+import hashlib
 import importlib.util
 import json
 import os
@@ -186,7 +187,9 @@ def grade(case, calls):
     return not why, shown, ", ".join(why)
 
 
-LIMIT_SIGNS = ("quota", "RESOURCE_EXHAUSTED", "usage limit", "rate limit")
+# 에이전트 쪽 사정으로 답 없이 끝난 건은 틀림이 아니라 재지 못한 것으로 센다. 앞의 까닭이 먼저 잡힌다.
+UNMEASURED = (("사용 한도", ("quota", "RESOURCE_EXHAUSTED", "usage limit", "rate limit")),
+              ("연결 실패", ('"type":"turn.failed"', "AGY_ERROR")))
 
 
 def load_case(agent, case, base):
@@ -195,11 +198,14 @@ def load_case(agent, case, base):
     log = tmp / "calls.jsonl"
     calls = [json.loads(x)["argv"] for x in log.read_text(encoding="utf-8").splitlines()] if log.exists() else []
     ok, shown, why = grade(case, calls)
-    meta = AGENTS[agent]["meta"]((tmp / "transcript.jsonl").read_text(encoding="utf-8"))
+    transcript = (tmp / "transcript.jsonl").read_text(encoding="utf-8")
+    meta = AGENTS[agent]["meta"](transcript)
     meta.setdefault("sec", 0)
     err = (tmp / "stderr.txt").read_text(encoding="utf-8") if (tmp / "stderr.txt").exists() else ""
-    # 무료 요금제는 사용 한도에 걸리면 답 없이 끝난다. 그런 건은 틀림이 아니라 재지 못한 것으로 센다.
-    meta["limited"] = not ok and any(k in err for k in LIMIT_SIGNS)
+    seen = err + transcript.replace('": "', '":"')
+    meta["unmeasured"] = "" if ok else next((why for why, signs in UNMEASURED if any(k in seen for k in signs)), "")
+    skill = tmp / "proj" / AGENTS[agent]["skill"]
+    meta["skill"] = hashlib.sha1(skill.read_bytes()).hexdigest()[:8] if skill.exists() else ""
     return case, ok, shown, why, meta
 
 
@@ -246,14 +252,15 @@ def expected(case):
 def report(agent, results, version, model=None):
     models = sorted({m["model"] for *_, m in results if m["model"]}) or ([model] if model else [])
     passed = sum(1 for _, ok, *_ in results if ok)
-    limited = sum(1 for *_, m in results if m["limited"])
+    unmeasured = sum(1 for *_, m in results if m["unmeasured"])
     cost = sum(m["cost"] for *_, m in results)
     lines = [f"# 동작 테스트: {agent}", "",
              f"- 날짜: {date.today().isoformat()}",
              f"- 에이전트: {version}",
+             f"- SKILL.md 지문: {', '.join(sorted({m['skill'] for *_, m in results if m['skill']})) or '알 수 없음'}",
              f"- 모델: {', '.join(models) or '알 수 없음'}",
              *([f"- 요금제: {AGENTS[agent]['plan']() or '알 수 없음'}"] if AGENTS[agent].get("plan") else []),
-             f"- 맞음: {passed}/{len(results) - limited}" + (f" (사용 한도로 재지 못한 {limited}건 제외)" if limited else ""),
+             f"- 맞음: {passed}/{len(results) - unmeasured}" + (f" (재지 못한 {unmeasured}건 제외)" if unmeasured else ""),
              f"- 사용료: {cost:.2f}달러" if cost else "- 사용료: 에이전트가 알려 주지 않음",
              *([f"- 한계: {AGENTS[agent]['note']}"] if AGENTS[agent].get("note") else []),
              "", "| 케이스 | 기대 | 에이전트가 부른 것 | 판정 | 비고 | 초 |", "|---|---|---|---|---|---|"]
@@ -261,7 +268,7 @@ def report(agent, results, version, model=None):
         others = sorted({s for s in m["skills"] if s and s != "docs-suit"})
         note = ", ".join(([f"같이 불린 스킬 {', '.join(others)}"] if others else [])
                          + ([f"거절된 도구 {m['denied']}건"] if m["denied"] else []))
-        verdict = "맞음" if ok else "재지 못함: 사용 한도" if m["limited"] else f"틀림: {why}"
+        verdict = "맞음" if ok else f"재지 못함: {m['unmeasured']}" if m["unmeasured"] else f"틀림: {why}"
         lines.append(f"| {case['id']} | {expected(case)} | `{shown}` | {verdict} | {note} | {m['sec']} |")
     return "\n".join(lines) + "\n"
 
@@ -296,7 +303,7 @@ def main():
         out = HERE / "results" / f"{a.agent}.md"
         out.parent.mkdir(exist_ok=True)
         out.write_text(text, encoding="utf-8")
-    return 0 if all(ok or m["limited"] for _, ok, *_, m in results) else 1
+    return 0 if all(ok or m["unmeasured"] for _, ok, *_, m in results) else 1
 
 
 if __name__ == "__main__":
