@@ -11,7 +11,11 @@
   const state = { cls: null, kind: null, aud: null, sets: {} };
   let T = null, C = null;
 
+  // suit.py serve 로 띄웠으면 브라우저 저장소 대신 실행한 폴더 기준 슬롯을 읽고 쓴다
+  const L = window.DocsSuitLocal;
+  const local = { profile: null, slot: null };
   function loadPersonal() {
+    if (L) return local.profile || {};
     try { return JSON.parse(localStorage.getItem(KEY)) || {}; } catch (e) { return {}; }
   }
   function savePersonal(p) {
@@ -210,12 +214,27 @@
       a.click();
       URL.revokeObjectURL(a.href);
     });
-    $("save").addEventListener("click", () => {
+    $("save").addEventListener("click", async () => {
+      if (L) {
+        try {
+          const r = await L.api("/api/defaults", { slot: local.slot, here: $("here").checked, defaults: { ...state.sets } });
+          state.sets = {};
+          applyLocal(r.state);
+          $("status").textContent = r.message;
+        } catch (e) { $("status").textContent = e.message; }
+        return;
+      }
       const ok = savePersonal({ defaults: { ...state.sets } });
       $("status").textContent = ok ? "고른 값을 이 브라우저의 내 기본값으로 저장했습니다." : "저장하지 못했습니다. 브라우저 저장소가 막혀 있습니다.";
       render();
     });
     $("reset").addEventListener("click", () => {
+      if (L) {
+        state.sets = {};
+        $("status").textContent = "고른 값을 지웠습니다. 슬롯에 저장된 값은 그대로입니다.";
+        render();
+        return;
+      }
       savePersonal({});
       state.sets = {};
       $("chars").value = "";
@@ -224,6 +243,29 @@
     });
   }
 
-  fetch("themes.json").then((r) => r.json()).then((data) => { T = data; C = ThemeCore(T); wire(); render(); })
+  function applyLocal(st) {
+    local.profile = st.merged || {};
+    local.slot = st.slot;
+    state.cls = (local.profile.profile || {}).class || state.cls;
+    L.banner(st, async (name) => {
+      try {
+        state.sets = {};
+        applyLocal(await L.api(`/api/state?slot=${encodeURIComponent(name)}`));
+      } catch (e) { $("status").textContent = e.message; }
+    });
+    render();
+  }
+
+  fetch("themes.json").then((r) => r.json()).then(async (data) => {
+    T = data;
+    C = ThemeCore(T);
+    wire();
+    if (L) {
+      document.body.classList.add("is-local");
+      $("save").textContent = "고른 값을 슬롯에 저장";
+      try { applyLocal(await L.api("/api/state")); } catch (e) { $("status").textContent = e.message; }
+    }
+    render();
+  })
     .catch(() => { $("out").value = "themes.json 을 읽지 못했습니다. 로컬에서 열 때는 docs 폴더에서 python3 -m http.server 로 띄워 주세요."; });
 })();

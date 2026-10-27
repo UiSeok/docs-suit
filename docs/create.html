@@ -13,6 +13,7 @@
     <p class="nav"><a href="index.html">테마 고르기</a> · <b>캐릭터 만들기</b></p>
     <p>글 쓰는 나를 캐릭터로 만듭니다. 고른 대로 슬롯 파일을 내려받아 두면 AI 가 이 말투와 맥락으로 쓰고, 문서를 쓸수록 캐릭터가 자랍니다.</p>
   </header>
+  <div id="local"></div>
   <div class="layout">
     <div>
       <section class="step">
@@ -47,6 +48,10 @@
         <label>슬롯 이름 <input id="slot" type="text" placeholder="비우면 기본 슬롯" autocomplete="off"></label>
       </div>
       <textarea id="yaml" class="yaml" readonly spellcheck="false" aria-label="슬롯 파일 내용"></textarea>
+      <div class="row local-only">
+        <label><input type="checkbox" id="installSkills"> 고른 도구에 스킬도 깔기</label>
+        <label><input type="checkbox" id="useHere"> 실행한 폴더에서 이 슬롯 쓰기</label>
+      </div>
       <div class="actions">
         <button type="button" class="btn primary" id="download">내려받기</button>
         <button type="button" class="btn" id="copyYaml">복사</button>
@@ -54,12 +59,13 @@
       </div>
       <div class="status" id="status" aria-live="polite"></div>
       <div class="where">
-        내려받은 뒤 할 일
+        <span id="whereHead">내려받은 뒤 할 일</span>
         <pre class="cmd" id="install"></pre>
       </div>
     </aside>
   </div>
 </main>
+<script src="local.js"></script>
 <script src="core.js"></script>
 <script src="create.js"></script>
 </body>

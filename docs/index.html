@@ -13,6 +13,7 @@
     <p class="nav"><b>테마 고르기</b> · <a href="create.html">캐릭터 만들기</a></p>
     <p>문서에 입힐 옷을 고릅니다. 클래스와 문서 종류를 정하고, 같은 예문을 값마다 다르게 써 본 카드를 보며 마음에 드는 쪽을 누르세요.</p>
   </header>
+  <div id="local"></div>
   <div class="layout">
     <div>
       <section class="step">
@@ -46,6 +47,7 @@
         <button type="button" class="btn" id="copyReview">검토 지침 복사</button>
         <button type="button" class="btn" id="download">.md 로 저장</button>
         <button type="button" class="btn" id="save">고른 값을 내 기본값으로</button>
+        <label class="local-only"><input type="checkbox" id="here"> 실행한 폴더에만</label>
         <button type="button" class="btn" id="reset">초기화</button>
       </div>
       <div class="status" id="status" aria-live="polite"></div>
@@ -62,6 +64,7 @@
     </aside>
   </div>
 </main>
+<script src="local.js"></script>
 <script src="core.js"></script>
 <script src="app.js"></script>
 </body>

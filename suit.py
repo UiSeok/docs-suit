@@ -50,6 +50,7 @@ profiles/<이름>.yaml 이다. 폴더의 .docs-suit.yaml 은 쓸 슬롯과 그 �
   python3 suit.py growth on|off                     캐릭터 키우기를 켜고 끈다. 기록은 지우지 않는다
   python3 suit.py status [--size face|full|line]    상태 줄에 캐릭터를 그린다. 표준 입력의 JSON 에서 작업 폴더를 읽는다
   python3 suit.py widget [--cwd 폴더] [--split] [--once]  터미널 옆 칸의 캐릭터 창. 기록이 바뀌면 다시 그린다
+  python3 suit.py serve [--page index|create] [--detach]  화면을 로컬에 띄워 고른 값을 바로 슬롯에 쓴다
   python3 suit.py bundle                            웹 고르개용 docs/themes.json 을 만든다
   python3 suit.py selftest
 
@@ -65,16 +66,22 @@ import hmac
 import json
 import os
 import re
+import secrets
 import shlex
 import shutil
 import signal
+import socket
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 import unicodedata
+import webbrowser
 from datetime import datetime
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from urllib.parse import parse_qs, urlparse
 
 HERE = Path(__file__).resolve().parent
 DEFAULT_LANG = "ko"
@@ -1272,6 +1279,7 @@ description: 문서를 쓰거나 다듬거나 검토할 때 docs-suit 테마를 
    - 같은 출력의 `presets` 에 고른 클래스의 조합이 있으면, 다른 사람이 기여한 테마 조합으로 시작할지 묻는다. 추천 표시가 붙은 조합을 앞에 보인다.
    - 같은 출력의 `looks` 로 캐릭터 A 와 B 가운데 하나를 고르게 한다. 고르지 않으면 A 다.
    - `{run} bootstrap --class <클래스> --call … --affiliation … --goal … --docs <종류,종류> --facts … --dislikes … [--preset <조합>] [--look a|b] --yes` 로 저장한다.
+   - 사용자가 화면에서 고르겠다고 하면 묻는 대신 `{run} serve --page create --detach` 로 로컬 화면을 띄우고 나온 주소를 알려 준다. 화면에서 저장한 슬롯이 바로 적용된다.
 2. 요청에서 문서 종류를 정한다. 종류는 {kinds} 이다. 맞는 것이 없으면 종류 없이 조립한다. 독자가 분명하면 `--audience <키>` 로 넘긴다. 독자 키는 {auds} 이다. 독자가 여럿이면 키를 쉼표로 잇는다.
 3. 사용자가 문체, 어법, 분량, 글자수, 공개 범위를 말했으면 `--set 축=값` 과 `--chars` 로 넘긴다. 축과 값은 아래 영어 키로 쓴다. {axes}. 공개 범위는 안전 축이라 `--set exposure` 는 `team`, `submit`, `public` 순서로 더 조심하는 쪽으로만 먹는다. 사내나 팀 안에서만 볼 글이면 `--set` 대신 `--audience` 를 `teammate` 나 `peer-dev` 로 넘긴다. 붙여 넣을 곳이 메일 본문이나 메신저, 지원서 입력 칸처럼 마크다운이 먹지 않는 곳이면 `--set markup=plain` 을 넘긴다.
 4. `{run} compose --kind <종류> [--audience …] [--set …] [--chars N] [--revise]` 의 출력 전체를 이번 문서의 규칙으로 따른다. 사용자가 원문을 주고 다듬어 달라고 하면 `--revise` 를 붙이고, 문서 종류는 원문을 보고 정한다. 다른 문체 지침이나 스킬과 겹치면 어법, 분량, 공개 범위 같은 축의 값은 이 출력을 따른다. 지침의 공통 바닥이 시키는 대로, 문서 종류의 "쓰기 전에 받을 것" 가운데 요청과 자료에 없는 것만 두세 개 묻는다.
@@ -1283,7 +1291,7 @@ description: 문서를 쓰거나 다듬거나 검토할 때 docs-suit 테마를 
    ```
    `✗` 가 나온 줄이 있으면 그 줄이 말하는 대로 한 번 고쳐 쓰고 같은 명령을 다시 부른다. `△` 는 제안이다. 본문을 보고 고칠 만한 것만 고치고, 고치지 않아도 검사는 통과다. 답에 보이는 본문은 마지막으로 검사에 넘긴 본문과 글자 하나까지 같게 둔다. 보일 때 제목을 굵게 바꾸는 식으로 손대지 않는다. 출력에 `성장:` 으로 시작하는 줄이 있으면 본문과 떨어뜨려 답의 맨 끝에 그 줄만 그대로 옮긴다. 이 줄은 check 만 만들 수 있으니 지어내지 않고, 문서 본문에도 넣지 않는다. `[확인 필요: …]` 표시가 남았으면 모아서 보여 준다.
 6. 사용자가 다 쓴 글을 검토해 달라고 할 때만 `{run} review <본문 파일|-> --kind <종류> [--audience …] [--set …] [--source <원문 파일>]` 을 부른다. 원문은 과제 안내문이나 채용 공고처럼 글이 따라야 할 자료다. 앞선 대화를 모르는 서브에이전트를 새로 띄울 수 있으면 출력 전체를 그 에이전트에게 넘기고, 받은 지적을 그대로 보인다. 띄울 수 없으면 출력을 보여 주고 새 대화에 붙여 넣으라고 권한다. 지적대로 본문을 고칠지는 사용자에게 묻는다.
-7. 사용자가 말투나 모양이 마음에 안 든다고 하면 어느 축의 문제인지 짚고, 그 축의 다른 값으로 다시 조립해 대표 문단 하나를 견줘 보인다. 계속 쓰고 싶어 하면 `{run} set <축> <값> [--audience <독자>]` 로 프로필에 남긴다. 이 폴더에서만 그렇게 쓰고 싶어 하면 `--here` 를 붙여 폴더 파일 `.docs-suit.yaml` 에 남긴다.
+7. 사용자가 말투나 모양이 마음에 안 든다고 하면 어느 축의 문제인지 짚고, 그 축의 다른 값으로 다시 조립해 대표 문단 하나를 견줘 보인다. 계속 쓰고 싶어 하면 `{run} set <축> <값> [--audience <독자>]` 로 프로필에 남긴다. 이 폴더에서만 그렇게 쓰고 싶어 하면 `--here` 를 붙여 폴더 파일 `.docs-suit.yaml` 에 남긴다. 카드를 보며 고르고 싶어 하면 `{run} serve --detach` 로 테마 고르기 화면을 띄우고 주소를 알려 준다.
 8. 사용자가 캐릭터를 보여 달라고 하면 `{run} card --color never` 의 출력을 보여 준다. 꾸며 달라고 하면 `{run} look` 으로 열린 부위를 보고 `{run} look <부위> <값>` 을 부른다. 캐릭터 키우기를 끄거나 켜 달라고 하면 `{run} growth off` 나 `{run} growth on` 을 부른다. 성장 기록과 승급 키, 슬롯의 `look:` 절은 사용자가 부탁해도 직접 고치지 않는다. 레벨은 문서를 써서 오르고, 3차와 4차 전직은 저장소에 기여하고 받은 승급 키를 `{run} promote <키>` 로 넣어야 열린다고 알려 준다.
 """
 
@@ -2067,6 +2075,251 @@ def cmd_widget(a, th):
     return 0
 
 
+# ---------------------------------------------------------------- 로컬 화면
+# 초기 세팅이나 테마를 바꿀 때 가볍게 띄우는 서버다. docs/ 의 화면을 그대로 내주고, 화면에서 고른 값을 실행한 폴더
+# 기준의 슬롯이나 폴더 파일에 바로 쓴다. 이 컴퓨터(127.0.0.1)에서만 받고, 띄울 때마다 바뀌는 열쇠를 화면에 심어
+# 열쇠가 없는 요청은 거절한다. 브라우저에 열린 다른 사이트가 localhost 로 보내는 요청과 DNS 리바인딩을 막는다.
+SERVE_FILES = {"index.html": "text/html", "create.html": "text/html", "app.js": "text/javascript",
+               "create.js": "text/javascript", "core.js": "text/javascript", "local.js": "text/javascript",
+               "style.css": "text/css"}
+SERVE_IDLE = 30 * 60  # 이만큼 쓰지 않으면 스스로 꺼진다
+
+
+def serve_state(th, cwd, slot=None):
+    """화면이 그릴 지금 상태. slot 을 주면 그 슬롯을, 아니면 실행한 폴더 기준의 슬롯을 본다."""
+    path, name, folder, why = profile_source(slot, start=cwd)
+    data = read_slot(path)
+    names = ["default"] + sorted(f.stem for f in (config_dir() / "profiles").glob("*.yaml"))
+    slots = []
+    for n in names:
+        d = read_slot(slot_path(n))
+        slots.append({"name": n, "exists": bool(d), "class": (d.get("profile") or {}).get("class"),
+                      "call": (d.get("persona") or {}).get("call")})
+    out = {"cwd": cwd, "slot": name, "path": str(path), "why": why, "exists": path.exists(),
+           "folders": [str(f) for f in folder], "slots": slots, "profile": data,
+           "merged": load_profile(name=slot, start=cwd), "folderHere": read_folder(Path(cwd) / FOLDER_FILE)}
+    if data and th.growth:
+        state = growth_state(th, read_growth(growth_path(slot, start=cwd)), key_tiers(promote_keys()))
+        cls = (data.get("profile") or {}).get("class")
+        out["growth"] = {"level": state["level"], "tier": state["tier"], "title": title_of(th, cls, state["tier"]),
+                         "docs": state["docs"]}
+    return out
+
+
+def clean_slot(th, data, old=None):
+    """화면이 보낸 슬롯을 엔진이 쓰는 꼴로 다듬는다. 모르는 값은 거절한다. 전직으로 얻은 꾸미기와 키우기 설정은 남긴다."""
+    old = old or {}
+    cls = (data.get("profile") or {}).get("class")
+    th.known_class(cls)
+    meta = dict(old.get("profile") or {})
+    meta.update({"class": cls, "lang": DEFAULT_LANG})
+    agents = (data.get("profile") or {}).get("agents") or []
+    expand_agents(agents)
+    if agents:
+        meta["agents"] = list(agents)
+    else:
+        meta.pop("agents", None)
+    persona = {}
+    for k in PERSONA_IN_PROMPT:
+        v = (data.get("persona") or {}).get(k)
+        if isinstance(v, str) and v.strip():
+            persona[k] = clean_text(v)
+    docs = (data.get("persona") or {}).get("docs") or []
+    for d in docs:
+        if d not in th.kinds:
+            raise Missing(f"모르는 문서 종류: {d}")
+    if docs:
+        persona["docs"] = list(docs)
+    out = {"profile": meta, "persona": persona}
+    look = dict(old.get("look") or {})
+    base = (data.get("look") or {}).get("base")
+    if base:
+        if base not in (th.look.get("base") or {}):
+            raise Missing(f"모르는 캐릭터: {base}")
+        look["base"] = base
+    if look:
+        out["look"] = look
+    defaults = data.get("defaults") or {}
+    for axis, value in defaults.items():
+        th.known(axis, value)
+    auds = data.get("audiences") or {}
+    for aud, vals in auds.items():
+        if aud not in th.audiences or not isinstance(vals, dict):
+            raise Missing(f"모르는 독자: {aud}")
+        for axis, value in vals.items():
+            th.known(axis, value)
+    out["defaults"] = dict(defaults)
+    out["audiences"] = {k: dict(v) for k, v in auds.items()}
+    return out
+
+
+def make_server(th, cwd, port=0):
+    """(서버, 열쇠). 서버는 127.0.0.1 에서만 받는다."""
+    token = secrets.token_urlsafe(18)
+    seen = {"at": time.time()}
+
+    class Handler(BaseHTTPRequestHandler):
+        def log_message(self, *args):
+            pass
+
+        def send(self, code, body, ctype="application/json; charset=utf-8"):
+            data = body if isinstance(body, bytes) else (
+                json.dumps(body, ensure_ascii=False) if not isinstance(body, str) else body).encode("utf-8")
+            self.send_response(code)
+            self.send_header("Content-Type", ctype)
+            self.send_header("Content-Length", str(len(data)))
+            self.send_header("Cache-Control", "no-store")
+            self.end_headers()
+            self.wfile.write(data)
+
+        def allowed(self, need_token):
+            host = self.headers.get("Host", "")
+            port = self.server.server_address[1]
+            if host not in (f"127.0.0.1:{port}", f"localhost:{port}"):
+                self.send(403, {"ok": False, "message": "이 컴퓨터에서 연 화면에서만 받는다"})
+                return False
+            if need_token and not hmac.compare_digest(self.headers.get("X-Docs-Suit-Token", ""), token):
+                self.send(403, {"ok": False, "message": "열쇠가 맞지 않는다. 화면을 새로 고친다"})
+                return False
+            seen["at"] = time.time()
+            return True
+
+        def do_GET(self):
+            url = urlparse(self.path)
+            name = url.path.lstrip("/") or "index.html"
+            if name == "api/state":
+                if self.allowed(True):
+                    slot = (parse_qs(url.query).get("slot") or [None])[0]
+                    try:
+                        self.send(200, serve_state(th, cwd, slot))
+                    except Missing as e:
+                        self.send(400, {"ok": False, "message": str(e)})
+                return
+            if not self.allowed(False):
+                return
+            if name == "themes.json":
+                self.send(200, bundle_text(th))
+            elif name in SERVE_FILES:
+                body = (HERE / "docs" / name).read_text(encoding="utf-8")
+                if name.endswith(".html"):
+                    body = body.replace("</head>", f'<meta name="docs-suit-token" content="{token}">\n</head>', 1)
+                self.send(200, body, SERVE_FILES[name] + "; charset=utf-8")
+            else:
+                self.send(404, {"ok": False, "message": "없는 파일"})
+
+        def do_POST(self):
+            if not self.allowed(True):
+                return
+            try:
+                body = json.loads(self.rfile.read(int(self.headers.get("Content-Length") or 0)) or b"{}")
+                self.send(200, self.route(urlparse(self.path).path, body))
+            except Missing as e:
+                self.send(400, {"ok": False, "message": str(e)})
+            except (ValueError, OSError) as e:
+                self.send(400, {"ok": False, "message": f"처리하지 못했다: {e}"})
+
+        def route(self, path, body):
+            slot = body.get("slot") or None
+            if path == "/api/defaults":
+                # 테마 고르기에서 고른 값을 슬롯이나 실행한 폴더의 폴더 파일 기본값에 얹는다
+                sets = body.get("defaults") or {}
+                for axis, value in sets.items():
+                    th.known(axis, value)
+                if body.get("here"):
+                    data = read_folder(Path(cwd) / FOLDER_FILE)
+                    data.setdefault("defaults", {}).update(sets)
+                    where = write_folder(data, cwd)
+                else:
+                    target = profile_source(slot, start=cwd)[0]
+                    data = read_slot(target)
+                    if not data:
+                        raise Missing("이 슬롯이 아직 없다. 캐릭터 만들기에서 먼저 만든다")
+                    data.setdefault("defaults", {}).update(sets)
+                    target.write_text(dump_yaml(data), encoding="utf-8")
+                    where = target
+                return {"ok": True, "message": f"저장했다: {where}", "state": serve_state(th, cwd, slot)}
+            if path == "/api/slot":
+                # 캐릭터 만들기에서 만든 슬롯을 쓴다. 있던 파일은 .bak 으로 남긴다
+                name = slot or "default"
+                target = slot_path(name)
+                old = read_slot(target)
+                data = clean_slot(th, body.get("data") or {}, old)
+                target.parent.mkdir(parents=True, exist_ok=True)
+                if target.exists():
+                    target.with_name(target.name + ".bak").write_text(target.read_text(encoding="utf-8"), encoding="utf-8")
+                target.write_text(dump_yaml(data), encoding="utf-8")
+                notes = [f"저장했다: {target}"]
+                if body.get("useHere") and name != "default":
+                    folder = read_folder(Path(cwd) / FOLDER_FILE)
+                    folder = {"profile": name, **{k: v for k, v in folder.items() if k != "profile"}}
+                    notes.append(f"이 폴더가 슬롯 {name} 을 쓴다: {write_folder(folder, cwd)}")
+                if body.get("install") and data["profile"].get("agents"):
+                    written = export(th, data["profile"]["agents"], say=lambda m: None)
+                    notes.append("스킬을 깔았다: " + ", ".join(str(w) for w in written) if written else "깔 스킬이 없다")
+                return {"ok": True, "message": " · ".join(notes), "state": serve_state(th, cwd, name)}
+            if path == "/api/stop":
+                threading.Thread(target=self.server.shutdown, daemon=True).start()
+                return {"ok": True, "message": "화면 서버를 껐다. 이 탭은 닫아도 된다"}
+            raise Missing(f"모르는 요청: {path}")
+
+    httpd = ThreadingHTTPServer(("127.0.0.1", port), Handler)
+    httpd.daemon_threads = True
+
+    def idle():
+        while True:
+            time.sleep(15)
+            if time.time() - seen["at"] > SERVE_IDLE:
+                httpd.shutdown()
+                return
+
+    threading.Thread(target=idle, daemon=True).start()
+    return httpd, token
+
+
+def free_port(prefer=8790):
+    for port in (prefer, 0):
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+            try:
+                sock.bind(("127.0.0.1", port))
+                return sock.getsockname()[1]
+            except OSError:
+                continue
+    raise OSError("빈 포트를 찾지 못했다")
+
+
+def cmd_serve(a, th):
+    """초기 세팅이나 테마를 바꿀 때 띄우는 로컬 화면. --detach 는 뒤에서 띄우고 바로 돌아온다."""
+    cwd = os.path.abspath(os.path.expanduser(a.cwd or os.getcwd()))
+    port = a.port or free_port()
+    url = f"http://127.0.0.1:{port}/{a.page}.html"
+    if a.detach:
+        args = [sys.executable, str(HERE / "suit.py"), "serve", "--port", str(port), "--cwd", cwd, "--page", a.page, "--no-open"]
+        subprocess.Popen(args, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                         start_new_session=True)
+        for _ in range(30):
+            with socket.socket() as sock:
+                if sock.connect_ex(("127.0.0.1", port)) == 0:
+                    break
+            time.sleep(0.1)
+    else:
+        httpd, _ = make_server(th, cwd, port)
+    _, slot, _, why = profile_source(None, start=cwd)
+    reason = {"env": "환경 변수", "arg": "--profile", "folder": "폴더 파일", "current": "profile use", "default": "기본 슬롯"}[why]
+    print(f"docs-suit 화면: {url}\n실행한 폴더 {cwd} · 슬롯 {slot or '-'} ({reason}). 화면에서 다른 슬롯도 고를 수 있다.\n"
+          f"{SERVE_IDLE // 60}분 동안 쓰지 않으면 꺼진다. 화면의 끄기 버튼" + ("으로 끈다." if a.detach else "이나 Ctrl+C 로 끈다."))
+    if not a.no_open:
+        webbrowser.open(url)
+    if a.detach:
+        return 0
+    try:
+        httpd.serve_forever()
+    except KeyboardInterrupt:
+        pass
+    finally:
+        httpd.server_close()
+    return 0
+
+
 def cmd_bundle(a, th):
     out = HERE / "docs" / "themes.json"
     out.write_text(bundle_text(th), encoding="utf-8")
@@ -2544,6 +2797,56 @@ def selftest(th):
                 if v is not None:
                     os.environ[k] = v
 
+    # 로컬 화면 서버. 열쇠와 Host 를 확인하고, 고른 값을 실행한 폴더 기준의 슬롯이나 폴더 파일에 쓴다
+    import urllib.error
+    import urllib.request
+    with tempfile.TemporaryDirectory() as td:
+        saved = {k: os.environ.pop(k, None) for k in ("DOCS_SUIT_PROFILE", "DOCS_SUIT_HOME")}
+        os.environ["DOCS_SUIT_HOME"] = str(Path(td) / "conf")
+        httpd = None
+        try:
+            write_profile({"profile": {"class": "office"}, "persona": {"call": "시험"}}, "default")
+            httpd, token = make_server(th, td)
+            threading.Thread(target=httpd.serve_forever, daemon=True).start()
+            port = httpd.server_address[1]
+
+            def req(path, body=None, tok=token, host=None):
+                r = urllib.request.Request(f"http://127.0.0.1:{port}{path}",
+                                           data=None if body is None else json.dumps(body).encode("utf-8"),
+                                           headers={"X-Docs-Suit-Token": tok or "", "Host": host or f"127.0.0.1:{port}",
+                                                    "Content-Type": "application/json"})
+                try:
+                    with urllib.request.urlopen(r, timeout=5) as resp:
+                        return resp.status, resp.read().decode("utf-8")
+                except urllib.error.HTTPError as e:
+                    return e.code, e.read().decode("utf-8")
+
+            code, page = req("/create.html", tok=None)
+            check(code == 200 and f'content="{token}"' in page, "로컬 화면에 열쇠를 심지 않는다")
+            check(req("/api/state", tok="wrong-token")[0] == 403 and req("/api/state", host="evil.example")[0] == 403
+                  and req("/api/defaults", {"defaults": {}}, tok=None)[0] == 403,
+                  "열쇠가 틀리거나 다른 주소로 온 요청을 받았다")
+            code, _ = req("/api/defaults", {"defaults": {"register": "haeyo"}})
+            check(code == 200 and read_slot(slot_path("default")).get("defaults") == {"register": "haeyo"},
+                  "테마 고르기의 값을 실행한 폴더 기준 슬롯에 쓰지 못한다")
+            check(req("/api/defaults", {"defaults": {"register": "nope"}})[0] == 400, "모르는 값을 슬롯에 썼다")
+            code, _ = req("/api/slot", {"slot": "web", "useHere": True, "data": {
+                "profile": {"class": "student"}, "persona": {"call": '민수 "님"', "docs": ["report"]}, "look": {"base": "b"}}})
+            web = read_slot(slot_path("web"))
+            check(code == 200 and web.get("look") == {"base": "b"} and web["persona"]["call"] == "민수 ”님”"
+                  and read_folder(Path(td) / FOLDER_FILE).get("profile") == "web",
+                  f"캐릭터 만들기의 슬롯을 쓰지 못하거나 폴더 파일을 남기지 않았다: {code}")
+            state = json.loads(req("/api/state")[1])
+            check(state["slot"] == "web" and state["why"] == "folder", "폴더 파일이 고른 슬롯을 상태에 싣지 않는다")
+        finally:
+            if httpd:
+                httpd.shutdown()
+                httpd.server_close()
+            for k, v in saved.items():
+                os.environ.pop(k, None)
+                if v is not None:
+                    os.environ[k] = v
+
     web = HERE / "docs" / "themes.json"
     if (HERE / "docs").is_dir() and th.root.resolve() == (HERE / "themes" / DEFAULT_LANG).resolve():
         check(web.exists() and web.read_text(encoding="utf-8") == bundle_text(th),
@@ -2657,6 +2960,12 @@ def main(argv=None):
     wd.add_argument("--close", action="store_true", help="이 칸 옆에 띄운 캐릭터 창을 닫는다")
     wd.add_argument("--follow-pid", type=int, help="이 프로세스가 끝나면 창도 끝내고 칸을 닫는다")
     wd.add_argument("--once", action="store_true", help="한 번만 그리고 끝낸다")
+    sv = sub.add_parser("serve")
+    sv.add_argument("--port", type=int, help="주지 않으면 8790, 쓰고 있으면 빈 포트")
+    sv.add_argument("--cwd", help="이 폴더 기준으로 슬롯을 고른다. 주지 않으면 지금 폴더")
+    sv.add_argument("--page", choices=("index", "create"), default="index", help="처음 열 화면")
+    sv.add_argument("--detach", action="store_true", help="뒤에서 띄우고 바로 돌아온다. 에이전트가 쓸 때 붙인다")
+    sv.add_argument("--no-open", action="store_true", help="브라우저를 열지 않는다")
     st = sub.add_parser("status", parents=[slot])
     st.add_argument("--size", choices=("face", "full", "line"), default="face", help="face 는 얼굴, full 은 온몸, line 은 한 줄")
     st.add_argument("--cwd", help="이 폴더 기준으로 슬롯을 고른다. 주지 않으면 표준 입력의 JSON 이나 지금 폴더")
@@ -2670,7 +2979,7 @@ def main(argv=None):
         return {"bootstrap": cmd_bootstrap, "profile": cmd_profile, "list": cmd_list, "get": cmd_get,
                 "compose": cmd_compose, "set": cmd_set, "export": cmd_export, "check": cmd_check, "review": cmd_review,
                 "card": cmd_card,
-                "look": cmd_look, "preset": cmd_preset, "promote": cmd_promote, "growth": cmd_growth, "status": cmd_status, "widget": cmd_widget,
+                "look": cmd_look, "preset": cmd_preset, "promote": cmd_promote, "growth": cmd_growth, "status": cmd_status, "widget": cmd_widget, "serve": cmd_serve,
                 "bundle": cmd_bundle}[a.cmd](a, th)
     except Missing as e:
         print(f"오류: {e}", file=sys.stderr)

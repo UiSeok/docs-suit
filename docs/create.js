@@ -6,7 +6,8 @@
   const AGENTS = [["claude", "Claude Code"], ["codex", "Codex CLI"], ["antigravity", "Antigravity CLI"],
     ["cursor", "Cursor"], ["grok", "Grok Build"], ["web", "웹 채팅"]];
   const SLOT_RE = /^[\p{L}\p{N}_-]+$/u;  // suit.py 의 슬롯 이름 규칙과 같다
-  const state = { cls: null, preset: null, base: null, persona: {}, docs: [], agents: [] };
+  const state = { cls: null, preset: null, base: null, persona: {}, docs: [], agents: [], keep: null };
+  const L = window.DocsSuitLocal;  // suit.py serve 로 띄웠으면 슬롯 파일을 바로 쓴다
   let T = null, C = null;
 
   function esc(s) { return String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
@@ -68,7 +69,8 @@
     if (state.docs.length) persona.docs = state.docs.slice();
     data.persona = persona;
     if (state.base) data.look = { base: state.base };
-    const p = state.preset && T.presets[state.preset];
+    // 조합을 고르면 조합의 값, 고르지 않았으면 불러온 슬롯에 있던 값을 그대로 둔다
+    const p = (state.preset && T.presets[state.preset]) || state.keep;
     if (p) {
       data.defaults = Object.assign({}, p.defaults || {});
       data.audiences = {};
@@ -93,7 +95,9 @@
   function renderPresets() {
     const box = $("presets");
     box.textContent = "";
-    opt(box, state.preset === null, `<b>클래스 기본값으로 시작</b><span class="d">고른 클래스의 기본 말투를 그대로 씁니다</span>`,
+    opt(box, state.preset === null, state.keep
+      ? `<b>지금 슬롯의 값 그대로</b><span class="d">불러온 슬롯에 저장된 말투와 독자별 값을 그대로 둡니다</span>`
+      : `<b>클래스 기본값으로 시작</b><span class="d">고른 클래스의 기본 말투를 그대로 씁니다</span>`,
       () => { state.preset = null; render(); });
     for (const key of presetOrder()) {
       const p = T.presets[key];
@@ -204,6 +208,15 @@
     $("copyYaml").disabled = !ready;
     $("copyPrompt").disabled = !cls;
     const agents = state.agents.filter((a) => a !== "web");
+    if (L) {
+      $("whereHead").textContent = "저장하면";
+      $("install").textContent = !slotOk ? "슬롯 이름은 글자, 숫자, -, _ 로 씁니다." : [
+        `${dest} 에 씁니다. 있던 파일은 .bak 으로 남깁니다.`,
+        slot && $("useHere").checked ? "실행한 폴더의 .docs-suit.yaml 이 이 슬롯을 쓰게 합니다." : null,
+        $("installSkills").checked && agents.length ? `${agents.join(", ")} 에 스킬을 깝니다.` : null,
+      ].filter(Boolean).join("\n");
+      return;
+    }
     $("install").textContent = !slotOk ? "슬롯 이름은 글자, 숫자, -, _ 로 씁니다." : [
       `mkdir -p ${dest.replace(/\/[^/]+$/, "")}`,
       `mv ~/Downloads/${file} ${dest}`,
@@ -231,9 +244,42 @@
     }
   }
 
+  // 불러온 슬롯으로 고른 값을 채운다. 조합은 슬롯에 남지 않으니 저장된 축 값을 keep 으로 들고 있는다
+  function fill(st) {
+    const prof = st.profile || {};
+    const meta = prof.profile || {};
+    state.cls = meta.class || null;
+    state.persona = {};
+    for (const k of T.personaInPrompt) state.persona[k] = (prof.persona || {})[k] || "";
+    state.docs = ((prof.persona || {}).docs || []).slice();
+    state.base = (prof.look || {}).base || null;
+    state.agents = (meta.agents || []).slice();
+    state.preset = null;
+    state.keep = st.exists ? { defaults: prof.defaults || {}, audiences: prof.audiences || {} } : null;
+    $("slot").value = st.slot && st.slot !== "default" ? st.slot : "";
+    L.banner(st, async (name) => {
+      try { fill(await L.api(`/api/state?slot=${encodeURIComponent(name)}`)); } catch (e) { $("status").textContent = e.message; }
+    });
+    render();
+  }
+
+  async function saveLocal() {
+    try {
+      const r = await L.api("/api/slot", { slot: $("slot").value.trim() || "default", data: slotData(),
+        install: $("installSkills").checked, useHere: $("useHere").checked });
+      $("status").textContent = r.message;
+      L.banner(r.state, async (name) => {
+        try { fill(await L.api(`/api/state?slot=${encodeURIComponent(name)}`)); } catch (e) { $("status").textContent = e.message; }
+      });
+    } catch (e) { $("status").textContent = e.message; }
+  }
+
   function wire() {
     $("slot").addEventListener("input", renderAside);
+    $("installSkills").addEventListener("change", renderAside);
+    $("useHere").addEventListener("change", renderAside);
     $("download").addEventListener("click", () => {
+      if (L) return saveLocal();
       const slot = $("slot").value.trim();
       const blob = new Blob([C.dumpYaml(slotData())], { type: "text/yaml" });
       const a = document.createElement("a");
@@ -252,10 +298,15 @@
     });
   }
 
-  fetch("themes.json").then((r) => r.json()).then((data) => {
+  fetch("themes.json").then((r) => r.json()).then(async (data) => {
     T = data;
     C = ThemeCore(T);
     wire();
+    if (L) {
+      document.body.classList.add("is-local");
+      $("download").textContent = "이 컴퓨터에 저장";
+      try { fill(await L.api("/api/state")); return; } catch (e) { $("status").textContent = e.message; }
+    }
     render();
   }).catch(() => {
     $("yaml").value = "themes.json 을 읽지 못했습니다. 로컬에서 열 때는 docs 폴더에서 python3 -m http.server 로 띄워 주세요.";

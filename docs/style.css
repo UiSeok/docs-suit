@@ -103,3 +103,14 @@ pre.cmd { font: 12px/1.5 "SF Mono", Menlo, Consolas, monospace; background: var(
 button:disabled { opacity: .45; cursor: not-allowed; }
 .lvbar { display: inline-block; width: 90px; height: 7px; background: var(--line); vertical-align: middle; margin: 0 6px; }
 .lvbar i { display: block; height: 100%; background: var(--accent); }
+
+/* 로컬로 띄운 화면의 띠 */
+.local { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-size: 13px; padding: 10px 12px; margin: 0 0 16px;
+  background: var(--accent-tint); border: 1px solid var(--accent); }
+.local code { font: 12px "SF Mono", Menlo, monospace; }
+.local select { font: inherit; padding: 4px 6px; background: var(--surface); color: var(--ink); border: 1px solid var(--line); }
+.local .muted { color: var(--muted); }
+.local .btn { margin-left: auto; }
+.local-only { display: none; }
+body.is-local .local-only { display: revert; }
+body.is-local .web-only { display: none; }
