@@ -12,6 +12,7 @@ docs-suit 를 고치는 사람과 AI 에이전트가 읽는 작업 규칙이다.
 | `themes/ko/kinds/<종류>.md` | 문서 종류의 틀 |
 | `docs/` | 웹 고르개. `core.js` 가 조립하고 `themes.json` 은 `suit.py bundle` 이 만든다 |
 | `tests/parity.js` | 웹과 엔진의 조립 결과를 견준다 |
+| `tests/agent/` | 실제 에이전트에 요청을 넣는 동작 테스트. 케이스는 `cases.py`, 에이전트별 결과는 `results/` |
 
 ## 고친 뒤에는 세 가지를 돌린다
 
@@ -22,6 +23,24 @@ node tests/parity.js        # 웹과 엔진이 같은 지침을 내는지
 ```
 
 CI 가 같은 검사를 돌린다. `docs/themes.json` 이 테마와 다르면 selftest 가 실패한다.
+
+## 요청을 고르는 단계는 동작 테스트로 본다
+
+selftest 와 parity 는 문서 종류와 독자를 넘겨받은 뒤의 조립만 잰다. 요청 문장을 보고 종류와 독자를 고르는 일은 SKILL.md 를 읽은 에이전트가 하므로, 실제 에이전트에 요청을 넣어 확인한다.
+
+```sh
+python3 tests/agent/run.py --agent claude             # 케이스 전체
+python3 tests/agent/run.py --agent antigravity --only sns  # 몇 건만
+python3 tests/agent/run.py --agent claude --record    # 결과를 tests/agent/results/ 에 남긴다
+```
+
+SKILL.md 문구나 문서 종류, 독자를 바꿨으면 돌리고 `--record` 로 결과를 갱신한다. 새 문서 종류를 더하면 `cases.py` 에도 케이스를 하나 더한다. 에이전트 로그인이 필요하고 돌릴 때마다 사용료가 들어서 CI 에는 넣지 않는다.
+
+실행기는 홈 폴더의 스킬과 프로필을 건드리지 않는다. 케이스마다 임시 폴더에 프로젝트 단위 스킬과 시험 프로필을 두고, `DOCS_SUIT_LOG` 로 suit.py 호출 인자를 모아 채점한다. Claude Code 는 사용자 설정과 개인 스킬, MCP 를 끄고 돌려서 처음 설치한 사람과 조건을 맞춘다.
+
+Antigravity CLI 는 한 번 실행 모드에서 확인 창을 띄우지 못해 명령을 거절하고, 작업 폴더 단위 설정이 없다. 그래서 `~/.gemini/antigravity-cli/settings.json` 의 `permissions.allow` 에 `command(python3 <suit.py 절대 경로>)` 를 더한 뒤 돌린다. Codex CLI 는 exec 모드가 샌드박스 안에서 확인 없이 돌아서 따로 설정하지 않는다.
+
+무료 요금제로 돌리면 사용 한도에 걸릴 수 있다. 한도 때문에 답 없이 끝난 건은 틀림이 아니라 재지 못함으로 표에 남고, 맞은 비율에서도 뺀다.
 
 ## 지킬 것
 

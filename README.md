@@ -4,7 +4,7 @@
 
 AI 에게 글을 맡길 때 매번 "합쇼체로, 결론 먼저, 출처는 각주로" 를 다시 쓰지 않도록, 글의 모양과 말투를 축으로 나눠 갈아입히는 테마 엔진입니다. 처음 받으면 게임에서 캐릭터를 만들듯 클래스(직업)를 고르고 페르소나를 입력합니다. 그다음 문서 종류만 말하면 클래스와 독자, 문서 종류에 맞는 규칙을 골라 AI 에게 줄 지침 한 장으로 조립합니다.
 
-출력은 마크다운 지침 한 장이라서 어떤 AI 에도 붙습니다. Claude Code, Codex, Gemini CLI, Grok Build, Cursor 는 공용 규격인 Agent Skills(`SKILL.md`)로, ChatGPT 와 Claude, Gemini, Grok 웹 채팅은 붙여 넣기로 씁니다.
+출력은 마크다운 지침 한 장이라서 어떤 AI 에도 붙습니다. Claude Code, Codex, Antigravity CLI, Grok Build, Cursor 는 공용 규격인 Agent Skills(`SKILL.md`)로, ChatGPT 와 Claude, Gemini, Grok 웹 채팅은 붙여 넣기로 씁니다.
 
 ## 처음 받았을 때
 
@@ -53,12 +53,12 @@ python3 suit.py export --agent web                       # 웹 채팅용 지침�
 |---|---|
 | Claude Code | `~/.claude/skills/docs-suit/SKILL.md`. output style 로 쓰려면 `compose --format output-style -o ~/.claude/output-styles/<이름>.md` |
 | Codex CLI | `~/.agents/skills/docs-suit/SKILL.md` |
-| Gemini CLI | `~/.gemini/skills/docs-suit/SKILL.md` |
+| Antigravity CLI | `~/.gemini/config/skills/docs-suit/SKILL.md`. suit.py 실행을 물으면 항상 허용을 고른다 |
 | Cursor | `~/.cursor/skills/docs-suit/SKILL.md` |
 | Grok Build | Claude 자리와 공용 자리에 함께 설치 |
 | 웹 채팅 | `export --agent web` 이 만든 지침이나 웹 고르개에서 복사한 지침을 맞춤 지침, 프로젝트, Gem 에 붙여 넣기 |
 
-Claude Code 를 뺀 자리는 2차 자료 기준이라 각 도구 문서로 확인이 필요합니다. 스킬 파일은 이 저장소의 `suit.py` 를 절대 경로로 부르므로, `git pull` 하면 모든 도구에 바로 반영됩니다. 저장소를 옮겼다면 `export` 를 다시 돌립니다.
+Claude Code, Antigravity CLI, Codex CLI 는 실제 요청을 넣어 스킬이 불리는 것을 확인했습니다. 결과는 `tests/agent/results/` 에 있습니다. Codex CLI 는 ChatGPT 무료 요금제로도 됩니다. Antigravity 와 Codex 는 작업 폴더의 `.agents/skills/` 로 확인했습니다. 두 도구의 전역 자리와 나머지 도구의 자리는 2차 자료 기준이라 각 도구 문서로 확인이 필요합니다. 스킬 파일은 이 저장소의 `suit.py` 를 절대 경로로 부르므로, `git pull` 하면 모든 도구에 바로 반영됩니다. 저장소를 옮겼다면 `export` 를 다시 돌립니다.
 
 ## 웹 고르개
 
