@@ -133,7 +133,16 @@ Claude Code 는 화면 맨 아래 상태 줄에 캐릭터를 그릴 수 있습�
 
 이미 쓰는 상태 줄 스크립트가 있으면 바꾸지 말고, 스크립트가 받은 JSON 을 그대로 넘기는 줄을 끝에 더합니다. 예를 들어 `input=$(cat)` 으로 받는 스크립트라면 `printf '%s' "$input" | python3 <docs-suit 경로>/suit.py status` 입니다. 기본은 얼굴과 칭호, 레벨을 일곱 줄로 그리고, `--size line` 은 글 한 줄, `--size full` 은 온몸입니다. 슬롯이 없거나 캐릭터 키우기를 끈 폴더에서는 아무것도 그리지 않습니다.
 
-Antigravity CLI 도 `~/.gemini/antigravity-cli/settings.json` 의 `statusLine` 에 같은 명령을 걸 수 있다고 문서에 나와 있지만 아직 직접 확인하지 않았습니다. Codex CLI 는 상태 줄에 외부 명령을 걸 수 없어서, 터미널 옆 칸에 띄우는 캐릭터 창을 따로 만들 예정입니다.
+Antigravity CLI 도 `~/.gemini/antigravity-cli/settings.json` 의 `statusLine` 에 같은 명령을 걸 수 있다고 문서에 나와 있지만 아직 직접 확인하지 않았습니다.
+
+Codex CLI 는 상태 줄에 외부 명령을 걸 수 없어서 터미널 옆 칸에 캐릭터 창을 띄웁니다. 캐릭터 창은 성장 기록과 슬롯 파일만 읽으므로 어느 에이전트로 문서를 쓰든 1초 안에 다시 그려지고, 방금 오른 경험치와 전직을 아래에 보여 줍니다.
+
+```sh
+python3 <docs-suit 경로>/suit.py widget --split && codex   # herdr 나 tmux 안이면 오른쪽에 칸을 나눠 띄우고 Codex 를 연다
+python3 <docs-suit 경로>/suit.py widget                    # 터미널 앱의 창 나누기로 연 옆 칸에서 직접 띄운다
+```
+
+칸이 좁으면 그림 아래로 글을 내립니다. 창은 그 칸에서 Ctrl+C 로 닫습니다.
 
 ## 테마 조합과 승급 키
 

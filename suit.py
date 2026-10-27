@@ -45,6 +45,7 @@ profiles/<이름>.yaml 이다. 폴더의 .docs-suit.yaml 은 쓸 슬롯과 그 �
                                                     테마 조합. 남의 조합을 입히거나 내 조합을 기여용 파일로 낸다
   python3 suit.py growth on|off                     캐릭터 키우기를 켜고 끈다. 기록은 지우지 않는다
   python3 suit.py status [--size face|full|line]    상태 줄에 캐릭터를 그린다. 표준 입력의 JSON 에서 작업 폴더를 읽는다
+  python3 suit.py widget [--cwd 폴더] [--split] [--once]  터미널 옆 칸의 캐릭터 창. 기록이 바뀌면 다시 그린다
   python3 suit.py bundle                            웹 고르개용 docs/themes.json 을 만든다
   python3 suit.py selftest
 
@@ -60,8 +61,14 @@ import hmac
 import json
 import os
 import re
+import shlex
+import shutil
+import signal
+import subprocess
 import sys
 import tempfile
+import time
+import unicodedata
 from datetime import datetime
 from pathlib import Path
 
@@ -1000,7 +1007,13 @@ def beside(art, width, info):
             for i in range(rows)]
 
 
-def card_lines(th, slot_data, slot, state, depth, vals=None, held=()):
+def display_width(text):
+    """터미널에서 차지하는 칸 수. 한글처럼 넓은 글자는 두 칸으로 센다."""
+    plain = re.sub(r"\033\[[0-9;]*m", "", text)
+    return sum(2 if unicodedata.east_asian_width(ch) in "WF" else 1 for ch in plain)
+
+
+def card_lines(th, slot_data, slot, state, depth, vals=None, held=(), stacked=False):
     """캐릭터 카드. 색을 쓸 수 있으면 왼쪽에 도트 그림을 그리고 오른쪽에 글을 놓는다. held 는 받은 승급 키다."""
     cls = (slot_data.get("profile") or {}).get("class")
     name = (slot_data.get("persona") or {}).get("call") or slot or "이름 없음"
@@ -1029,6 +1042,8 @@ def card_lines(th, slot_data, slot, state, depth, vals=None, held=()):
     if not depth or not th.look:
         return info
     grid = look_grid(th, look_of(th, slot_data, state["tier"]))
+    if stacked:
+        return render_grid(grid, depth) + [""] + info
     return beside(render_grid(grid, depth), len(grid[0]), info)
 
 
@@ -1687,6 +1702,90 @@ def cmd_status(a, th):
     return 0
 
 
+def widget_frame(th, cwd, width, depth, events=()):
+    """캐릭터 창 한 장. 칸이 좁으면 그림 아래로 글을 내린다. events 는 최근 성장 줄들이다."""
+    path, slot, _, _ = profile_source(None, start=cwd)
+    data = read_slot(path)
+    if not data:
+        return ["이 폴더에는 docs-suit 슬롯이 없다.", "python3 suit.py bootstrap 으로 캐릭터를 만든다"]
+    if not growth_on(data):
+        return ["캐릭터 키우기가 꺼져 있다.", "켜려면 python3 suit.py growth on"]
+    held = promote_keys()
+    state = growth_state(th, read_growth(growth_path(start=cwd)), key_tiers(held))
+    vals = resolve(th, profile=load_profile(start=cwd))[0]
+    lines = card_lines(th, data, slot, state, depth, vals, held)
+    if max(display_width(x) for x in lines) > width:
+        lines = card_lines(th, data, slot, state, depth, vals, held, stacked=True)
+    if events:
+        lines += ["", "최근 기록"] + [f"\033[1m{e}\033[0m" if depth else e for e in events]
+    return lines
+
+
+def widget_watch(cwd):
+    """다시 그릴지 가르는 지문. 슬롯, 폴더 파일, 성장 기록, 승급 키 파일의 수정 시각이다."""
+    path, _, folder, _ = profile_source(None, start=cwd)
+    files = [path, growth_path(start=cwd), keys_path(), *folder]
+    return tuple(f.stat().st_mtime if f.exists() else 0 for f in files)
+
+
+def cmd_widget(a, th):
+    """터미널 옆 칸에 캐릭터 창을 띄운다. 기록이 바뀌면 다시 그린다. Codex 처럼 상태 줄이 없는 에이전트 옆에 둔다."""
+    cwd = os.path.abspath(os.path.expanduser(a.cwd or os.getcwd()))
+    if a.split:
+        cmd = shlex.join([sys.executable, str(HERE / "suit.py"), "widget", "--cwd", cwd])
+        if os.environ.get("HERDR_ENV") == "1" and os.environ.get("HERDR_PANE_ID"):
+            # herdr 는 칸을 나누고 새 칸 번호를 JSON 으로 돌려준 뒤, 그 칸에 명령을 넣고 Enter 를 누른다
+            out = subprocess.run(["herdr", "pane", "split", "--current", "--direction", "right", "--cwd", cwd],
+                                 capture_output=True, text=True, check=True).stdout
+            pane = json.loads(out)["result"]["pane"]["pane_id"]
+            subprocess.run(["herdr", "pane", "run", pane, cmd], capture_output=True, check=True)
+        elif os.environ.get("TMUX"):
+            subprocess.run(["tmux", "split-window", "-h", "-d", "-l", str(a.width), cmd], check=True)
+        else:
+            print("herdr 나 tmux 안에서 돌릴 때만 칸을 나눈다. 터미널 앱의 창 나누기로 옆 칸을 열고 "
+                  f"`python3 {HERE / 'suit.py'} widget` 을 돌려도 된다", file=sys.stderr)
+            return 1
+        print("오른쪽 칸에 캐릭터 창을 띄웠다. 닫으려면 그 칸에서 Ctrl+C")
+        return 0
+    depth = color_depth("never" if os.environ.get("NO_COLOR") else "always")
+    if a.once:
+        print("\n".join(widget_frame(th, cwd, shutil.get_terminal_size().columns, depth)))
+        return 0
+    events, last = [], None
+    count = len(read_growth(growth_path(start=cwd)))
+
+    def stop(signum, frame):
+        raise KeyboardInterrupt  # 칸을 닫거나 kill 해도 커서를 되돌리고 끝낸다
+
+    signal.signal(signal.SIGTERM, stop)
+    signal.signal(signal.SIGHUP, stop)
+    sys.stdout.write("\033[?25l")
+    try:
+        while True:
+            now = (widget_watch(cwd), shutil.get_terminal_size())
+            if now != last:
+                entries = read_growth(growth_path(start=cwd))
+                if len(entries) > count:
+                    data = read_slot(profile_source(None, start=cwd)[0])
+                    keys = key_tiers(promote_keys())
+                    cls = (data.get("profile") or {}).get("class")
+                    for i in range(count, len(entries)):
+                        before, after = growth_state(th, entries[:i], keys), growth_state(th, entries[:i + 1], keys)
+                        events.append(growth_line(th, before, after, entries[i]["doc"], entries[i].get("kind"), cls))
+                    events = events[-3:]
+                count = len(entries)
+                frame = widget_frame(th, cwd, now[1].columns, depth, events)
+                sys.stdout.write("\033[H\033[2J" + "\n".join(frame) + "\n")
+                sys.stdout.flush()
+                last = now
+            time.sleep(1)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        sys.stdout.write("\033[?25h\033[0m\n")
+    return 0
+
+
 def cmd_bundle(a, th):
     out = HERE / "docs" / "themes.json"
     out.write_text(bundle_text(th), encoding="utf-8")
@@ -2027,6 +2126,10 @@ def selftest(th):
             line = status_lines(th, data, "work", state, 24, "line")
             check(len(face) == 7 and "[" in face[2] + face[3] and len(line) == 1 and "Lv.1" in line[0],
                   f"상태 줄 캐릭터가 다르다: {len(face)}줄")
+            wide, narrow = widget_frame(th, str(sub), 120, 24), widget_frame(th, str(sub), 30, 24)
+            check(len(wide) == 12 and len(narrow) > 12 and narrow[13].startswith("["),
+                  "캐릭터 창이 넓은 칸에서 옆으로, 좁은 칸에서 아래로 놓이지 않는다")
+            check(display_width("가a\033[1m나\033[0m") == 5, "한글 칸 수를 두 칸으로 세지 않는다")
             out = Path(td) / "mine.yaml"
             ns = argparse.Namespace(action="export", name="mine", by="@someone", label="내 조합", desc="시험", output=str(out),
                                     cls=None, here=False, profile="work")
@@ -2185,6 +2288,11 @@ def main(argv=None):
     pm.add_argument("key", nargs="?", help="기여하고 받은 승급 키. 주지 않으면 받은 키를 보인다")
     g = sub.add_parser("growth", parents=[slot])
     g.add_argument("action", choices=("on", "off"))
+    wd = sub.add_parser("widget")
+    wd.add_argument("--cwd", help="이 폴더의 슬롯을 그린다. 주지 않으면 지금 폴더")
+    wd.add_argument("--split", action="store_true", help="herdr 나 tmux 의 지금 칸 오른쪽에 칸을 나눠 띄운다")
+    wd.add_argument("--width", type=int, default=44, help="tmux 로 나눌 칸의 너비")
+    wd.add_argument("--once", action="store_true", help="한 번만 그리고 끝낸다")
     st = sub.add_parser("status", parents=[slot])
     st.add_argument("--size", choices=("face", "full", "line"), default="face", help="face 는 얼굴, full 은 온몸, line 은 한 줄")
     st.add_argument("--cwd", help="이 폴더 기준으로 슬롯을 고른다. 주지 않으면 표준 입력의 JSON 이나 지금 폴더")
@@ -2197,7 +2305,7 @@ def main(argv=None):
             return selftest(th)
         return {"bootstrap": cmd_bootstrap, "profile": cmd_profile, "list": cmd_list, "get": cmd_get,
                 "compose": cmd_compose, "set": cmd_set, "export": cmd_export, "check": cmd_check, "card": cmd_card,
-                "look": cmd_look, "preset": cmd_preset, "promote": cmd_promote, "growth": cmd_growth, "status": cmd_status,
+                "look": cmd_look, "preset": cmd_preset, "promote": cmd_promote, "growth": cmd_growth, "status": cmd_status, "widget": cmd_widget,
                 "bundle": cmd_bundle}[a.cmd](a, th)
     except Missing as e:
         print(f"오류: {e}", file=sys.stderr)
