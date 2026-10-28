@@ -1,0 +1,18 @@
+# docs-suit 테마 조합. suit.py preset use <이름> 으로 내 슬롯에 입힌다.
+# 공개 저장소에 올라가므로 페르소나와 회사, 사람 이름은 넣지 않는다.
+
+preset:
+  label: 과제 레포트
+  desc: 수업 과제와 레포트를 평어체 줄글로, 목적과 방법, 결과 순서로 넉넉히 쓴다
+  by: dodokim-lab
+  class: student
+  featured: true
+
+defaults:
+  skeleton: imrad
+  voice: prose
+  register: plain
+  terms: explained
+  length: full
+  sources: footnote
+  emphasis: none

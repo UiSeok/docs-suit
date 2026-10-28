@@ -2,12 +2,12 @@
 # 그림은 sprites/<부위>/<값>.txt 에 있고, 기본 몸 위에 옷, 머리, 소품 순으로 겹쳐 그린다.
 # 부품을 더하면 아래 목록에 한 줄을 더한다. 환생이나 추가 전직의 보상도 같은 방법으로 늘린다.
 
-# 기본 캐릭터. hair 는 처음 머리 모양이다.
+# 기본 캐릭터. hair 는 처음 머리 모양이다. 키 a, b 는 이미 저장한 슬롯이 읽으니 바꾸지 않는다.
 base:
-  a: {label: 캐릭터 A, hair: short}
-  b: {label: 캐릭터 B, hair: bob}
+  a: {label: 남자, hair: short}
+  b: {label: 여자, hair: long}
 
-# 몇 차 전직에서 여는지. 전직 전에는 흰 셔츠에 기본 머리다. 캐릭터 A, B 는 언제든 바꾼다.
+# 몇 차 전직에서 여는지. 전직 전에는 흰 셔츠에 기본 머리다. 남자와 여자 캐릭터는 언제든 바꾼다.
 unlock:
   color: {at: 1, label: 옷 색}
   hair: {at: 2, label: 머리 모양}
@@ -27,6 +27,7 @@ top:
 hair:
   short: 짧은 머리
   bob: 단발
+  long: 긴 머리
   bangs: 앞머리
   side: 가르마
   messy: 부스스한 머리

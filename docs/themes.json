@@ -910,9 +910,9 @@
      "label": "입",
      "custom": false
     },
-    "p": {
-     "color": "#2c303b",
-     "label": "바지",
+    "q": {
+     "color": "#3a3550",
+     "label": "치마",
      "custom": false
     },
     "f": {
@@ -930,9 +930,9 @@
     ".kssssssssssssk.",
     ".kssssssssssssk.",
     ".kssssssssssssk.",
-    ".kssskesseksssk.",
+    ".ksskkessekkssk.",
     ".kssskksskksssk.",
-    ".kscskksskkscsk.",
+    ".kscsssssssscsk.",
     "..kssssmmssssk..",
     "...kkkkkkkkkk...",
     "..kssssssssssk..",
@@ -941,11 +941,11 @@
     "kssssssssssssssk",
     "kssssssssssssssk",
     "kssksssssssskssk",
-    ".kkkppppppppkkk.",
-    "...kpppkkpppk...",
-    "...kpppkkpppk...",
-    "...kfffkkfffk...",
-    "...kkkk..kkkk..."
+    ".kkkqqqqqqqqkkk.",
+    "..kqqqqqqqqqqk..",
+    ".kqqqqqqqqqqqqk.",
+    "....ksk..ksk....",
+    "...kffk..kffk..."
    ]
   },
   "hair/bangs": {
@@ -1029,6 +1029,51 @@
     "................",
     "................",
     "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................"
+   ]
+  },
+  "hair/long": {
+   "palette": {
+    "k": {
+     "color": "#2b1d16",
+     "label": "윤곽",
+     "custom": false
+    },
+    "h": {
+     "color": "#4a3022",
+     "label": "머리",
+     "custom": false
+    },
+    "g": {
+     "color": "#6e4a35",
+     "label": "머리 윤기",
+     "custom": false
+    }
+   },
+   "rows": [
+    "................",
+    "....kkkkkkkk....",
+    "...khhhhhhhhk...",
+    "..khgghhhhhhhk..",
+    "..khghhhhhhhhk..",
+    ".khhhhhhhhhhhhk.",
+    ".khhh......hhhk.",
+    ".kh..........hk.",
+    ".kh..........hk.",
+    ".kh..........hk.",
+    ".kh..........hk.",
+    ".kh..........hk.",
+    ".khh........hhk.",
+    "khhh........hhhk",
+    "khhh........hhhk",
+    "khhk........khhk",
+    ".kk..........kk.",
     "................",
     "................",
     "................",
@@ -1787,12 +1832,12 @@
  "look": {
   "base": {
    "a": {
-    "label": "캐릭터 A",
+    "label": "남자",
     "hair": "short"
    },
    "b": {
-    "label": "캐릭터 B",
-    "hair": "bob"
+    "label": "여자",
+    "hair": "long"
    }
   },
   "unlock": {
@@ -1826,6 +1871,7 @@
   "hair": {
    "short": "짧은 머리",
    "bob": "단발",
+   "long": "긴 머리",
    "bangs": "앞머리",
    "side": "가르마",
    "messy": "부스스한 머리"
@@ -1874,6 +1920,74 @@
   }
  },
  "presets": {
+  "friendly-blog": {
+   "label": "친근한 블로그",
+   "desc": "블로그와 뉴스레터를 해요체 줄글로, 쉬운 말과 본문 링크를 써서 한 쪽 분량으로 쓴다",
+   "by": "dodokim-lab",
+   "class": "creator",
+   "featured": "true",
+   "defaults": {
+    "voice": "prose",
+    "register": "haeyo",
+    "terms": "everyday",
+    "length": "page",
+    "sources": "link",
+    "emphasis": "bold"
+   },
+   "audiences": {}
+  },
+  "one-page-spec": {
+   "label": "한 장 기획서",
+   "desc": "기획서와 진행 보고를 문제와 해결, 효과 순서로, 표를 먼저 두고 한 쪽 안에 정리한다",
+   "by": "dodokim-lab",
+   "class": "planner",
+   "featured": "true",
+   "defaults": {
+    "skeleton": "psr",
+    "voice": "bullet",
+    "register": "polite",
+    "terms": "explained",
+    "length": "page",
+    "diagram": "table",
+    "emphasis": "bold"
+   },
+   "audiences": {}
+  },
+  "paper-draft": {
+   "label": "논문 초고",
+   "desc": "논문과 연구계획서를 평어체로, 목적과 방법, 결과, 고찰 순서와 APA 참고문헌으로 쓴다",
+   "by": "dodokim-lab",
+   "class": "researcher",
+   "featured": "true",
+   "defaults": {
+    "skeleton": "imrad",
+    "voice": "prose",
+    "register": "plain",
+    "terms": "major",
+    "length": "full",
+    "sources": "apa",
+    "emphasis": "none",
+    "diagram": "table"
+   },
+   "audiences": {}
+  },
+  "plain-apply": {
+   "label": "담백한 지원서",
+   "desc": "자기소개서와 지원서 답변을 합쇼체 줄글로, 경험과 수치 위주로 군더더기 없이 쓴다",
+   "by": "dodokim-lab",
+   "class": "jobseeker",
+   "featured": "true",
+   "defaults": {
+    "skeleton": "bluf",
+    "voice": "prose",
+    "register": "polite",
+    "terms": "everyday",
+    "length": "page",
+    "emphasis": "none",
+    "markup": "plain"
+   },
+   "audiences": {}
+  },
   "plain-doc": {
    "label": "평어체 설명 문서",
    "desc": "위키와 설계 문서를 평어체 줄글로, 결론 먼저 한 쪽 안에 쓴다",
@@ -1888,6 +2002,23 @@
     "length": "page",
     "emphasis": "none",
     "diagram": "table"
+   },
+   "audiences": {}
+  },
+  "school-report": {
+   "label": "과제 레포트",
+   "desc": "수업 과제와 레포트를 평어체 줄글로, 목적과 방법, 결과 순서로 넉넉히 쓴다",
+   "by": "dodokim-lab",
+   "class": "student",
+   "featured": "true",
+   "defaults": {
+    "skeleton": "imrad",
+    "voice": "prose",
+    "register": "plain",
+    "terms": "explained",
+    "length": "full",
+    "sources": "footnote",
+    "emphasis": "none"
    },
    "audiences": {}
   },

@@ -14,7 +14,7 @@ docs-suit 를 고치는 사람과 AI 에이전트가 읽는 작업 규칙이다.
 | `themes/ko/tells.yaml` | 본문 검사의 문장 규칙 패턴. `error` 는 ✗ 로 고쳐 쓰게 하고, `suggest` 는 △ 로 보이기만 한다 |
 | `themes/ko/revise.md`, `review.md` | 다듬기 절과 검토 지침의 머리. `compose --revise` 와 `review` 가 싣는다 |
 | `themes/ko/growth.yaml` | 캐릭터 성장 규칙. 문서 한 건이 받는 경험치와 레벨, 전직 문턱 |
-| `themes/ko/look.yaml` | 캐릭터 A, B 와 전직마다 여는 꾸미기, 부품과 옷 색 목록 |
+| `themes/ko/look.yaml` | 남자·여자 캐릭터와 전직마다 여는 꾸미기, 부품과 옷 색 목록 |
 | `themes/ko/presets/<이름>.yaml` | 기여받은 테마 조합. 축 기본값과 독자별 값, 소개, 만든 사람 |
 | `themes/ko/sprites/<부위>/<값>.txt` | 도트 그림 부품. 기본 몸(`base`) 위에 옷(`top`), 머리(`hair`), 소품(`prop`) 순으로 겹친다. 모두 같은 크기다 |
 | `tools/issue-key.py` | 관리자가 승급 키를 만드는 도구. 개인 키는 저장소 밖 `~/.config/docs-suit-admin/` 에 둔다 |

@@ -1,0 +1,17 @@
+# docs-suit 테마 조합. suit.py preset use <이름> 으로 내 슬롯에 입힌다.
+# 공개 저장소에 올라가므로 페르소나와 회사, 사람 이름은 넣지 않는다.
+
+preset:
+  label: 친근한 블로그
+  desc: 블로그와 뉴스레터를 해요체 줄글로, 쉬운 말과 본문 링크를 써서 한 쪽 분량으로 쓴다
+  by: dodokim-lab
+  class: creator
+  featured: true
+
+defaults:
+  voice: prose
+  register: haeyo
+  terms: everyday
+  length: page
+  sources: link
+  emphasis: bold

@@ -1528,7 +1528,7 @@ description: 문서를 쓰거나 다듬거나 검토할 때 docs-suit 테마를 
    - `{run} list --classes` 로 클래스 일곱 가지를 보여 주고 하나 고르게 한다.
    - `{run} bootstrap --questions` 가 내는 페르소나 질문을 차례로 묻는다. 답하기 싫은 질문은 비워 둔다.
    - 같은 출력의 `presets` 에 고른 클래스의 조합이 있으면, 다른 사람이 기여한 테마 조합으로 시작할지 묻는다. 추천 표시가 붙은 조합을 앞에 보인다.
-   - 같은 출력의 `looks` 로 캐릭터 A 와 B 가운데 하나를 고르게 한다. 고르지 않으면 A 다.
+   - 같은 출력의 `looks` 로 남자 캐릭터(`a`)와 여자 캐릭터(`b`) 가운데 하나를 고르게 한다. 고르지 않으면 남자 캐릭터다.
    - `{run} bootstrap --class <클래스> --call … --affiliation … --goal … --docs <종류,종류> --facts … --dislikes … [--preset <조합>] [--look a|b] --yes` 로 저장한다.
    - 사용자가 화면에서 고르겠다고 하면 묻는 대신 `{run} serve --page create --detach` 로 로컬 화면을 띄우고 나온 주소를 알려 준다. 화면에서 저장한 슬롯이 바로 적용된다.
 2. 요청에서 문서 종류를 정한다. 종류는 {kinds} 이다. 맞는 것이 없으면 종류 없이 조립한다. 종류 없는 글은 문체 축을 프로필과 클래스에서 물려받지 않고, 지침의 "대화로 정하기" 절대로 요청과 대화에서 읽어 맞춘다. 독자가 분명하면 `--audience <키>` 로 넘긴다. 독자 키는 {auds} 이다. 독자가 여럿이면 키를 쉼표로 잇는다.
@@ -1958,7 +1958,7 @@ def cmd_card(a, th):
 
 
 def cmd_look(a, th):
-    """꾸미기를 보거나 바꾼다. 캐릭터 A, B 는 언제든, 나머지는 전직해서 연 부위만 바꾼다."""
+    """꾸미기를 보거나 바꾼다. 남자와 여자 캐릭터는 언제든, 나머지는 전직해서 연 부위만 바꾼다."""
     path, slot, _, _ = profile_source(a.profile)
     data = read_slot(path, warn_stderr)
     if not data:
