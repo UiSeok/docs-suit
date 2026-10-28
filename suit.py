@@ -48,7 +48,7 @@ profiles/<이름>.yaml 이다. 폴더의 .docs-suit.yaml 은 쓸 슬롯과 그 �
   python3 suit.py preset list|show|use|export [<이름>] [--here] [--by 아이디] [--label …] [--desc …]
                                                     테마 조합. 남의 조합을 입히거나 내 조합을 기여용 파일로 낸다
   python3 suit.py growth on|off                     캐릭터 키우기를 켜고 끈다. 기록은 지우지 않는다
-  python3 suit.py status [--size face|full|line]    상태 줄에 캐릭터를 그린다. 표준 입력의 JSON 에서 작업 폴더를 읽는다
+  python3 suit.py status [--size line|face|full]    상태 줄에 캐릭터를 그린다. 표준 입력의 JSON 에서 작업 폴더를 읽는다
   python3 suit.py widget [--cwd 폴더] [--split] [--once]  터미널 옆 칸의 캐릭터 창. 기록이 바뀌면 다시 그린다
   python3 suit.py serve [--page index|create] [--kind K] [--audience A] [--set 축=값]... [--detach]
                                                화면을 로컬에 띄운다. 테마 고르기는 지금 문서의 종류로 열린다
@@ -1631,8 +1631,13 @@ def status_cwd(text):
     return (ws or {}).get("current_dir") or data.get("cwd") if isinstance(data, dict) else None
 
 
-def status_lines(th, slot_data, slot, state, depth, size="face", held=()):
-    """상태 줄에 그릴 캐릭터. face 는 얼굴과 세 줄, full 은 온몸, line 은 글 한 줄이다."""
+# 한 줄 상태에 그릴 작은 얼굴. 온몸 그림에서 머리 줄과 눈 줄을 골라 뽑는다. 반 칸 블록 한 줄이 픽셀 두 줄이다.
+# 옆 열은 단발과 긴 머리가 눈 옆에 머리카락을 내리는 자리라 머리 모양이 조금 드러난다.
+TINY_FACE = ((5, 8), (1, 2, 5, 7, 8, 10, 13, 14))
+
+
+def status_lines(th, slot_data, slot, state, depth, size="line", held=()):
+    """상태 줄에 그릴 캐릭터. line 은 작은 얼굴과 글 한 줄, face 는 얼굴과 세 줄, full 은 온몸이다."""
     cls = (slot_data.get("profile") or {}).get("class")
     name = (slot_data.get("persona") or {}).get("call") or slot or "이름 없음"
     title = title_of(th, cls, state["tier"])
@@ -1640,8 +1645,12 @@ def status_lines(th, slot_data, slot, state, depth, size="face", held=()):
     bar = f"Lv.{state['level']} {'█' * filled}{'░' * (10 - filled)} " + (
         f"{state['into']}/{state['need']}" if state["need"] else "최고 레벨")
     head = (f"[{title}] " if title else "") + name
-    if size == "line" or not depth or not th.look:
+    if not depth or not th.look:
         return [f"{head} · {bar}"]
+    if size == "line":
+        grid = look_grid(th, look_of(th, slot_data, state["tier"]))
+        rows, cols = TINY_FACE
+        return [render_grid([[grid[r][c] for c in cols] for r in rows], depth)[0] + f" {head} · {bar}"]
     nxt = next(((t, lv, keyed) for t, lv, keyed in promote_rules(th) if t == state["tier"] + 1), None)
     info = [head + (f" · {th.classes[cls]['label']}" if cls in th.classes else ""), bar]
     if nxt:
@@ -1748,6 +1757,7 @@ description: 문서를 쓰거나 다듬거나 검토할 때 docs-suit 테마를 
    - 카드를 보며 고르고 싶어 하면 지금 문서의 compose 인자를 붙여 `{run} serve --detach --kind <종류> [--audience …] [--set …]` 로 테마 고르기 화면을 띄우고 주소를 알려 준다. 화면은 그 문서 종류로 열린다.
    - 사용자가 화면에서 "이번 문서에만" 을 누르고 골랐다고 하면 `{run} picked` 가 내는 인자로 다시 조립해 그 문서를 고쳐 쓴다. "이 종류에 저장" 을 눌렀으면 슬롯의 종류별 값에 남았으니 같은 인자로 다시 조립하면 된다.
 8. 사용자가 캐릭터를 보여 달라고 하면 `{run} card --color never` 의 출력을 보여 준다. 꾸며 달라고 하면 `{run} look` 으로 열린 부위를 보고 `{run} look <부위> <값>` 을 부른다. 캐릭터 키우기를 끄거나 켜 달라고 하면 `{run} growth off` 나 `{run} growth on` 을 부른다. 성장 기록과 승급 키, 슬롯의 `look:` 절은 사용자가 부탁해도 직접 고치지 않는다. 레벨은 문서를 써서 오르고, 3차와 4차 전직은 저장소에 기여하고 받은 승급 키를 `{run} promote <키>` 로 넣어야 열린다고 알려 준다.
+   - 사용자가 캐릭터 창이나 위젯을 켜 달라고 하면 `{run} widget --split --cwd <작업 폴더>` 를 부른다. herdr 나 tmux 안이면 옆 칸에 색 있는 캐릭터 창이 뜨고, 기록이 바뀔 때마다 다시 그리며, 에이전트 세션이 끝나면 함께 닫힌다. 꺼 달라고 하면 `{run} widget --close` 를 부른다. 칸을 나누지 못했다고 나오면 터미널 앱의 창 나누기로 옆 칸을 열고 `{run} widget` 을 돌리면 된다고 알려 준다.
 9. 사용자가 화면을 열어 달라고 하거나 화면에서 고르겠다고 하면 사용자에게 명령을 시키지 않고 직접 띄운 뒤 나온 주소를 알려 준다. 화면은 두 가지다. 말투나 분량 같은 테마 값을 카드로 견줘 고르려면 `{run} serve --detach` 로 테마 고르기 화면을 띄운다. 쓰고 있는 문서가 있으면 7번처럼 그 문서의 `--kind` 와 `--audience`, `--set` 을 붙인다. 처음 세팅하거나 클래스와 캐릭터를 고르려면 `{run} serve --page create --detach` 로 캐릭터 만들기 화면을 띄운다. 어느 쪽인지 모르면 프로필이 없을 때는 캐릭터 만들기 화면을, 있을 때는 테마 고르기 화면을 띄운다.
 10. 사용자가 예전에 쓴 글로 문체를 맞춰 달라고 하거나 bootstrap 중에 글을 주면 아래 순서로 배운다. 원문은 어디에도 저장하지 않는다.
    - 파일이면 경로를 그대로 넘기고, 붙여 넣은 글이면 `-` 를 쓰고 heredoc 으로 넘긴다. check 처럼 다른 명령과 잇지 않는다.
@@ -2538,8 +2548,8 @@ def split_pane(mux, anchor, cwd, cmd, width):
     return pane
 
 
-def agent_pid(names=("codex",)):
-    """훅을 부른 에이전트 프로세스. 부모를 거슬러 올라가며 이름에 codex 가 든 것을 찾는다. 없으면 None."""
+def agent_pid(names=("codex", "claude")):
+    """창을 띄운 에이전트 프로세스. 부모를 거슬러 올라가며 이름에 codex 나 claude 가 든 것을 찾는다. 없으면 None."""
     pid = os.getppid()
     for _ in range(8):
         out = subprocess.run(["ps", "-o", "ppid=,comm=", "-p", str(pid)], capture_output=True, text=True).stdout.split(None, 1)
@@ -2599,7 +2609,8 @@ def cmd_widget(a, th):
             if not a.auto:
                 print("이 칸 옆에 캐릭터 창이 이미 떠 있다")
             return 0
-        follow = a.follow_pid or (agent_pid() if a.auto else None)
+        # 훅이든 대화든 에이전트가 띄운 창은 그 에이전트가 끝날 때 함께 닫는다. 사람이 셸에서 띄우면 따라갈 것이 없다
+        follow = a.follow_pid or agent_pid()
         # 새 칸은 새 셸에서 시작해 이 프로세스의 환경을 물려받지 못한다. docs-suit 설정 변수는 명령 앞에 붙여 넘긴다
         env = [f"{k}={v}" for k, v in sorted(os.environ.items()) if k in ("DOCS_SUIT_HOME", "DOCS_SUIT_PROFILE", "DOCS_SUIT_THEMES")]
         args = (["env", *env] if env else []) + [sys.executable, str(HERE / "suit.py"), "widget", "--cwd", cwd]
@@ -3489,7 +3500,7 @@ def selftest(th):
             state = growth_state(th, [])
             face = status_lines(th, data, "work", state, 24, "face")
             line = status_lines(th, data, "work", state, 24, "line")
-            check(len(face) == 7 and "[" in face[2] + face[3] and len(line) == 1 and "Lv.1" in line[0],
+            check(len(face) == 7 and "[" in face[2] + face[3] and len(line) == 1 and "▀" in line[0] and "Lv.1" in line[0],
                   f"상태 줄 캐릭터가 다르다: {len(face)}줄")
             wide, narrow = widget_frame(th, str(sub), 120, 24), widget_frame(th, str(sub), 30, 24)
             check(len(wide) == 12 and len(narrow) > 12 and narrow[13].startswith("["),
@@ -3838,7 +3849,7 @@ def main(argv=None):
     pk.add_argument("--json", action="store_true")
     pk.add_argument("--clear", action="store_true", help="읽은 뒤 지운다")
     st = sub.add_parser("status", parents=[slot])
-    st.add_argument("--size", choices=("face", "full", "line"), default="face", help="face 는 얼굴, full 은 온몸, line 은 한 줄")
+    st.add_argument("--size", choices=("line", "face", "full"), default="line", help="line 은 작은 얼굴과 한 줄, face 는 얼굴, full 은 온몸")
     st.add_argument("--cwd", help="이 폴더 기준으로 슬롯을 고른다. 주지 않으면 표준 입력의 JSON 이나 지금 폴더")
     sub.add_parser("bundle")
     sub.add_parser("selftest")
