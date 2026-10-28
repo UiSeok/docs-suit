@@ -25,7 +25,7 @@ profiles/<이름>.yaml 이다. 폴더의 .docs-suit.yaml 은 쓸 슬롯과 그 �
 사용
   python3 suit.py bootstrap                             처음 세팅. 클래스와 페르소나를 묻고 프로필을 만든다
   python3 suit.py bootstrap --class C [--call …] [--affiliation …] [--goal …] [--docs a,b]
-                            [--facts …] [--dislikes …] [--agents a,b] [--look a|b] [--preset 이름] --yes [--force]
+                            [--facts …] [--dislikes …] [--agents a,b] [--hair 머리] [--preset 이름] --yes [--force]
   python3 suit.py bootstrap --questions                 에이전트가 대신 물을 때 쓸 질문 목록
   python3 suit.py profile [show|list]                   지금 쓰는 프로필 보기, 슬롯 목록
   python3 suit.py profile use <슬롯> [--here]           기본 슬롯을 바꾼다. --here 는 지금 폴더에 적는다
@@ -1065,6 +1065,31 @@ def read_growth(path, warn=lambda m: None):
     return out
 
 
+def slot_class(slot_data):
+    return ((slot_data or {}).get("profile") or {}).get("class")
+
+
+def class_growth(path, slot_data, warn=lambda m: None):
+    """슬롯의 성장 기록 가운데 지금 클래스의 것. 클래스를 바꾸면 새 클래스는 처음부터 키우고, 돌아오면 이어서 키운다.
+    클래스가 적히기 전의 기록은 처음 읽을 때 지금 클래스로 한 번 채워 넣는다."""
+    cls = slot_class(slot_data)
+    if cls and path.exists():
+        raw = path.read_text(encoding="utf-8").splitlines()
+        fixed, changed = [], False
+        for line in raw:
+            try:
+                e = json.loads(line) if line.strip() else None
+            except ValueError:
+                e = None
+            if isinstance(e, dict) and e.get("doc") and "class" not in e:
+                e["class"] = cls
+                line, changed = json.dumps(e, ensure_ascii=False), True
+            fixed.append(line)
+        if changed:
+            path.write_text("".join(x + "\n" for x in fixed), encoding="utf-8")
+    return [e for e in read_growth(path, warn) if e.get("class") == cls]
+
+
 def doc_key(src, text):
     """같은 문서를 다시 검사했는지 가리는 지문. 경로나 본문 대신 해시만 남긴다."""
     key = f"file:{Path(src).expanduser().resolve()}" if src != "-" else f"text:{text}"
@@ -1145,9 +1170,28 @@ def title_of(th, cls, tier):
     return titles[min(tier, len(titles) - 1)] if titles else None
 
 
-def opened_at(th, tier):
-    """이 차수에서 새로 여는 꾸미기 부위의 이름들."""
-    return [v["label"] for v in (th.look.get("unlock") or {}).values() if int(v["at"]) == tier]
+def class_rewards(th, cls):
+    """[(차수, 부위, 값)]. 클래스가 전직할 때 여는 꾸미기다."""
+    out = []
+    for tier, items in sorted(((th.look.get("rewards") or {}).get(cls) or {}).items(), key=lambda kv: int(kv[0])):
+        for item in items:
+            part, val = item.split(".", 1)
+            out.append((int(tier), part, val))
+    return out
+
+
+def opened_at(th, cls, tier):
+    """이 차수에서 새로 여는 꾸미기의 이름들. `소품 가방끈` 꼴이다."""
+    names, out = {}, []
+    for t, part, val in class_rewards(th, cls):
+        if t == tier:
+            names.setdefault(part, []).append(look_label(th, part, val))
+    return [f"{th.look['parts'][part]} {', '.join(vals)}" for part, vals in names.items()]
+
+
+def look_label(th, part, val):
+    table = th.look["colors"] if part == "color" else th.look[part]
+    return table[val]["label"] if part == "color" else table[val]
 
 
 def growth_line(th, before, after, key, kind, cls=None):
@@ -1166,7 +1210,7 @@ def growth_line(th, before, after, key, kind, cls=None):
     for tier in range(before["tier"] + 1, after["tier"] + 1):
         title = title_of(th, cls, tier)
         lv += f" · 전직 [{title}]" if title else f" · {tier}차 전직"
-        lv += "".join(f" · {label} 열림" for label in opened_at(th, tier))
+        lv += "".join(f" · {label} 열림" for label in opened_at(th, cls, tier))
     left = f"다음 레벨까지 {after['need'] - after['into']}" if after["need"] else "최고 레벨"
     return f"성장: {head} · {lv} · {left}"
 
@@ -1177,8 +1221,9 @@ def record_check(th, name, src, text, kind, checks, left, warn=lambda m: None):
     if not growth_on(slot_data):
         return None
     path = growth_path(name)
-    entries = read_growth(path, warn)
+    entries = class_growth(path, slot_data, warn)
     entry = {"v": 1, "at": datetime.now().isoformat(timespec="minutes"), "doc": doc_key(src, text), "kind": kind,
+             "class": slot_class(slot_data),
              "checks": {axis: ok for axis, ok, _ in checks}, "unresolved": left,
              "chars": len("\n".join(body_lines(text)))}
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -1325,21 +1370,34 @@ def sprite_grid(path, custom=None):
 LOOK_LAYERS = ("top", "hair", "prop")  # 기본 몸 위에 이 순서로 겹친다
 
 
+def look_open(th, cls, tier):
+    """부위마다 고를 수 있는 값. 머리 모양은 처음부터 모두 열려 있고, 나머지는 클래스가 tier 차까지 연 것이다.
+    tier 가 None 이면 잠그지 않는다."""
+    if tier is None:
+        return {part: set(th.look["colors"] if part == "color" else th.look[part]) for part in ("top", "hair", "prop", "color")}
+    out = {"top": {"shirt"}, "hair": set(th.look["hair"]), "prop": set(), "color": set()}
+    for t, part, val in class_rewards(th, cls):
+        if t <= tier:
+            out[part].add(val)
+    return out
+
+
 def look_of(th, slot_data, tier=None, warn=lambda m: None):
-    """슬롯의 look 절에 기본값을 채운다. 모르는 값은 기본값으로 돌린다. tier 를 주면 그 차수까지 열린 부위만
-    입힌다. 슬롯 파일을 손으로 고쳐 잠긴 옷을 입히는 길을 막는다."""
+    """슬롯의 look 절에 기본값을 채운다. 모르는 값은 기본값으로 돌린다. tier 를 주면 그 차수까지 클래스가 연
+    꾸미기만 입힌다. 슬롯 파일을 손으로 고쳐 잠긴 옷을 입히거나 클래스를 바꿔 다른 클래스의 보상을 입는 길을 막는다."""
     have = (slot_data or {}).get("look") or {}
     have = have if isinstance(have, dict) else {}
     bases = th.look.get("base") or {}
     base = have.get("base") if have.get("base") in bases else next(iter(bases), "a")
     look = {"base": base, "top": "shirt", "hair": bases.get(base, {}).get("hair"), "prop": None, "color": None}
+    opened = look_open(th, slot_class(slot_data), tier)
     for part, table in (("top", th.look.get("top")), ("hair", th.look.get("hair")), ("prop", th.look.get("prop")),
                         ("color", th.look.get("colors"))):
         val = have.get(part)
-        locked = tier is not None and tier < int(((th.look.get("unlock") or {}).get(part) or {}).get("at", 0))
-        if val and val in (table or {}) and not locked:
-            look[part] = val
-        elif val and not locked:
+        if val and val in (table or {}):
+            if val in opened[part]:
+                look[part] = val
+        elif val:
             warn(f"프로필의 look.{part}={val} 는 모르는 값이라 기본값을 쓴다")
     return look
 
@@ -1410,7 +1468,7 @@ def card_lines(th, slot_data, slot, state, depth, vals=None, held=(), stacked=Fa
         t, lv, keyed = nxt
         nt = title_of(th, cls, t)
         when = "승급 키를 받으면" if keyed and state["level"] >= lv else f"Lv.{lv}" + (" + 승급 키" if keyed else "")
-        info.append(f"다음 전직 {when}" + (f" [{nt}]" if nt else "") + "".join(f" · {label} 열림" for label in opened_at(th, t)))
+        info.append(f"다음 전직 {when}" + (f" [{nt}]" if nt else "") + "".join(f" · {label} 열림" for label in opened_at(th, cls, t)))
     else:
         info.append("전직을 모두 마쳤다")
     if vals:
@@ -1528,8 +1586,8 @@ description: 문서를 쓰거나 다듬거나 검토할 때 docs-suit 테마를 
    - `{run} list --classes` 로 클래스 일곱 가지를 보여 주고 하나 고르게 한다.
    - `{run} bootstrap --questions` 가 내는 페르소나 질문을 차례로 묻는다. 답하기 싫은 질문은 비워 둔다.
    - 같은 출력의 `presets` 에 고른 클래스의 조합이 있으면, 다른 사람이 기여한 테마 조합으로 시작할지 묻는다. 추천 표시가 붙은 조합을 앞에 보인다.
-   - 같은 출력의 `looks` 로 남자 캐릭터(`a`)와 여자 캐릭터(`b`) 가운데 하나를 고르게 한다. 고르지 않으면 남자 캐릭터다.
-   - `{run} bootstrap --class <클래스> --call … --affiliation … --goal … --docs <종류,종류> --facts … --dislikes … [--preset <조합>] [--look a|b] --yes` 로 저장한다.
+   - 같은 출력의 `hairs` 로 캐릭터의 머리 모양을 고르게 한다. 고르지 않으면 짧은 머리다. 옷 색과 소품, 옷은 클래스마다 전직할 때 열린다.
+   - `{run} bootstrap --class <클래스> --call … --affiliation … --goal … --docs <종류,종류> --facts … --dislikes … [--preset <조합>] [--hair <머리>] --yes` 로 저장한다.
    - 사용자가 화면에서 고르겠다고 하면 묻는 대신 `{run} serve --page create --detach` 로 로컬 화면을 띄우고 나온 주소를 알려 준다. 화면에서 저장한 슬롯이 바로 적용된다.
 2. 요청에서 문서 종류를 정한다. 종류는 {kinds} 이다. 맞는 것이 없으면 종류 없이 조립한다. 종류 없는 글은 문체 축을 프로필과 클래스에서 물려받지 않고, 지침의 "대화로 정하기" 절대로 요청과 대화에서 읽어 맞춘다. 독자가 분명하면 `--audience <키>` 로 넘긴다. 독자 키는 {auds} 이다. 독자가 여럿이면 키를 쉼표로 잇는다.
 3. 사용자가 문체, 어법, 분량, 글자수, 공개 범위를 말했으면 `--set 축=값` 과 `--chars` 로 넘긴다. 축과 값은 아래 영어 키로 쓴다. {axes}. 공개 범위는 안전 축이라 `--set exposure` 는 `team`, `submit`, `public` 순서로 더 조심하는 쪽으로만 먹는다. 사내나 팀 안에서만 볼 글이면 `--set` 대신 `--audience` 를 `teammate` 나 `peer-dev` 로 넘긴다. 붙여 넣을 곳이 메일 본문이나 메신저, 지원서 입력 칸처럼 마크다운이 먹지 않는 곳이면 `--set markup=plain` 을 넘긴다.
@@ -1651,17 +1709,17 @@ def bootstrap_interactive(th):
     for i, n in enumerate(names, 1):
         print(f"  {i}. {labels[n]}")
     agents = _pick_numbers(_ask("\n번호를 쉼표로 이어 고른다: "), names)
-    print("\n4단계. 캐릭터. 문서를 쓸수록 자라고, 전직하면 칭호와 꾸미기 거리가 열린다.\n")
-    bases = list(th.look.get("base") or {})
+    print("\n4단계. 캐릭터의 머리 모양. 문서를 쓸수록 자라고, 전직하면 칭호와 클래스의 꾸미기 거리가 열린다.\n")
+    hairs = list(th.look.get("hair") or {})
     depth = color_depth()
-    if depth and bases:
-        grids = [look_grid(th, look_of(th, {"look": {"base": b}})) for b in bases]
+    if depth and hairs:
+        grids = [look_grid(th, look_of(th, {"look": {"hair": h}})) for h in hairs]
         arts = [render_grid(g, depth) for g in grids]
         for row in zip(*arts):
             print("  " + "    ".join(row))
-    for i, b in enumerate(bases, 1):
-        print(f"  {i}. {th.look['base'][b]['label']}")
-    picked = _pick_numbers(_ask("\n번호를 고른다. Enter 면 1번: "), bases)
+    for i, h in enumerate(hairs, 1):
+        print(f"  {i}. {th.look['hair'][h]}")
+    picked = _pick_numbers(_ask("\n번호를 고른다. Enter 면 1번: "), hairs)
     return cls, persona, agents, (picked[0] if picked else None), preset
 
 
@@ -1674,7 +1732,7 @@ def cmd_bootstrap(a, th):
                                        "class": th.presets[k].get("class"),
                                        "featured": str(th.presets[k].get("featured")) == "true"}
                                       for k in preset_order(th)],
-                          "looks": {k: v["label"] for k, v in (th.look.get("base") or {}).items()}},
+                          "hairs": dict(th.look.get("hair") or {})},
                          ensure_ascii=False, indent=1))
         return 0
     p = profile_path(a.profile)
@@ -1695,17 +1753,17 @@ def cmd_bootstrap(a, th):
                     raise Missing(f"모르는 문서 종류: {d}")
             persona["docs"] = docs
         agents = [x.strip() for x in a.agents.split(",") if x.strip()] if a.agents else []
-        base, preset = a.look, a.preset
+        hair, preset = a.hair, a.preset
     else:
         if not sys.stdin.isatty():
             raise Missing("대화형 입력을 받을 수 없다. --class 와 --yes 로 진행한다")
-        cls, persona, agents, base, preset = bootstrap_interactive(th)
+        cls, persona, agents, hair, preset = bootstrap_interactive(th)
     expand_agents(agents)
-    if base and base not in (th.look.get("base") or {}):
-        raise Missing(f"모르는 캐릭터: {base}. 고를 수 있는 것은 {', '.join(th.look.get('base') or {})}")
+    if hair and hair not in (th.look.get("hair") or {}):
+        raise Missing(f"모르는 머리 모양: {hair}. 고를 수 있는 것은 {', '.join(th.look.get('hair') or {})}")
     data = {"profile": {"class": cls, "lang": DEFAULT_LANG}, "persona": persona}
-    if base:
-        data["look"] = {"base": base}
+    if hair:
+        data["look"] = {"hair": hair}
     if preset:
         if preset not in th.presets:
             raise Missing(f"모르는 조합: {preset}. 고를 수 있는 조합은 {', '.join(preset_order(th)) or '없음'}")
@@ -1944,7 +2002,7 @@ def cmd_card(a, th):
         print(f"프로필이 없다: {path}\n`python3 suit.py bootstrap` 으로 캐릭터를 만든다")
         return 3
     held = promote_keys(warn_stderr)
-    state = growth_state(th, read_growth(growth_path(a.profile), warn_stderr), key_tiers(held))
+    state = growth_state(th, class_growth(growth_path(a.profile), data, warn_stderr), key_tiers(held))
     if a.json:
         cls = (data.get("profile") or {}).get("class")
         print(json.dumps({"slot": slot, "name": (data.get("persona") or {}).get("call") or slot, "class": cls,
@@ -1958,52 +2016,55 @@ def cmd_card(a, th):
 
 
 def cmd_look(a, th):
-    """꾸미기를 보거나 바꾼다. 남자와 여자 캐릭터는 언제든, 나머지는 전직해서 연 부위만 바꾼다."""
+    """꾸미기를 보거나 바꾼다. 머리 모양은 언제든, 옷 색과 소품, 옷 모양은 클래스가 전직해서 연 것만 바꾼다."""
     path, slot, _, _ = profile_source(a.profile)
     data = read_slot(path, warn_stderr)
     if not data:
         print(f"프로필이 없다: {path}\n`python3 suit.py bootstrap` 으로 캐릭터를 만든다")
         return 3
-    tier = growth_state(th, read_growth(growth_path(a.profile), warn_stderr), key_tiers(promote_keys(warn_stderr)))["tier"]
+    cls = slot_class(data)
+    tier = growth_state(th, class_growth(growth_path(a.profile), data, warn_stderr),
+                        key_tiers(promote_keys(warn_stderr)))["tier"]
     look = look_of(th, data, tier, warn_stderr)
-    unlock = th.look.get("unlock") or {}
-    tables = {"base": {k: v["label"] for k, v in th.look["base"].items()}, "top": th.look["top"],
-              "hair": th.look["hair"], "prop": th.look["prop"],
+    opened = look_open(th, cls, tier)
+    labels = th.look["parts"]
+    tables = {"top": th.look["top"], "hair": th.look["hair"], "prop": th.look["prop"],
               "color": {k: v["label"] for k, v in th.look["colors"].items()}}
-    labels = {"base": "캐릭터", **{k: v["label"] for k, v in unlock.items()}}
-    is_open = {k: k == "base" or tier >= int(unlock[k]["at"]) for k in tables}
+    later = [(t, part, val) for t, part, val in class_rewards(th, cls) if t > tier]
     if a.json:
-        print(json.dumps({"look": look, "tier": tier, "open": is_open, "options": tables}, ensure_ascii=False, indent=1))
+        print(json.dumps({"look": look, "tier": tier, "open": {k: sorted(v) for k, v in opened.items()},
+                          "later": [{"tier": t, "part": part, "value": val} for t, part, val in later], "options": tables},
+                         ensure_ascii=False, indent=1))
         return 0
     if not a.part:
         print(("아직 전직 전이다" if not tier else f"{tier}차 전직까지 마쳤다") + ". 바꾸려면 suit.py look <부위> <값>")
-        for part in ("base", "color", "hair", "prop", "top"):
+        for part in ("hair", "color", "prop", "top"):
             now = tables[part].get(look[part]) if look[part] else ("기본" if part == "color" else "없음")
-            if is_open[part]:
-                opts = ", ".join(f"{k} {v}" for k, v in tables[part].items())
-                print(f"- {labels[part]} ({part}): 지금 {now}. 고를 수 있는 값 {opts}")
-            else:
-                print(f"- {labels[part]} ({part}): 지금 {now}. {unlock[part]['at']}차 전직에서 열린다")
+            opts = ", ".join(f"{k} {v}" for k, v in tables[part].items() if k in opened[part])
+            print(f"- {labels[part]} ({part}): 지금 {now}. " + (f"고를 수 있는 값 {opts}" if opts else "아직 연 것이 없다"))
+        if later:
+            print("앞으로 열리는 것: " + ", ".join(f"{t}차 {labels[part]} {look_label(th, part, val)}" for t, part, val in later))
         return 0
     if a.part not in tables:
         raise Missing(f"모르는 부위: {a.part}. 부위는 {', '.join(tables)}")
-    if not is_open[a.part]:
-        print(f"{labels[a.part]}: {unlock[a.part]['at']}차 전직에서 열린다. 지금은 {tier}차다")
-        return 1
     if not a.value:
-        raise Missing(f"값을 준다: suit.py look {a.part} <값>. 고를 수 있는 값은 {', '.join(tables[a.part])}")
+        raise Missing(f"값을 준다: suit.py look {a.part} <값>. 고를 수 있는 값은 {', '.join(sorted(opened[a.part])) or '아직 없음'}")
     want = dict(data.get("look") or {}) if isinstance(data.get("look"), dict) else {}
     if a.value == "none" and a.part in ("prop", "color"):
         want.pop(a.part, None)
     elif a.value not in tables[a.part]:
         raise Missing(f"모르는 값: {a.part}={a.value}. 고를 수 있는 값은 {', '.join(tables[a.part])}")
+    elif a.value not in opened[a.part]:
+        when = next((t for t, part, val in later if part == a.part and val == a.value), None)
+        print(f"{labels[a.part]} {tables[a.part][a.value]}: "
+              + (f"{when}차 전직에서 열린다. 지금은 {tier}차다" if when else "이 클래스의 보상이 아니다"))
+        return 1
     else:
         want[a.part] = a.value
     data["look"] = want
     write_profile(data, a.profile)
     print(f"바꿨다: {labels[a.part]} → {tables[a.part].get(a.value, '없음')}. suit.py card 로 본다")
     return 0
-
 
 def cmd_preset(a, th):
     """테마 조합 보기, 입히기, 내 설정을 조합 파일로 내보내기."""
@@ -2085,11 +2146,11 @@ def cmd_promote(a, th):
     print(f"승급 키를 받았다: {payload['tier']}차 · @{payload['who']} · {payload.get('ref', '')}")
     data = read_slot(profile_path(a.profile), warn_stderr)
     if data:
-        before = growth_state(th, read_growth(growth_path(a.profile), warn_stderr), key_tiers(held))
-        after = growth_state(th, read_growth(growth_path(a.profile), warn_stderr), key_tiers(held + [payload]))
+        before = growth_state(th, class_growth(growth_path(a.profile), data, warn_stderr), key_tiers(held))
+        after = growth_state(th, class_growth(growth_path(a.profile), data, warn_stderr), key_tiers(held + [payload]))
         cls = (data.get("profile") or {}).get("class")
         for tier in range(before["tier"] + 1, after["tier"] + 1):
-            print(f"전직 [{title_of(th, cls, tier)}]" + "".join(f" · {label} 열림" for label in opened_at(th, tier)))
+            print(f"전직 [{title_of(th, cls, tier)}]" + "".join(f" · {label} 열림" for label in opened_at(th, cls, tier)))
         if after["tier"] == before["tier"]:
             lv = next((lv for t, lv, _ in promote_rules(th) if t == after["tier"] + 1), None)
             print(f"지금 Lv.{after['level']}" + (f". Lv.{lv} 이 되면 전직한다" if lv else ""))
@@ -2119,7 +2180,7 @@ def cmd_status(a, th):
     if not growth_on(data):
         return 0
     held = promote_keys()
-    state = growth_state(th, read_growth(growth_path(a.profile, start=cwd)), key_tiers(held))
+    state = growth_state(th, class_growth(growth_path(a.profile, start=cwd), data), key_tiers(held))
     depth = color_depth("never" if os.environ.get("NO_COLOR") else "always")
     print("\n".join(status_lines(th, data, slot, state, depth, a.size, held)))
     return 0
@@ -2134,7 +2195,7 @@ def widget_frame(th, cwd, width, depth, events=()):
     if not growth_on(data):
         return ["캐릭터 키우기가 꺼져 있다.", "켜려면 python3 suit.py growth on"]
     held = promote_keys()
-    state = growth_state(th, read_growth(growth_path(start=cwd)), key_tiers(held))
+    state = growth_state(th, class_growth(growth_path(start=cwd), data), key_tiers(held))
     vals = resolve(th, profile=load_profile(start=cwd))[0]
     lines = card_lines(th, data, slot, state, depth, vals, held)
     if max(display_width(x) for x in lines) > width:
@@ -2284,7 +2345,7 @@ def cmd_widget(a, th):
         print("\n".join(widget_frame(th, cwd, shutil.get_terminal_size().columns, depth)))
         return 0
     events, last = [], None
-    count = len(read_growth(growth_path(start=cwd)))
+    count = len(class_growth(growth_path(start=cwd), read_slot(profile_source(None, start=cwd)[0])))
 
     def stop(signum, frame):
         raise KeyboardInterrupt  # 칸을 닫거나 kill 해도 커서를 되돌리고 끝낸다
@@ -2305,9 +2366,9 @@ def cmd_widget(a, th):
                     pass
             now = (widget_watch(cwd), shutil.get_terminal_size())
             if now != last:
-                entries = read_growth(growth_path(start=cwd))
+                data = read_slot(profile_source(None, start=cwd)[0])
+                entries = class_growth(growth_path(start=cwd), data)
                 if len(entries) > count:
-                    data = read_slot(profile_source(None, start=cwd)[0])
                     keys = key_tiers(promote_keys())
                     cls = (data.get("profile") or {}).get("class")
                     for i in range(count, len(entries)):
@@ -2357,7 +2418,7 @@ def serve_state(th, cwd, slot=None):
            "folders": [str(f) for f in folder], "slots": slots, "profile": data,
            "merged": load_profile(name=slot, start=cwd), "folderHere": read_folder(Path(cwd) / FOLDER_FILE)}
     if data and th.growth:
-        state = growth_state(th, read_growth(growth_path(slot, start=cwd)), key_tiers(promote_keys()))
+        state = growth_state(th, class_growth(growth_path(slot, start=cwd), data), key_tiers(promote_keys()))
         cls = (data.get("profile") or {}).get("class")
         out["growth"] = {"level": state["level"], "tier": state["tier"], "title": title_of(th, cls, state["tier"]),
                          "docs": state["docs"]}
@@ -2390,11 +2451,11 @@ def clean_slot(th, data, old=None):
         persona["docs"] = list(docs)
     out = {"profile": meta, "persona": persona}
     look = dict(old.get("look") or {})
-    base = (data.get("look") or {}).get("base")
-    if base:
-        if base not in (th.look.get("base") or {}):
-            raise Missing(f"모르는 캐릭터: {base}")
-        look["base"] = base
+    hair = (data.get("look") or {}).get("hair")
+    if hair:
+        if hair not in (th.look.get("hair") or {}):
+            raise Missing(f"모르는 머리 모양: {hair}")
+        look["hair"] = hair
     if look:
         out["look"] = look
     defaults = data.get("defaults") or {}
@@ -2710,9 +2771,15 @@ def selftest(th):
     lk = th.look
     check(lk.get("base") and all(v.get("hair") in (lk.get("hair") or {}) for v in lk["base"].values()),
           "look.yaml 의 base 가 없거나 처음 머리 모양을 모른다")
-    check(set(lk.get("unlock") or {}) == {"color", "hair", "prop", "top"}
-          and all(str(v.get("at", "")).isdigit() and v.get("label") for v in lk["unlock"].values()),
-          "look.yaml 의 unlock 에 color, hair, prop, top 의 at 과 label 이 있어야 한다")
+    check(set(lk.get("parts") or {}) == {"color", "hair", "prop", "top"}, "look.yaml 의 parts 에 color, hair, prop, top 이름이 있어야 한다")
+    tiers = {str(t) for t, _, _ in promote_rules(th)}
+    for cls in th.classes:
+        got = (lk.get("rewards") or {}).get(cls)
+        check(isinstance(got, dict) and set(got) == tiers, f"look.yaml 의 rewards 에 {cls} 의 차수 {sorted(tiers)} 가 모두 있어야 한다")
+        for t, part, val in (class_rewards(th, cls) if isinstance(got, dict) else []):
+            table = lk.get("colors") if part == "color" else lk.get(part)
+            check(part in ("color", "prop", "top") and val in (table or {}), f"look.yaml 의 rewards.{cls} 에 모르는 값 {part}.{val}")
+    check(set(lk.get("rewards") or {}) <= set(th.classes), "look.yaml 의 rewards 에 모르는 클래스가 있다")
     check("shirt" in (lk.get("top") or {}), "look.yaml 의 top 에 기본 옷 shirt 가 없다")
     for k, v in (lk.get("colors") or {}).items():
         check(re.match(r"^#[0-9a-fA-F]{6}$", str(v.get("color", ""))) and v.get("label"), f"look.yaml 의 색 {k} 이 다르다")
@@ -2732,9 +2799,17 @@ def selftest(th):
         mine = sum(1 for x in pal.values() if x["custom"])
         check(mine == (1 if part == "top" else 0), f"* 는 옷에만 하나 둔다: sprites/{part}/{name}.txt")
     if lk.get("colors") and not problems:
-        grid = look_grid(th, look_of(th, {"look": {"base": "b", "top": "suit", "prop": "tie", "color": "wine"}}))
+        grid = look_grid(th, look_of(th, {"look": {"top": "suit", "prop": "tie", "color": "wine"}}))
         check(any(lk["colors"]["wine"]["color"] in row for row in grid), "옷 색 바꾸기가 그림에 먹지 않는다")
         check(look_of(th, {"look": {"top": "nope"}})["top"] == "shirt", "모르는 옷을 기본 옷으로 돌리지 않는다")
+        # 클래스 보상. 머리는 처음부터 열리고, 옷 색과 소품, 옷은 그 클래스가 그 차수까지 연 것만 입는다.
+        office = {"profile": {"class": "office"}, "look": {"hair": "long", "color": "navy", "prop": "tie", "top": "suit"}}
+        check(look_of(th, office, 0) == {"base": "a", "top": "shirt", "hair": "long", "prop": None, "color": None},
+              "전직 전에 머리 말고 다른 꾸미기가 열렸다")
+        check(look_of(th, office, 3) == {"base": "a", "top": "shirt", "hair": "long", "prop": "tie", "color": "navy"},
+              "직장인 3차까지 연 꾸미기가 다르다")
+        check(look_of(th, {**office, "profile": {"class": "creator"}}, 4)["prop"] is None, "다른 클래스의 보상을 입었다")
+        check(look_of(th, {"look": {"base": "b"}})["base"] == "a", "없어진 캐릭터를 기본 캐릭터로 돌리지 않는다")
 
     # 본문 검사와 경험치 계약. 경험치 숫자는 growth.yaml 과 상관없이 고정한 규칙으로 잰다.
     vals = {"register": ("polite", ""), "skeleton": ("bluf", ""), "voice": ("prose", ""), "length": ("brief", ""),
@@ -2915,12 +2990,12 @@ def selftest(th):
         try:
             ns = argparse.Namespace(questions=False, force=False, cls="developer", yes=True, profile=None,
                                     call='민수 "님"', affiliation="백엔드, 2년 차: 결제", goal=None,
-                                    facts="#1 은 지도 시각화", dislikes=None, docs="pr,design-doc", agents="", look="b",
+                                    facts="#1 은 지도 시각화", dislikes=None, docs="pr,design-doc", agents="", hair="bob",
                                     preset=next(iter(th.presets), None))
             quiet(cmd_bootstrap, ns, th)
             prof = load_profile(start=td)
             check(prof.get("profile", {}).get("class") == "developer", "bootstrap 이 클래스를 남기지 않았다")
-            check(prof.get("look") == {"base": "b"}, "bootstrap 이 캐릭터를 남기지 않았다")
+            check(prof.get("look") == {"hair": "bob"}, "bootstrap 이 머리 모양을 남기지 않았다")
             if th.presets:
                 check(prof.get("defaults") == th.presets[next(iter(th.presets))]["defaults"],
                       "bootstrap 이 고른 조합으로 시작하지 않았다")
@@ -2950,7 +3025,7 @@ def selftest(th):
                   "export 가 손으로 만든 SKILL.md 를 덮어썼다")
             check("check - --kind" in skill and "<<'EOF'" in skill and "growth off" in skill,
                   "SKILL.md 에 검사 단계나 캐릭터 끄기가 없다")
-            check("--preset <조합>" in skill and "--look a|b" in skill and "promote <키>" in skill,
+            check("--preset <조합>" in skill and "--hair <머리>" in skill and "promote <키>" in skill,
                   "SKILL.md 에 조합이나 캐릭터 고르기, 승급 키 안내가 없다")
             doc = Path(td) / "pr.md"
             doc.write_text("## 바뀐 것\n\n결제 재시도를 붙였다.\n테스트를 더했다.\n", encoding="utf-8")
@@ -2962,7 +3037,8 @@ def selftest(th):
             check(grow == Path(td) / "profile.growth.jsonl" and len(read_growth(grow)) == 2,
                   "환경 변수로 정한 프로필 옆에 성장 기록이 남지 않는다")
             entry = read_growth(grow)[0]
-            check(set(entry) == {"v", "at", "doc", "kind", "checks", "unresolved", "chars"} and str(td) not in json.dumps(entry),
+            check(set(entry) == {"v", "at", "doc", "kind", "class", "checks", "unresolved", "chars"}
+                  and entry["class"] == "developer" and str(td) not in json.dumps(entry),
                   f"성장 기록에 본문이나 경로가 남는다: {entry}")
             check(growth_state(th, read_growth(grow))["docs"] == 1, "같은 파일을 다시 검사했는데 문서가 두 건으로 셌다")
             empty = Path(td) / "empty.md"
@@ -2974,13 +3050,22 @@ def selftest(th):
             look_ns = argparse.Namespace(part="color", value="navy", json=False, profile=None)
             check(quiet(cmd_look, look_ns, th) == 1 and "color" not in (read_slot(profile_path()).get("look") or {}),
                   "전직 전인데 옷 색을 바꿨다")
-            quiet(cmd_look, argparse.Namespace(part="base", value="a", json=False, profile=None), th)
-            check(read_slot(profile_path()).get("look") == {"base": "a"}
+            quiet(cmd_look, argparse.Namespace(part="hair", value="messy", json=False, profile=None), th)
+            check(read_slot(profile_path()).get("look") == {"hair": "messy"}
                   and read_slot(profile_path()).get("persona", {}).get("affiliation") == "백엔드, 2년 차: 결제",
-                  "look 이 캐릭터를 바꾸지 못하거나 프로필을 망가뜨렸다")
+                  "look 이 머리 모양을 바꾸지 못하거나 프로필을 망가뜨렸다")
+            # 클래스를 바꾸면 처음부터 키우고, 돌아오면 이어서 키운다. 클래스가 적히기 전의 기록은 지금 클래스로 채운다.
+            with open(grow, "a", encoding="utf-8") as f:
+                f.write(json.dumps({"v": 1, "at": "2026-01-01T09:00", "doc": "old", "kind": "pr", "checks": {}}) + "\n")
+            dev = read_slot(profile_path())
+            check(growth_state(th, class_growth(grow, dev))["docs"] == 2 and all("class" in e for e in read_growth(grow)),
+                  "클래스가 없는 지난 기록을 지금 클래스로 채우지 못했다")
+            writer = {**dev, "profile": {**dev["profile"], "class": "creator"}}
+            check(growth_state(th, class_growth(grow, writer))["docs"] == 0, "클래스를 바꿨는데 지난 클래스의 레벨을 이어 받았다")
+            check(growth_state(th, class_growth(grow, dev))["docs"] == 2, "원래 클래스로 돌아왔는데 기록을 잃었다")
             quiet(cmd_growth, argparse.Namespace(action="off", profile=None), th)
             quiet(cmd_check, ns, th)
-            check(len(read_growth(grow)) == 2 and not growth_on(read_slot(profile_path())), "캐릭터 키우기를 껐는데 기록이 남는다")
+            check(len(read_growth(grow)) == 3 and not growth_on(read_slot(profile_path())), "캐릭터 키우기를 껐는데 기록이 남는다")
             check(load_profile(start=td).get("persona", {}).get("affiliation") == "백엔드, 2년 차: 결제",
                   "growth off 가 프로필을 망가뜨렸다")
         finally:
@@ -3143,9 +3228,9 @@ def selftest(th):
                   "테마 고르기의 값을 실행한 폴더 기준 슬롯에 쓰지 못한다")
             check(req("/api/defaults", {"defaults": {"register": "nope"}})[0] == 400, "모르는 값을 슬롯에 썼다")
             code, _ = req("/api/slot", {"slot": "web", "useHere": True, "data": {
-                "profile": {"class": "student"}, "persona": {"call": '민수 "님"', "docs": ["report"]}, "look": {"base": "b"}}})
+                "profile": {"class": "student"}, "persona": {"call": '민수 "님"', "docs": ["report"]}, "look": {"hair": "bob"}}})
             web = read_slot(slot_path("web"))
-            check(code == 200 and web.get("look") == {"base": "b"} and web["persona"]["call"] == "민수 ”님”"
+            check(code == 200 and web.get("look") == {"hair": "bob"} and web["persona"]["call"] == "민수 ”님”"
                   and read_folder(Path(td) / FOLDER_FILE).get("profile") == "web",
                   f"캐릭터 만들기의 슬롯을 쓰지 못하거나 폴더 파일을 남기지 않았다: {code}")
             state = json.loads(req("/api/state")[1])
@@ -3188,7 +3273,7 @@ def main(argv=None):
         b.add_argument(f"--{k}")
     b.add_argument("--docs", help="자주 쓰는 문서 종류. 쉼표로 잇는다")
     b.add_argument("--agents", help="스킬을 설치할 도구. 쉼표로 잇는다")
-    b.add_argument("--look", help="캐릭터 a 나 b. 주지 않으면 a")
+    b.add_argument("--hair", help="처음 머리 모양. bootstrap --questions 의 hairs 에서 고른다")
     b.add_argument("--preset", help="이 테마 조합으로 시작한다. suit.py preset list 로 본다")
     b.add_argument("--yes", action="store_true", help="묻지 않고 진행한다")
     b.add_argument("--force", action="store_true", help="있는 프로필을 .bak 으로 남기고 새로 만든다")
@@ -3248,7 +3333,7 @@ def main(argv=None):
     ca.add_argument("--color", choices=("auto", "always", "never"), default="auto",
                     help="auto 는 터미널일 때만 도트 그림을 그린다")
     lo = sub.add_parser("look", parents=[slot])
-    lo.add_argument("part", nargs="?", help="base, color, hair, prop, top")
+    lo.add_argument("part", nargs="?", help="hair, color, prop, top")
     lo.add_argument("value", nargs="?", help="고를 값. prop 과 color 는 none 으로 지운다")
     lo.add_argument("--json", action="store_true")
     ps = sub.add_parser("preset", parents=[slot])

@@ -883,71 +883,6 @@
     "...kkkk..kkkk..."
    ]
   },
-  "base/b": {
-   "palette": {
-    "k": {
-     "color": "#2b1d16",
-     "label": "윤곽",
-     "custom": false
-    },
-    "s": {
-     "color": "#f3c9a0",
-     "label": "피부",
-     "custom": false
-    },
-    "c": {
-     "color": "#ef9f86",
-     "label": "볼",
-     "custom": false
-    },
-    "e": {
-     "color": "#fdf8ef",
-     "label": "눈 반짝임",
-     "custom": false
-    },
-    "m": {
-     "color": "#c0505a",
-     "label": "입",
-     "custom": false
-    },
-    "q": {
-     "color": "#3a3550",
-     "label": "치마",
-     "custom": false
-    },
-    "f": {
-     "color": "#3d2a20",
-     "label": "구두",
-     "custom": false
-    }
-   },
-   "rows": [
-    "................",
-    "....kkkkkkkk....",
-    "...kssssssssk...",
-    "..kssssssssssk..",
-    "..kssssssssssk..",
-    ".kssssssssssssk.",
-    ".kssssssssssssk.",
-    ".kssssssssssssk.",
-    ".ksskkessekkssk.",
-    ".kssskksskksssk.",
-    ".kscsssssssscsk.",
-    "..kssssmmssssk..",
-    "...kkkkkkkkkk...",
-    "..kssssssssssk..",
-    ".kssssssssssssk.",
-    "kssssssssssssssk",
-    "kssssssssssssssk",
-    "kssssssssssssssk",
-    "kssksssssssskssk",
-    ".kkkqqqqqqqqkkk.",
-    "..kqqqqqqqqqqk..",
-    ".kqqqqqqqqqqqqk.",
-    "....ksk..ksk....",
-    "...kffk..kffk..."
-   ]
-  },
   "hair/bangs": {
    "palette": {
     "k": {
@@ -1293,6 +1228,156 @@
     "................"
    ]
   },
+  "prop/camera": {
+   "palette": {
+    "l": {
+     "color": "#3a3a3a",
+     "label": "끈",
+     "custom": false
+    },
+    "k": {
+     "color": "#1f1f24",
+     "label": "몸체",
+     "custom": false
+    },
+    "d": {
+     "color": "#45464f",
+     "label": "몸체 윤기",
+     "custom": false
+    },
+    "L": {
+     "color": "#8fb0c8",
+     "label": "렌즈",
+     "custom": false
+    },
+    "e": {
+     "color": "#eef4f8",
+     "label": "렌즈 빛",
+     "custom": false
+    }
+   },
+   "rows": [
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    ".....l....l.....",
+    ".....l....l.....",
+    ".....kkkkkk.....",
+    ".....kdLedk.....",
+    ".....kdLLdk.....",
+    ".....kkkkkk.....",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................"
+   ]
+  },
+  "prop/clipboard": {
+   "palette": {
+    "k": {
+     "color": "#2b1d16",
+     "label": "윤곽",
+     "custom": false
+    },
+    "m": {
+     "color": "#9aa1ab",
+     "label": "집게",
+     "custom": false
+    },
+    "w": {
+     "color": "#f7f4ec",
+     "label": "종이",
+     "custom": false
+    },
+    "q": {
+     "color": "#8a8f99",
+     "label": "글줄",
+     "custom": false
+    }
+   },
+   "rows": [
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "............kmk.",
+    "...........kwmwk",
+    "...........kwwwk",
+    "...........kqqwk",
+    "...........kwwwk",
+    "...........kqqwk",
+    "...........kkkkk",
+    "................",
+    "................",
+    "................",
+    "................"
+   ]
+  },
+  "prop/flask": {
+   "palette": {
+    "k": {
+     "color": "#2b1d16",
+     "label": "윤곽",
+     "custom": false
+    },
+    "g": {
+     "color": "#dfeef2",
+     "label": "유리",
+     "custom": false
+    },
+    "v": {
+     "color": "#5fbf7a",
+     "label": "약품",
+     "custom": false
+    }
+   },
+   "rows": [
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "............kgk.",
+    "............kgk.",
+    "...........kgggk",
+    "...........kvvvk",
+    "...........kvvvk",
+    "............kkk.",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................"
+   ]
+  },
   "prop/glasses": {
    "palette": {
     "q": {
@@ -1407,6 +1492,51 @@
     "......iqqi......",
     "................",
     "................",
+    "................",
+    "................",
+    "................",
+    "................"
+   ]
+  },
+  "prop/laptop": {
+   "palette": {
+    "k": {
+     "color": "#2b1d16",
+     "label": "윤곽",
+     "custom": false
+    },
+    "a": {
+     "color": "#b9bec8",
+     "label": "덮개",
+     "custom": false
+    },
+    "g": {
+     "color": "#eef1f5",
+     "label": "로고",
+     "custom": false
+    }
+   },
+   "rows": [
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "...kkkkkkkkkk...",
+    "...kaaaaaaaak...",
+    "...kaaaggaaak...",
+    "...kaaaaaaaak...",
+    "..kkkkkkkkkkkk..",
     "................",
     "................",
     "................",
@@ -1778,6 +1908,61 @@
     "................"
    ]
   },
+  "top/uniform": {
+   "palette": {
+    "k": {
+     "color": "#2b1d16",
+     "label": "윤곽",
+     "custom": false
+    },
+    "o": {
+     "color": "#34507f",
+     "label": "옷",
+     "custom": true
+    },
+    "w": {
+     "color": "#f2efe7",
+     "label": "셔츠",
+     "custom": false
+    },
+    "r": {
+     "color": "#b8383a",
+     "label": "리본",
+     "custom": false
+    },
+    "y": {
+     "color": "#d8b448",
+     "label": "표장",
+     "custom": false
+    }
+   },
+   "rows": [
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "..kooowwwwoook..",
+    ".koooowrrwooook.",
+    "kooookwrrwkooook",
+    "kooookowwokyoook",
+    "kooookooookooook",
+    "....oooooooo....",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................"
+   ]
+  },
   "top/zip-hoodie": {
    "palette": {
     "k": {
@@ -1832,39 +2017,131 @@
  "look": {
   "base": {
    "a": {
-    "label": "남자",
+    "label": "기본",
     "hair": "short"
-   },
-   "b": {
-    "label": "여자",
-    "hair": "long"
    }
   },
-  "unlock": {
-   "color": {
-    "at": "1",
-    "label": "옷 색"
+  "parts": {
+   "color": "옷 색",
+   "hair": "머리 모양",
+   "prop": "소품",
+   "top": "옷 모양"
+  },
+  "rewards": {
+   "student": {
+    "1": [
+     "color.sky",
+     "color.green"
+    ],
+    "2": [
+     "prop.backpack"
+    ],
+    "3": [
+     "top.uniform"
+    ],
+    "4": [
+     "prop.glasses"
+    ]
    },
-   "hair": {
-    "at": "2",
-    "label": "머리 모양"
+   "jobseeker": {
+    "1": [
+     "color.navy",
+     "color.charcoal"
+    ],
+    "2": [
+     "prop.tie"
+    ],
+    "3": [
+     "top.suit"
+    ],
+    "4": [
+     "prop.lanyard"
+    ]
    },
-   "prop": {
-    "at": "3",
-    "label": "소품"
+   "researcher": {
+    "1": [
+     "color.ivory",
+     "color.green"
+    ],
+    "2": [
+     "prop.glasses"
+    ],
+    "3": [
+     "top.coat"
+    ],
+    "4": [
+     "prop.flask"
+    ]
    },
-   "top": {
-    "at": "4",
-    "label": "옷 모양"
+   "developer": {
+    "1": [
+     "color.charcoal",
+     "color.green"
+    ],
+    "2": [
+     "prop.headphones"
+    ],
+    "3": [
+     "top.hoodie"
+    ],
+    "4": [
+     "prop.laptop"
+    ]
+   },
+   "planner": {
+    "1": [
+     "color.mustard",
+     "color.navy"
+    ],
+    "2": [
+     "prop.lanyard"
+    ],
+    "3": [
+     "top.blazer"
+    ],
+    "4": [
+     "prop.clipboard"
+    ]
+   },
+   "office": {
+    "1": [
+     "color.navy",
+     "color.charcoal"
+    ],
+    "2": [
+     "prop.lanyard"
+    ],
+    "3": [
+     "prop.tie"
+    ],
+    "4": [
+     "top.suit"
+    ]
+   },
+   "creator": {
+    "1": [
+     "color.pink",
+     "color.wine"
+    ],
+    "2": [
+     "prop.beret"
+    ],
+    "3": [
+     "top.stripe"
+    ],
+    "4": [
+     "prop.camera"
+    ]
    }
   },
   "top": {
    "shirt": "흰 셔츠",
    "suit": "정장",
-   "blazer": "검은 정장",
+   "blazer": "재킷",
    "hoodie": "후드티",
    "zip-hoodie": "지퍼 후드",
    "coat": "흰 가운",
+   "uniform": "교복",
    "turtleneck": "터틀넥",
    "stripe": "줄무늬 티"
   },
@@ -1882,7 +2159,11 @@
    "headphones": "헤드폰",
    "lanyard": "사원증",
    "backpack": "가방끈",
-   "beret": "베레모"
+   "beret": "베레모",
+   "flask": "플라스크",
+   "laptop": "노트북",
+   "clipboard": "클립보드",
+   "camera": "카메라"
   },
   "colors": {
    "navy": {

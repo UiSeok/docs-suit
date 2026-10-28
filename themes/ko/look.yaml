@@ -1,26 +1,37 @@
-# 캐릭터 꾸미기. 기본 캐릭터 두 가지와 전직할 때마다 여는 꾸미기 거리.
+# 캐릭터 꾸미기. 캐릭터는 하나이고, 클래스마다 전직할 때 여는 꾸미기 거리가 다르다.
 # 그림은 sprites/<부위>/<값>.txt 에 있고, 기본 몸 위에 옷, 머리, 소품 순으로 겹쳐 그린다.
-# 부품을 더하면 아래 목록에 한 줄을 더한다. 환생이나 추가 전직의 보상도 같은 방법으로 늘린다.
+# 부품을 더하면 아래 목록에 한 줄을 더한다. 환생이나 추가 전직의 보상도 rewards 에 차수를 더해 늘린다.
 
-# 기본 캐릭터. hair 는 처음 머리 모양이다. 키 a, b 는 이미 저장한 슬롯이 읽으니 바꾸지 않는다.
+# 기본 캐릭터. hair 는 처음 머리 모양이다. 키 a 는 이미 저장한 슬롯이 읽으니 바꾸지 않는다.
 base:
-  a: {label: 남자, hair: short}
-  b: {label: 여자, hair: long}
+  a: {label: 기본, hair: short}
 
-# 몇 차 전직에서 여는지. 전직 전에는 흰 셔츠에 기본 머리다. 남자와 여자 캐릭터는 언제든 바꾼다.
-unlock:
-  color: {at: 1, label: 옷 색}
-  hair: {at: 2, label: 머리 모양}
-  prop: {at: 3, label: 소품}
-  top: {at: 4, label: 옷 모양}
+# 부위 이름. 머리 모양은 처음부터 모두 고르고, 옷 색과 소품, 옷 모양은 클래스 보상으로 연다.
+parts:
+  color: 옷 색
+  hair: 머리 모양
+  prop: 소품
+  top: 옷 모양
+
+# 클래스마다 몇 차 전직에서 무엇을 여는지. `부위.값` 을 적고, 연 것은 다음 차수에도 남는다.
+# 클래스를 바꾸면 그 클래스의 성장 기록으로 다시 계산해서, 새 클래스는 처음부터 키운다.
+rewards:
+  student: {1: [color.sky, color.green], 2: [prop.backpack], 3: [top.uniform], 4: [prop.glasses]}
+  jobseeker: {1: [color.navy, color.charcoal], 2: [prop.tie], 3: [top.suit], 4: [prop.lanyard]}
+  researcher: {1: [color.ivory, color.green], 2: [prop.glasses], 3: [top.coat], 4: [prop.flask]}
+  developer: {1: [color.charcoal, color.green], 2: [prop.headphones], 3: [top.hoodie], 4: [prop.laptop]}
+  planner: {1: [color.mustard, color.navy], 2: [prop.lanyard], 3: [top.blazer], 4: [prop.clipboard]}
+  office: {1: [color.navy, color.charcoal], 2: [prop.lanyard], 3: [prop.tie], 4: [top.suit]}
+  creator: {1: [color.pink, color.wine], 2: [prop.beret], 3: [top.stripe], 4: [prop.camera]}
 
 top:
   shirt: 흰 셔츠
   suit: 정장
-  blazer: 검은 정장
+  blazer: 재킷
   hoodie: 후드티
   zip-hoodie: 지퍼 후드
   coat: 흰 가운
+  uniform: 교복
   turtleneck: 터틀넥
   stripe: 줄무늬 티
 
@@ -39,6 +50,10 @@ prop:
   lanyard: 사원증
   backpack: 가방끈
   beret: 베레모
+  flask: 플라스크
+  laptop: 노트북
+  clipboard: 클립보드
+  camera: 카메라
 
 # 옷 색. 옷 그림에서 * 가 붙은 색을 바꾼다.
 colors:

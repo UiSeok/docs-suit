@@ -6,7 +6,7 @@
   const AGENTS = [["claude", "Claude Code"], ["codex", "Codex CLI"], ["antigravity", "Antigravity CLI"],
     ["cursor", "Cursor"], ["grok", "Grok Build"], ["web", "웹 채팅"]];
   const SLOT_RE = /^[\p{L}\p{N}_-]+$/u;  // suit.py 의 슬롯 이름 규칙과 같다
-  const state = { cls: null, preset: null, base: null, persona: {}, docs: [], agents: [], keep: null };
+  const state = { cls: null, preset: null, hair: null, persona: {}, docs: [], agents: [], keep: null };
   const L = window.DocsSuitLocal;  // suit.py serve 로 띄웠으면 슬롯 파일을 바로 쓴다
   let T = null, C = null;
 
@@ -54,10 +54,6 @@
     });
   }
 
-  function unlockLabels(tier) {
-    return Object.values(T.look.unlock || {}).filter((u) => parseInt(u.at, 10) === tier).map((u) => u.label);
-  }
-
   // suit.py bootstrap 이 쓰는 슬롯과 같은 꼴
   function slotData() {
     const data = { profile: { class: state.cls, lang: "ko" } };
@@ -68,7 +64,7 @@
     }
     if (state.docs.length) persona.docs = state.docs.slice();
     data.persona = persona;
-    if (state.base) data.look = { base: state.base };
+    if (state.hair) data.look = { hair: state.hair };
     // 조합을 고르면 조합의 값, 고르지 않았으면 불러온 슬롯에 있던 값을 그대로 둔다
     const p = (state.preset && T.presets[state.preset]) || state.keep;
     if (p) {
@@ -114,10 +110,11 @@
   function renderBases() {
     const box = $("bases");
     box.textContent = "";
-    for (const [key, b] of Object.entries(T.look.base || {})) {
-      const btn = opt(box, (state.base || "a") === key, `<canvas class="portrait"></canvas><b>${esc(b.label)}</b>`,
-        () => { state.base = key; render(); }, "base");
-      draw(btn.querySelector("canvas"), C.lookGrid(C.lookOf({ look: { base: key } }, 0)), 5);
+    const first = T.look.base[Object.keys(T.look.base)[0]].hair;
+    for (const [key, label] of Object.entries(T.look.hair || {})) {
+      const btn = opt(box, (state.hair || first) === key, `<canvas class="portrait"></canvas><b>${esc(label)}</b>`,
+        () => { state.hair = key; render(); }, "base");
+      draw(btn.querySelector("canvas"), C.lookGrid(C.lookOf({ look: { hair: key } }, 0)), 5);
     }
   }
 
@@ -170,7 +167,7 @@
   // ---------------------------------------------------------------- 오른쪽 결과
   function renderAside() {
     const cls = state.cls;
-    const grid = C.lookGrid(C.lookOf({ look: { base: state.base || "a" } }, 0));
+    const grid = C.lookGrid(C.lookOf({ look: { hair: state.hair } }, 0));
     draw($("portrait"), grid, 8);
     const name = C.cleanText(state.persona.call || "") || "이름 없음";
     const title = cls ? C.titleOf(cls, 0) : null;
@@ -193,7 +190,8 @@
     for (const p of T.promote) {
       const li = document.createElement("li");
       const nt = cls ? C.titleOf(cls, p.tier) : `${p.tier}차`;
-      li.innerHTML = `Lv.${p.level} <b>[${esc(nt)}]</b> · ${esc(unlockLabels(p.tier).join(", "))} 열림` +
+      const opened = cls ? C.openedAt(cls, p.tier).join(" · ") : "클래스의 꾸미기";
+      li.innerHTML = `Lv.${p.level} <b>[${esc(nt)}]</b> · ${esc(opened)} 열림` +
         (p.key ? (p.tier === 4 ? " · 테마 조합 기여" : " · 저장소 기여") : "");
       ladder.appendChild(li);
     }
@@ -252,7 +250,7 @@
     state.persona = {};
     for (const k of T.personaInPrompt) state.persona[k] = (prof.persona || {})[k] || "";
     state.docs = ((prof.persona || {}).docs || []).slice();
-    state.base = (prof.look || {}).base || null;
+    state.hair = (prof.look || {}).hair || null;
     state.agents = (meta.agents || []).slice();
     state.preset = null;
     state.keep = st.exists ? { defaults: prof.defaults || {}, audiences: prof.audiences || {} } : null;

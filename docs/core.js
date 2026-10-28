@@ -148,18 +148,52 @@
       return sp.rows.map((row) => Array.from(row).map((ch) => colors[ch] || null));
     }
 
-    // 슬롯의 look 에 기본값을 채운다. tier 를 주면 그 차수까지 열린 부위만 입힌다.
+    // 클래스가 전직할 때 여는 꾸미기. [차수, 부위, 값] 의 목록이다.
+    function classRewards(cls) {
+      const out = [];
+      const table = (T.look.rewards || {})[cls] || {};
+      for (const tier of Object.keys(table).sort((a, b) => parseInt(a, 10) - parseInt(b, 10))) {
+        for (const item of table[tier]) {
+          const i = item.indexOf(".");
+          out.push([parseInt(tier, 10), item.slice(0, i), item.slice(i + 1)]);
+        }
+      }
+      return out;
+    }
+
+    function lookLabel(part, val) {
+      return part === "color" ? T.look.colors[val].label : T.look[part][val];
+    }
+
+    // 이 차수에서 새로 여는 꾸미기의 이름들. "소품 가방끈" 꼴이다.
+    function openedAt(cls, tier) {
+      const names = {};
+      for (const [t, part, val] of classRewards(cls)) {
+        if (t === tier) (names[part] = names[part] || []).push(lookLabel(part, val));
+      }
+      return Object.entries(names).map(([part, vals]) => `${T.look.parts[part]} ${vals.join(", ")}`);
+    }
+
+    // 부위마다 고를 수 있는 값. 머리 모양은 처음부터, 나머지는 클래스가 tier 차까지 연 것이다.
+    function lookOpen(cls, tier) {
+      const all = (part) => new Set(Object.keys(part === "color" ? T.look.colors : T.look[part]));
+      if (tier === undefined || tier === null) return { top: all("top"), hair: all("hair"), prop: all("prop"), color: all("color") };
+      const out = { top: new Set(["shirt"]), hair: all("hair"), prop: new Set(), color: new Set() };
+      for (const [t, part, val] of classRewards(cls)) if (t <= tier) out[part].add(val);
+      return out;
+    }
+
+    // 슬롯의 look 에 기본값을 채운다. tier 를 주면 그 차수까지 클래스가 연 꾸미기만 입힌다.
     function lookOf(slot, tier) {
       const have = (slot && slot.look) || {};
       const bases = T.look.base || {};
       const base = have.base in bases ? have.base : Object.keys(bases)[0];
       const look = { base, top: "shirt", hair: (bases[base] || {}).hair, prop: null, color: null };
       const tables = { top: T.look.top, hair: T.look.hair, prop: T.look.prop, color: T.look.colors };
+      const opened = lookOpen(((slot && slot.profile) || {}).class, tier);
       for (const part of ["top", "hair", "prop", "color"]) {
         const val = have[part];
-        const at = parseInt(((T.look.unlock || {})[part] || {}).at || "0", 10);
-        const locked = tier !== undefined && tier !== null && tier < at;
-        if (val && tables[part] && val in tables[part] && !locked) look[part] = val;
+        if (val && tables[part] && val in tables[part] && opened[part].has(val)) look[part] = val;
       }
       return look;
     }
@@ -221,7 +255,7 @@
       return lines.join("\n");
     }
 
-    return { resolve, compose, review, label, SRC, lookOf, lookGrid, titleOf, levelCost, cleanText, dumpYaml };
+    return { resolve, compose, review, label, SRC, lookOf, lookGrid, openedAt, titleOf, levelCost, cleanText, dumpYaml };
   }
   if (typeof module !== "undefined" && module.exports) module.exports = make;
   else root.ThemeCore = make;

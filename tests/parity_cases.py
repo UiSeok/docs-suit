@@ -37,15 +37,22 @@ slots = [
     {"profile": {"class": "office", "lang": "ko", "agents": ["claude", "codex"]},
      "persona": {"call": '민수 "님"', "affiliation": "백엔드, 2년 차: 결제", "goal": " 앞뒤 공백 ", "facts": "#1 은 [지도]",
                  "docs": ["work-report", "email"]},
-     "look": {"base": "b"}, "defaults": {"register": "polite", "length": "brief"},
+     "look": {"hair": "long"}, "defaults": {"register": "polite", "length": "brief"},
      "audiences": {"manager": {"register": "haeyo"}}},
     {"profile": {"class": "student", "lang": "ko"}, "persona": {}, "defaults": {}},
 ]
 slot_cases = [{"data": d, "expected": suit.dump_yaml(d)} for d in slots]
-# 웹이 그리는 캐릭터. 기본 몸에 옷, 머리, 소품을 겹치고, 차수로 잠긴 부위는 기본값으로 둔다.
-looks = [({}, None), ({"look": {"base": "b"}}, 0), ({"look": {"base": "a", "color": "wine", "hair": "bangs"}}, 1),
-         ({"look": {"base": "b", "top": "suit", "prop": "tie", "color": "navy", "hair": "short"}}, 4),
-         ({"look": {"base": "b", "top": "coat", "prop": "glasses"}}, 2), ({"look": {"top": "nope"}}, 4)]
+# 웹이 그리는 캐릭터. 기본 몸에 옷, 머리, 소품을 겹치고, 클래스가 그 차수까지 열지 않은 꾸미기는 기본값으로 둔다.
+office = {"class": "office"}
+looks = [({}, None), ({"look": {"base": "b"}}, 0), ({"look": {"color": "wine", "hair": "bangs"}}, 1),
+         ({"profile": office, "look": {"top": "suit", "prop": "tie", "color": "navy", "hair": "short"}}, 4),
+         ({"profile": office, "look": {"top": "suit", "prop": "tie", "color": "navy"}}, 2),
+         ({"profile": {"class": "researcher"}, "look": {"top": "coat", "prop": "flask", "color": "ivory"}}, 4),
+         ({"profile": {"class": "student"}, "look": {"top": "uniform", "prop": "backpack", "hair": "long"}}, 3),
+         ({"profile": {"class": "developer"}, "look": {"prop": "laptop", "top": "hoodie"}}, 4),
+         ({"profile": {"class": "planner"}, "look": {"prop": "clipboard", "top": "blazer", "color": "mustard"}}, 4),
+         ({"profile": {"class": "creator"}, "look": {"prop": "camera", "top": "stripe", "color": "pink"}}, 4),
+         ({"profile": {"class": "creator"}, "look": {"prop": "tie"}}, 4), ({"look": {"top": "nope"}}, 4)]
 look_cases = [{"slot": slot, "tier": tier, "look": suit.look_of(th, slot, tier),
                "expected": suit.look_grid(th, suit.look_of(th, slot, tier))} for slot, tier in looks]
 json.dump({"compose": cases, "slots": slot_cases, "looks": look_cases}, sys.stdout, ensure_ascii=False)
