@@ -252,6 +252,8 @@ def checked_body(transcripts):
                 walk(json.loads(line))
             except ValueError:
                 continue
+    # compose 끝의 검사 안내도 같은 꼴의 heredoc 을 담는다. 그 자리표시는 본문이 아니다.
+    found = [b for b in found if b.strip() != "(본문 전체)"]
     return found[-1] if found else ""
 
 
