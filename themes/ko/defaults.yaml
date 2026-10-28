@@ -60,6 +60,7 @@ kinds:
   postmortem: {label: 사건 회고, audience: [peer-dev], skeleton: template}
   spec: {label: 기획서, audience: [stakeholder], skeleton: template}
   work-report: {label: 업무 보고, audience: [manager]}
+  biz-report: {label: 사업 계획·실적 보고서, audience: [manager]}
   blog: {label: 블로그·기술 글, audience: [reader], skeleton: template}
   newsletter: {label: 뉴스레터, audience: [reader], skeleton: template}
   sns: {label: SNS 글, audience: [reader], skeleton: template, diagram: none, sources: link}
@@ -84,6 +85,7 @@ prefer:
   postmortem: {length: full}
   spec: {diagram: table}
   work-report: {skeleton: bluf, voice: bullet, length: brief}
+  biz-report: {skeleton: bluf, length: full, diagram: table, sources: footnote}
   blog: {sources: link}
   newsletter: {sources: link}
   sns: {length: brief, emphasis: none, markup: plain}
@@ -102,5 +104,6 @@ must:
   postmortem: [타임라인, 원인, 대책]
   spec: [범위 밖]
   work-report: [한 일, 할 일]
+  biz-report: [요약, 요청 사항]
   guide: [빠른 시작]
   notice: [적용 시점, 할 일, 문의]
