@@ -63,8 +63,10 @@ bootstrap, profile, get, compose, set, export, check, review, card, look, preset
 """
 import argparse
 import base64
+import contextlib
 import hashlib
 import hmac
+import io
 import json
 import os
 import re
@@ -1752,6 +1754,7 @@ description: 문서를 쓰거나 다듬거나 검토할 때 docs-suit 테마를 
    - 카드를 보며 고르고 싶어 하면 지금 문서의 compose 인자를 붙여 `{run} serve --detach --kind <종류> [--audience …] [--set …]` 로 테마 고르기 화면을 띄우고 주소를 알려 준다. 화면은 그 문서 종류로 열린다.
    - 사용자가 화면에서 "이번 문서에만" 을 누르고 골랐다고 하면 `{run} picked` 가 내는 인자로 다시 조립해 그 문서를 고쳐 쓴다. "이 종류에 저장" 을 눌렀으면 슬롯의 종류별 값에 남았으니 같은 인자로 다시 조립하면 된다.
 8. 사용자가 캐릭터를 보여 달라고 하면 `{run} card --color never` 의 출력을 보여 준다. 꾸며 달라고 하면 `{run} look` 으로 열린 부위를 보고 `{run} look <부위> <값>` 을 부른다. 캐릭터 키우기를 끄거나 켜 달라고 하면 `{run} growth off` 나 `{run} growth on` 을 부른다. 성장 기록과 승급 키, 슬롯의 `look:` 절은 사용자가 부탁해도 직접 고치지 않는다. 레벨은 문서를 써서 오르고, 3차와 4차 전직은 저장소에 기여하고 받은 승급 키를 `{run} promote <키>` 로 넣어야 열린다고 알려 준다.
+   - 사용자가 이 폴더에서 어떤 캐릭터를 쓰겠다고 하면 `{run} profile use <슬롯> --here` 로 폴더 파일에 슬롯을 적는다. 상태 줄의 캐릭터는 슬롯을 적은 폴더 파일이 있는 폴더와 그 아래 폴더에서만 뜬다.
    - 사용자가 캐릭터 창이나 위젯을 켜 달라고 하면 `{run} widget --split --cwd <작업 폴더>` 를 부른다. herdr 나 tmux 안이면 옆 칸에 색 있는 캐릭터 창이 뜨고, 기록이 바뀔 때마다 다시 그리며, 에이전트 세션이 끝나면 함께 닫힌다. 꺼 달라고 하면 `{run} widget --close` 를 부른다. 칸을 나누지 못했다고 나오면 터미널 앱의 창 나누기로 옆 칸을 열고 `{run} widget` 을 돌리면 된다고 알려 준다.
 9. 사용자가 화면을 열어 달라고 하거나 화면에서 고르겠다고 하면 사용자에게 명령을 시키지 않고 직접 띄운 뒤 나온 주소를 알려 준다. 화면은 두 가지다. 말투나 분량 같은 테마 값을 카드로 견줘 고르려면 `{run} serve --detach` 로 테마 고르기 화면을 띄운다. 쓰고 있는 문서가 있으면 7번처럼 그 문서의 `--kind` 와 `--audience`, `--set` 을 붙인다. 처음 세팅하거나 클래스와 캐릭터를 고르려면 `{run} serve --page create --detach` 로 캐릭터 만들기 화면을 띄운다. 어느 쪽인지 모르면 프로필이 없을 때는 캐릭터 만들기 화면을, 있을 때는 테마 고르기 화면을 띄운다.
 10. 사용자가 예전에 쓴 글로 문체를 맞춰 달라고 하거나 bootstrap 중에 글을 주면 아래 순서로 배운다. 원문은 어디에도 저장하지 않는다.
@@ -2453,10 +2456,13 @@ def cmd_growth(a, th):
 
 
 def cmd_status(a, th):
-    """상태 줄에 캐릭터를 그린다. 슬롯이 없거나 캐릭터 키우기가 꺼져 있으면 아무것도 내지 않는다."""
+    """상태 줄에 캐릭터를 그린다. 슬롯을 적은 폴더 파일이 없거나 캐릭터 키우기가 꺼져 있으면 아무것도 내지 않는다."""
     piped = "" if sys.stdin.isatty() else sys.stdin.read()
     cwd = a.cwd or status_cwd(piped) or os.getcwd()
-    path, slot, _, _ = profile_source(a.profile, start=cwd)
+    path, slot, _, why = profile_source(a.profile, start=cwd)
+    # 폴더마다 다른 캐릭터를 키운다. 기본 슬롯이나 profile use 로 고른 슬롯이 상관없는 폴더의 세션에 뜨지 않게 한다
+    if why in ("current", "default"):
+        return 0
     data = read_slot(path)
     if not growth_on(data):
         return 0
@@ -3485,6 +3491,14 @@ def selftest(th):
             os.environ.pop("DOCS_SUIT_PROFILE")
             (Path(td) / "conf" / "current").write_text("work\n", encoding="utf-8")
             check(profile_source(start=td)[1] == "work", "profile use 로 고른 슬롯을 쓰지 않는다")
+            for where, want in ((td, False), (str(sub), True)):
+                stdin, sys.stdin = sys.stdin, io.StringIO("")
+                try:
+                    with contextlib.redirect_stdout(io.StringIO()) as out:
+                        cmd_status(argparse.Namespace(cwd=where, profile=None, size="line"), th)
+                finally:
+                    sys.stdin = stdin
+                check(bool(out.getvalue()) == want, "상태 줄이 폴더 파일의 슬롯이 있는 곳에서만 캐릭터를 그리지 않는다")
             try:
                 slot_path("../x")
                 problems.append("슬롯 이름에 경로를 받았다")
