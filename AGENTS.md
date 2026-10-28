@@ -1,6 +1,6 @@
 # 이 저장소에서 일하는 법
 
-docs-suit 를 고치는 사람과 AI 에이전트가 읽는 작업 규칙이다. 쓰는 법은 `README.md`, 앞으로 할 일은 `ROADMAP.md` 에 있다.
+docs-suit 를 고치는 사람과 AI 에이전트가 읽는 작업 규칙이다. 쓰는 법은 `README.md` 와 기능마다 자세히 적은 `GUIDE.md`, 앞으로 할 일은 `ROADMAP.md` 에 있다.
 
 ## 구조
 
