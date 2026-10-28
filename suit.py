@@ -571,8 +571,9 @@ def persona_section(th, cls, persona):
             "사용자가 넣으라고 하지 않는 한 본문에 옮겨 적지 않는다.\n\n" + "\n".join(rows))
 
 
-def rule_sections(th, kind, vals, chars=None, revise=False):
-    """compose 와 review 가 같이 쓰는 규칙 절. [(제목, 본문)] 이고, 앞에 나온 절이 이긴다."""
+def rule_sections(th, kind, vals, chars=None, revise=False, voice=None):
+    """compose 와 review 가 같이 쓰는 규칙 절. [(제목, 본문)] 이고, 앞에 나온 절이 이긴다.
+    voice 는 슬롯의 내 문체 문서다. 맨 끝에 실어 다른 규칙이 정하지 않은 곳만 채운다."""
     out = [("공통 바닥", _body(th.root / "base.md"))]
     if revise:
         out.append(("다듬기", _body(th.root / "revise.md")))
@@ -596,6 +597,8 @@ def rule_sections(th, kind, vals, chars=None, revise=False):
                         f"- 본문은 공백 포함 {chars}자를 넘기지 않는다. 넘치면 근거가 약한 문장부터 뺀다.\n"
                         "- 다 쓴 뒤 끝에 `(공백 포함 n자)` 로 센 값을 적는다.\n"
                         "- AI 가 센 글자수는 틀리기 쉽다. 제출 전에 글자수 세기 도구로 다시 잰다."))
+    if voice:
+        out.append(("내 문체", f"{VOICE_HEAD}\n\n{voice}"))
     return out
 
 
@@ -605,11 +608,11 @@ def _labels(th, kind, auds):
 
 
 def compose(th, kind=None, audiences=None, sets=None, profile=None, cls=None, chars=None, fmt="prompt",
-            revise=False, warn=lambda m: None, talk=False):
+            revise=False, warn=lambda m: None, talk=False, voice=None):
     profile = profile or {}
     vals, auds, cls = resolve(th, kind, audiences, sets, profile, cls, warn, talk)
     kind_label, aud_label = _labels(th, kind, auds)
-    sections = [f"## {head}\n\n{body}" for head, body in rule_sections(th, kind, vals, chars, revise)]
+    sections = [f"## {head}\n\n{body}" for head, body in rule_sections(th, kind, vals, chars, revise, voice)]
     who = persona_section(th, cls, profile.get("persona"))
     parts = [
         f"# 글쓰기 테마 · {kind_label} · 독자 {aud_label}",
@@ -633,12 +636,12 @@ REVIEW_DOC = "(다 쓴 글 전체)"
 
 
 def review(th, kind=None, audiences=None, sets=None, profile=None, cls=None, chars=None, doc=None, source=None,
-           warn=lambda m: None, talk=False):
+           warn=lambda m: None, talk=False, voice=None):
     """새 대화나 서브에이전트에 넘길 검토 지침. 쓴 사람과 같은 값으로 조립하되 페르소나는 싣지 않는다."""
     vals, auds, _ = resolve(th, kind, audiences, sets, profile or {}, cls, warn, talk)
     kind_label, aud_label = _labels(th, kind, auds)
     parts = [f"# 검토 지침 · {kind_label} · 독자 {aud_label}", _body(th.root / "review.md")]
-    parts += [f"## 채점 기준 · {head}\n\n{body}" for head, body in rule_sections(th, kind, vals, chars)]
+    parts += [f"## 채점 기준 · {head}\n\n{body}" for head, body in rule_sections(th, kind, vals, chars, voice=voice)]
     parts.append("## 원문\n\n" + (source.strip() if source and source.strip() else REVIEW_SOURCE))
     parts.append("## 검토할 글\n\n" + (doc.strip() if doc and doc.strip() else REVIEW_DOC))
     return "\n\n".join(parts) + "\n"
@@ -1029,6 +1032,91 @@ def check_hint(th, axis, vals):
         return hint[vals[axis][0]]
     # 문서 종류의 틀(kind)처럼 축이 아닌 검사는 맞출 값이 없어 문구만 낸다
     return hint.format(want=th.label(axis, vals[axis][0])) if axis in vals else hint
+
+# ---------------------------------------------------------------- 문체 배우기
+# 사용자가 예전에 쓴 글을 재서 축 값을 제안한다. 원문은 어디에도 남기지 않는다.
+# 축에 잡히지 않는 버릇은 에이전트가 learn.md 지침대로 "내 문체" 문서로 요약하고, 사용자가 고친 뒤 voice set 으로 남긴다.
+LEARN_MIN_DOCS, LEARN_MIN_CHARS = 3, 2000   # 이보다 적으면 축 값만 제안하고 내 문체 문서는 쓰지 않는다
+VOICE_MAX_CHARS = 1500
+VOICE_HEAD = ("이 사람이 예전에 쓴 글에서 뽑은 버릇이다. 위의 규칙과 부딪치면 위의 규칙을 따르고, "
+              "위의 규칙이 정하지 않은 곳에서만 따른다.")
+
+
+def learn_sample(th, name, text, is_doc):
+    """샘플 한 편을 잰다. 원문은 돌려주지 않고 잰 값만 낸다."""
+    lines = body_lines(text)
+    count = endings(lines)
+    total = sum(count.values())
+    out = {"name": name, "chars": len("\n".join(lines)), "endings": count, "register": None, "voice": None,
+           "bold": None if is_doc else "**" in text, "ai": [], "secret": False}
+    if total >= 3:
+        top = max(count, key=count.get)
+        if count[top] >= 0.6 * total:
+            out["register"] = top
+    if len(lines) >= 4:
+        # 긴 문단 몇 개와 짧은 목록 몇 줄이 섞인 글을 개조식으로 보지 않게 줄 수가 아니라 글자 수로 센다
+        size = sum(len(ln) for ln in lines)
+        ratio = sum(len(ln) for ln in lines if re.match(r"([-*+]|\d+[.)])\s", ln)) / size
+        out["list_ratio"] = round(ratio, 2)
+        out["voice"] = "bullet" if ratio >= 0.5 else "prose" if ratio <= 0.25 else None
+    hits = tells_found(th, text, {})
+    out["secret"] = any(n == "secret" for n, _, _ in hits)
+    out["ai"] = [f"{th.tells[n]['label']} {c}곳" for n, c, _ in hits if n not in ("secret", "contact", "placeholder")]
+    flat = [x for r in sentences(text) for x in r]
+    if len(flat) >= 5:
+        k = sum(1 for x in flat if CONNECTIVE_COMMA.search(x))
+        if k / len(flat) >= 0.2:
+            out["ai"].append(f"연결어미 뒤 쉼표 문장 {k}/{len(flat)}")
+    out["suspect"] = len(out["ai"]) >= 2
+    return out
+
+
+def learn_plan(samples):
+    """사람이 쓴 것으로 보이는 샘플만 모아 축 값을 제안한다. 샘플끼리 다르면 독자별로 남기라고 낸다."""
+    ok = [x for x in samples if not x["suspect"]]
+    plan = {}
+    for axis in ("register", "voice"):
+        vals = [x[axis] for x in ok if x[axis]]
+        if len(vals) >= 2 and len(set(vals)) == 1:
+            plan[axis] = {"value": vals[0], "note": f"{len(vals)}편 모두 같다"}
+        elif len(set(vals)) > 1:
+            plan[axis] = {"value": None, "note": "샘플마다 다르다. 누구에게 쓴 글인지 보고 독자별로 남긴다",
+                          "by_sample": {x["name"]: x[axis] for x in ok if x[axis]}}
+    bold = [x["bold"] for x in ok if x["bold"] is not None]
+    if len(bold) >= 2 and not any(bold):
+        plan["emphasis"] = {"value": "none", "note": f"마크다운 샘플 {len(bold)}편 모두 굵은 글씨가 없다"}
+    chars = sum(x["chars"] for x in ok)
+    return plan, len(ok) >= LEARN_MIN_DOCS and chars >= LEARN_MIN_CHARS, chars
+
+
+def voice_path(name=None, start=None):
+    """슬롯의 내 문체 문서. 환경 변수로 프로필 파일을 정했으면 그 파일 옆에 둔다."""
+    path, slot, _, _ = profile_source(name, start)
+    if slot is None:
+        return path.with_name(path.stem + ".voice.md")
+    return config_dir() / "voices" / f"{slot}.md"
+
+
+def voice_text(name=None, start=None):
+    p = voice_path(name, start)
+    return p.read_text(encoding="utf-8").strip() if p.exists() else ""
+
+
+def clean_voice(th, text):
+    """저장할 내 문체 문서를 다듬는다. 맨 앞 제목은 떼고, 다른 제목은 지침의 절을 깨지 않게 ### 로 낮춘다."""
+    lines = text.strip().splitlines()
+    if lines and re.match(r"#\s", lines[0]):
+        lines = lines[1:]
+    lines = [re.sub(r"^#{1,2}\s", "### ", ln) for ln in lines]
+    out = "\n".join(lines).strip()
+    if not out:
+        raise Missing("내 문체 문서가 비어 있다")
+    if len(out) > VOICE_MAX_CHARS:
+        raise Missing(f"내 문체 문서는 {VOICE_MAX_CHARS}자 안쪽으로 쓴다. 지금 {len(out)}자다")
+    if any(n == "secret" for n, _, _ in tells_found(th, out, {})):
+        raise Missing("내 문체 문서에 키나 비밀번호로 보이는 값이 있다. 빼고 다시 넘긴다")
+    return out
+
 
 # ---------------------------------------------------------------- 캐릭터와 성장
 # 슬롯이 캐릭터다. check 가 문서 한 건마다 기록 한 줄을 남기고, 경험치와 레벨은 기록에서 매번 다시 계산한다.
@@ -1603,6 +1691,7 @@ description: 문서를 쓰거나 다듬거나 검토할 때 docs-suit 테마를 
 1. `{run} profile` 로 프로필이 있는지 본다. 없으면 이번 문서는 중립 기본값으로 쓰고, 다 쓴 뒤 프로필을 만들면 다음 문서부터 호칭과 말투가 맞춰진다고 권한다. 사용자가 원하거나 세팅해 달라고 하면 bootstrap 을 대신 진행하고, 사용자의 답 없이 프로필을 저장하지 않는다.
    - `{run} list --classes` 로 클래스 일곱 가지를 보여 주고 하나 고르게 한다.
    - `{run} bootstrap --questions` 가 내는 페르소나 질문을 차례로 묻는다. 답하기 싫은 질문은 비워 둔다.
+   - 페르소나 질문을 마치면 "<호칭>만의 글쓰기 스타일을 원하시면 예전에 작성하셨던 글 몇 개를 알려 주세요" 처럼 권한다. 호칭이 없으면 빼고 묻는다. 건너뛰어도 된다고 함께 말하고, 글을 받으면 프로필을 저장한 뒤 10번대로 배운다.
    - 같은 출력의 `presets` 에 고른 클래스의 조합이 있으면, 다른 사람이 기여한 테마 조합으로 시작할지 묻는다. 추천 표시가 붙은 조합을 앞에 보인다.
    - 같은 출력의 `hairs` 로 캐릭터의 머리 모양을 고르게 한다. 고르지 않으면 짧은 머리다. 옷 색과 소품, 옷은 클래스마다 전직할 때 열린다.
    - `{run} bootstrap --class <클래스> --call … --affiliation … --goal … --docs <종류,종류> --facts … --dislikes … [--preset <조합>] [--hair <머리>] --yes` 로 저장한다.
@@ -1621,6 +1710,15 @@ description: 문서를 쓰거나 다듬거나 검토할 때 docs-suit 테마를 
 7. 사용자가 말투나 모양이 마음에 안 든다고 하면 어느 축의 문제인지 짚고, 그 축의 다른 값으로 다시 조립해 대표 문단 하나를 견줘 보인다. 계속 쓰고 싶어 하면 `{run} set <축> <값> [--audience <독자>]` 로 프로필에 남긴다. 이 폴더에서만 그렇게 쓰고 싶어 하면 `--here` 를 붙여 폴더 파일 `.docs-suit.yaml` 에 남긴다. 종류 없는 글은 프로필 값을 쓰지 않으니, 그런 글에서 잡은 말투는 그 대화에서만 지키고, 남겨 달라고 하면 종류가 있는 글에만 먹는다고 알려 준다. 카드를 보며 고르고 싶어 하면 `{run} serve --detach` 로 테마 고르기 화면을 띄우고 주소를 알려 준다.
 8. 사용자가 캐릭터를 보여 달라고 하면 `{run} card --color never` 의 출력을 보여 준다. 꾸며 달라고 하면 `{run} look` 으로 열린 부위를 보고 `{run} look <부위> <값>` 을 부른다. 캐릭터 키우기를 끄거나 켜 달라고 하면 `{run} growth off` 나 `{run} growth on` 을 부른다. 성장 기록과 승급 키, 슬롯의 `look:` 절은 사용자가 부탁해도 직접 고치지 않는다. 레벨은 문서를 써서 오르고, 3차와 4차 전직은 저장소에 기여하고 받은 승급 키를 `{run} promote <키>` 로 넣어야 열린다고 알려 준다.
 9. 사용자가 화면을 열어 달라고 하거나 화면에서 고르겠다고 하면 사용자에게 명령을 시키지 않고 직접 띄운 뒤 나온 주소를 알려 준다. 화면은 두 가지다. 말투나 분량 같은 테마 값을 카드로 견줘 고르려면 `{run} serve --detach` 로 테마 고르기 화면을 띄운다. 처음 세팅하거나 클래스와 캐릭터를 고르려면 `{run} serve --page create --detach` 로 캐릭터 만들기 화면을 띄운다. 어느 쪽인지 모르면 프로필이 없을 때는 캐릭터 만들기 화면을, 있을 때는 테마 고르기 화면을 띄운다.
+10. 사용자가 예전에 쓴 글로 문체를 맞춰 달라고 하거나 bootstrap 중에 글을 주면 아래 순서로 배운다. 원문은 어디에도 저장하지 않는다.
+   - 파일이면 경로를 그대로 넘기고, 붙여 넣은 글이면 `-` 를 쓰고 heredoc 으로 넘긴다. check 처럼 다른 명령과 잇지 않는다.
+     ```sh
+     {run} learn <파일> <파일> <파일>
+     ```
+   - 출력을 보여 준다. AI 가 쓴 글일 수 있다고 표시된 샘플은 사용자가 직접 썼는지 묻는다. 직접 썼다고 하면 `--human` 을 붙여 다시 부르고, 아니라고 하면 그 샘플을 빼고 다시 부른다.
+   - 샘플마다 누구에게 쓴 어떤 글인지 묻는다. 제안된 값은 사용자가 고르면 `{run} set <축> <값>` 으로 남기고, 특정 독자에게 쓴 글에서만 나온 값이면 `--audience <독자>` 를 붙인다.
+   - 출력에 내 문체 문서를 쓸 수 있다고 나오면 `{run} learn --guide` 의 지침대로 초안을 쓰고 보여 준다. 사용자가 고치거나 승인한 판만 `{run} voice set -` 에 heredoc 으로 넘긴다. 이 문서는 조립한 지침의 맨 끝에 실린다.
+   - 사용자가 내 문체 문서를 보거나 지워 달라고 하면 `{run} voice` 나 `{run} voice clear` 를 부른다.
 """
 
 
@@ -1635,7 +1733,7 @@ def expand_agents(names):
     return out
 
 
-def export(th, agents, dest=None, dry_run=False, profile=None, say=print):
+def export(th, agents, dest=None, dry_run=False, profile=None, say=print, voice=None):
     """에이전트마다 SKILL.md 나 붙여 넣을 지침을 쓴다. 손으로 만든 파일은 덮어쓰지 않는다."""
     written = []
     for a in expand_agents(agents):
@@ -1643,7 +1741,7 @@ def export(th, agents, dest=None, dry_run=False, profile=None, say=print):
         path = Path(os.path.expanduser(t["path"]))
         if dest:
             path = Path(dest) / a / path.name
-        text = compose(th, profile=profile)[0] if a == "web" else skill_text(th)
+        text = compose(th, profile=profile, voice=voice)[0] if a == "web" else skill_text(th)
         note = "" if t["checked"] else " (이 자리는 2차 자료 기준이다. 도구 문서로 확인한다)"
         if path.exists() and a != "web" and EXPORT_MARK not in path.read_text(encoding="utf-8"):
             say(f"건너뜀: {t['label']} → {path} 에 docs-suit 가 만들지 않은 파일이 있다")
@@ -1912,7 +2010,7 @@ def cmd_compose(a, th):
     if a.html:
         sets.setdefault("markup", "html")  # 예전 --html 은 출력 형식 HTML 과 같다
     text, _ = compose(th, a.kind, _auds(a.audience), sets, load_profile(warn_stderr, a.profile), a.cls,
-                      a.chars, a.format, a.revise, warn_stderr, talk=True)
+                      a.chars, a.format, a.revise, warn_stderr, talk=True, voice=voice_text(a.profile))
     if a.output:
         Path(a.output).expanduser().write_text(text, encoding="utf-8")
         print(f"썼다: {a.output}", file=sys.stderr)
@@ -1954,7 +2052,7 @@ def cmd_set(a, th):
 
 def cmd_export(a, th):
     agents = [x.strip() for x in a.agent.split(",") if x.strip()]
-    export(th, agents, a.dest, a.dry_run, load_profile(warn_stderr, a.profile))
+    export(th, agents, a.dest, a.dry_run, load_profile(warn_stderr, a.profile), voice=voice_text(a.profile))
     return 0
 
 
@@ -2004,12 +2102,100 @@ def cmd_review(a, th):
         return 1
     read = lambda f: sys.stdin.read() if f == "-" else doc_file_text(f)[0]
     text = review(th, a.kind, _auds(a.audience), _sets(a.set), load_profile(warn_stderr, a.profile), a.cls, a.chars,
-                  read(a.file) if a.file else None, read(a.source) if a.source else None, warn_stderr, talk=True)
+                  read(a.file) if a.file else None, read(a.source) if a.source else None, warn_stderr, talk=True,
+                  voice=voice_text(a.profile))
     if a.output:
         Path(a.output).expanduser().write_text(text, encoding="utf-8")
         print(f"썼다: {a.output}", file=sys.stderr)
     else:
         sys.stdout.write(text)
+    return 0
+
+
+def cmd_learn(a, th):
+    if a.guide:
+        sys.stdout.write(_body(th.root / "learn.md") + "\n")
+        return 0
+    if not a.files:
+        raise Missing("잴 글을 넘긴다. 파일 경로를 쓰거나, - 를 쓰고 글을 heredoc 으로 넘긴다")
+    if a.files.count("-") > 1:
+        raise Missing("표준 입력은 한 번만 쓴다. 붙여 넣은 글이 여럿이면 파일로 나눠 넘긴다")
+    samples = []
+    for f in a.files:
+        if f == "-":
+            text, is_doc, name = sys.stdin.read(), False, "붙여 넣은 글"
+        else:
+            text, is_doc = doc_file_text(f)
+            name = Path(f).name
+        if not text.strip():
+            raise Missing(f"{name} 에서 글을 읽지 못했다")
+        x = learn_sample(th, name, text, is_doc)
+        if a.human and x["suspect"]:
+            x["suspect"], x["vouched"] = False, True  # 사용자가 직접 썼다고 한 글은 표지가 있어도 제안에 넣는다
+        samples.append(x)
+    plan, voice_ok, chars = learn_plan(samples)
+    if a.json:
+        print(json.dumps({"samples": samples, "plan": plan, "voice_ok": voice_ok, "chars": chars},
+                         ensure_ascii=False, indent=1))
+        return 0
+    label = lambda axis, v: th.label(axis, v) if v else "섞임"
+    print(f"샘플 {len(samples)}편 · 사람이 쓴 것으로 보는 글 {chars:,}자")
+    for i, x in enumerate(samples, 1):
+        parts = [f"{x['chars']:,}자"]
+        if x["register"] or sum(x["endings"].values()) >= 3:
+            parts.append(f"어법 {label('register', x['register'])}")
+        if "list_ratio" in x:
+            parts.append(f"문체 {label('voice', x['voice'])} (목록 줄 {x['list_ratio']:.0%})")
+        if x["bold"] is not None:
+            parts.append("굵은 글씨 있음" if x["bold"] else "굵은 글씨 없음")
+        print(f"{i}. {x['name']} · " + " · ".join(parts))
+        if x["suspect"]:
+            print(f"   ⚠ AI 가 쓴 글일 수 있어 제안에서 뺐다: {', '.join(x['ai'])}. 직접 쓴 글이면 --human 을 붙여 다시 부른다")
+        elif x.get("vouched"):
+            print(f"   · AI 글의 표지가 있지만 직접 쓴 글이라고 해서 넣었다: {', '.join(x['ai'])}")
+        if x["secret"]:
+            print("   ⚠ 키나 비밀번호로 보이는 값이 있다. 이 글은 다른 곳에 옮기지 않는다")
+    print("제안")
+    if not plan:
+        print("- 축 값을 정할 만큼 샘플이 모이지 않았다")
+    for axis, v in plan.items():
+        if v["value"]:
+            print(f"- {th.axes[axis]['label']} {th.label(axis, v['value'])}: {v['note']}. "
+                  f"남기려면 suit.py set {axis} {v['value']} [--audience <독자>]")
+        else:
+            each = ", ".join(f"{n} {th.label(axis, val)}" for n, val in v["by_sample"].items())
+            print(f"- {th.axes[axis]['label']}: {v['note']} ({each})")
+    if voice_ok:
+        print("내 문체 문서를 쓸 수 있다. suit.py learn --guide 의 지침대로 초안을 쓰고, 사용자가 고친 뒤 suit.py voice set 으로 남긴다")
+    else:
+        print(f"내 문체 문서는 쓰지 않는다. 사람이 쓴 서로 다른 글 {LEARN_MIN_DOCS}편, 합쳐서 {LEARN_MIN_CHARS:,}자 이상이 필요하다")
+    print("· 원문은 저장하지 않았다. 축 값은 사용자가 확인한 뒤 set 으로 남긴다")
+    return 0
+
+
+def cmd_voice(a, th):
+    path = voice_path(a.profile)
+    if a.action == "clear":
+        if path.exists():
+            path.unlink()
+        print(f"내 문체 문서를 지웠다: {path}")
+        return 0
+    if a.action == "set":
+        if not a.file:
+            raise Missing("저장할 문서를 넘긴다. 파일 경로를 쓰거나, - 를 쓰고 heredoc 으로 넘긴다")
+        raw = sys.stdin.read() if a.file == "-" else Path(a.file).expanduser().read_text(encoding="utf-8")
+        text = clean_voice(th, raw)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(text + "\n", encoding="utf-8")
+        print(f"내 문체 문서를 남겼다: {path} ({len(text)}자). 이제 조립하는 지침의 맨 끝에 실린다")
+        if any(n == "contact" for n, _, _ in tells_found(th, text, {"exposure": ("public", "")})):
+            print("· 연락처로 보이는 값이 있다. 샘플에서 옮겨 온 것이면 빼고 다시 남긴다")
+        return 0
+    if not path.exists():
+        print(f"내 문체 문서가 없다. 예전에 쓴 글로 만들려면 suit.py learn <파일…> 부터 부른다. 자리: {path}")
+        return 0
+    print(f"# 내 문체 문서: {path}\n")
+    print(path.read_text(encoding="utf-8").rstrip())
     return 0
 
 
@@ -3217,6 +3403,45 @@ def selftest(th):
                 if v is not None:
                     os.environ[k] = v
 
+    # 문체 배우기. 샘플을 재서 축 값을 제안하고, AI 글로 보이는 샘플은 빼고, 원문은 어디에도 남기지 않는다
+    human = "- 평일 아침 사흘 동안 대기 시간을 쟀습니다.\n- 평균은 7분이었습니다.\n- 출근 시간이 가장 길었습니다.\n- 다음 주에 저녁을 재겠습니다.\n"
+    machine = ("정류장 대기 시간은 단순한 숫자를 넘어 삶과 직결됩니다. 다양한 데이터를 쓰면, 효율적인 개선이 가능하며, "
+               "결국 경험이 바뀝니다. 결론적으로, 최적의 시간을 위해 노력합니다. 궁극적으로, 이것이 방향입니다. 시너지가 큽니다.\n")
+    got = [learn_sample(th, str(i), t, False) for i, t in enumerate([human, human, human, machine])]
+    check([x["register"] for x in got[:3]] == ["polite"] * 3 and got[0]["voice"] == "bullet" and not got[0]["suspect"],
+          "샘플의 어법이나 문체를 재지 못한다")
+    check(got[3]["suspect"], "AI 글의 표지가 많은 샘플을 가려내지 못한다")
+    plan, voice_ok, _ = learn_plan(got)
+    check(plan.get("register", {}).get("value") == "polite" and plan.get("emphasis", {}).get("value") == "none"
+          and not voice_ok, f"샘플에서 제안한 축 값이 다르거나, 짧은 샘플로 내 문체 문서를 권했다: {plan}")
+    mixed, _, _ = learn_plan([got[0], dict(got[1], register="plain")])
+    check(mixed["register"]["value"] is None and "by_sample" in mixed["register"], "어법이 다른 샘플을 한 값으로 합쳤다")
+    check(clean_voice(th, "# 내 문체\n\n## 보기\n- 결론으로 연다.") == "### 보기\n- 결론으로 연다.",
+          "내 문체 문서의 제목을 다듬지 못한다")
+    for bad in ("", "가" * (VOICE_MAX_CHARS + 1), "- 결론으로 연다.\npassword: hunter2xyz"):
+        try:
+            clean_voice(th, bad)
+            check(False, "비었거나 너무 길거나 비밀값이 든 내 문체 문서를 받았다")
+        except Missing:
+            pass
+    text, _ = compose(th, kind="email", voice="- 결론으로 연다.")
+    check(text.rstrip().endswith("## 내 문체\n\n" + VOICE_HEAD + "\n\n- 결론으로 연다."), "내 문체 절이 지침의 맨 끝에 실리지 않는다")
+    check("내 문체" not in compose(th, kind="email")[0], "내 문체 문서가 없는데 절을 실었다")
+    with tempfile.TemporaryDirectory() as td:
+        saved = {k: os.environ.pop(k, None) for k in ("DOCS_SUIT_PROFILE", "DOCS_SUIT_HOME")}
+        os.environ["DOCS_SUIT_HOME"] = str(Path(td) / "conf")
+        try:
+            sample = Path(td) / "sample.md"
+            sample.write_text(human, encoding="utf-8")
+            quiet(cmd_learn, argparse.Namespace(files=[str(sample)] * 3, guide=False, json=False, human=False), th)
+            check(not (Path(td) / "conf").exists(), "learn 이 설정 폴더에 무언가를 남겼다")
+            check(voice_path("work") == Path(td) / "conf" / "voices" / "work.md", "슬롯의 내 문체 자리가 다르다")
+        finally:
+            for k, v in saved.items():
+                os.environ.pop(k, None)
+                if v is not None:
+                    os.environ[k] = v
+
     # 로컬 화면 서버. 열쇠와 Host 를 확인하고, 고른 값을 실행한 폴더 기준의 슬롯이나 폴더 파일에 쓴다
     import urllib.error
     import urllib.request
@@ -3351,6 +3576,14 @@ def main(argv=None):
     rv.add_argument("--set", action="append", metavar="축=값")
     rv.add_argument("--chars", type=int)
     rv.add_argument("-o", "--output")
+    le = sub.add_parser("learn", help="예전에 쓴 글을 재서 축 값을 제안한다. 원문은 남기지 않는다")
+    le.add_argument("files", nargs="*", help="샘플 파일. md, txt 와 docx, pptx, hwpx, odt, odp, html, pdf 를 읽는다. - 이면 표준 입력")
+    le.add_argument("--guide", action="store_true", help="내 문체 문서를 쓰는 지침을 낸다")
+    le.add_argument("--human", action="store_true", help="넘긴 글을 모두 사용자가 직접 쓴 글로 본다. 사용자가 그렇다고 했을 때만 붙인다")
+    le.add_argument("--json", action="store_true")
+    vo = sub.add_parser("voice", parents=[slot], help="슬롯의 내 문체 문서를 보거나 남기거나 지운다")
+    vo.add_argument("action", nargs="?", choices=("show", "set", "clear"), default="show")
+    vo.add_argument("file", nargs="?", help="set 할 문서. - 이면 표준 입력")
     ca = sub.add_parser("card", parents=[slot])
     ca.add_argument("--json", action="store_true")
     ca.add_argument("--color", choices=("auto", "always", "never"), default="auto",
@@ -3398,7 +3631,7 @@ def main(argv=None):
             return selftest(th)
         return {"bootstrap": cmd_bootstrap, "profile": cmd_profile, "list": cmd_list, "get": cmd_get,
                 "compose": cmd_compose, "set": cmd_set, "export": cmd_export, "check": cmd_check, "review": cmd_review,
-                "card": cmd_card,
+                "card": cmd_card, "learn": cmd_learn, "voice": cmd_voice,
                 "look": cmd_look, "preset": cmd_preset, "promote": cmd_promote, "growth": cmd_growth, "status": cmd_status, "widget": cmd_widget, "serve": cmd_serve,
                 "bundle": cmd_bundle}[a.cmd](a, th)
     except Missing as e:

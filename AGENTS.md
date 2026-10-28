@@ -13,6 +13,7 @@ docs-suit 를 고치는 사람과 AI 에이전트가 읽는 작업 규칙이다.
 | `themes/ko/base.md` | 공통 바닥. 사실, 쓰기 전에, 문장, 상투 표현의 네 묶음이고 모든 지침의 맨 앞에 실린다 |
 | `themes/ko/tells.yaml` | 본문 검사의 문장 규칙 패턴. `error` 는 ✗ 로 고쳐 쓰게 하고, `suggest` 는 △ 로 보이기만 한다 |
 | `themes/ko/revise.md`, `review.md` | 다듬기 절과 검토 지침의 머리. `compose --revise` 와 `review` 가 싣는다 |
+| `themes/ko/learn.md` | 예전 글에서 "내 문체" 문서를 쓰는 지침. `learn --guide` 가 낸다. 쓴 문서는 저장소 밖 `~/.config/docs-suit/voices/<슬롯>.md` 에 남는다 |
 | `themes/ko/growth.yaml` | 캐릭터 성장 규칙. 문서 한 건이 받는 경험치와 레벨, 전직 문턱 |
 | `themes/ko/look.yaml` | 기본 캐릭터와 머리 모양, 클래스마다 전직할 때 여는 꾸미기(`rewards`), 부품과 옷 색 목록 |
 | `themes/ko/presets/<이름>.yaml` | 기여받은 테마 조합. 축 기본값과 독자별 값, 소개, 만든 사람 |
@@ -20,7 +21,7 @@ docs-suit 를 고치는 사람과 AI 에이전트가 읽는 작업 규칙이다.
 | `tools/issue-key.py` | 관리자가 승급 키를 만드는 도구. 개인 키는 저장소 밖 `~/.config/docs-suit-admin/` 에 둔다 |
 | `docs/` | 웹 화면. 테마 고르기(`index.html`, `app.js`)와 캐릭터 만들기(`create.html`, `create.js`)가 `style.css` 를 함께 쓴다. `core.js` 가 조립과 캐릭터 그림, 슬롯 파일 쓰기를 하고 `themes.json` 은 `suit.py bundle` 이 만든다. `local.js` 는 `suit.py serve` 로 띄웠을 때만 켜져 바로 적용하게 한다 |
 | `tests/parity.js` | 웹과 엔진의 조립 결과를 견준다 |
-| `tests/agent/` | 실제 에이전트에 요청을 넣는 동작 테스트. 케이스는 `cases.py`, 에이전트별 결과는 `results/` |
+| `tests/agent/` | 실제 에이전트에 요청을 넣는 동작 테스트. 케이스는 `cases.py`, 에이전트별 결과는 `results/`, 문체 배우기 흐름의 지어낸 샘플은 `samples/` |
 
 ## 고친 뒤에는 세 가지를 돌린다
 
@@ -71,4 +72,6 @@ Antigravity CLI 는 한 번 실행 모드에서 확인 창을 띄우지 못해 �
 - 승급 키의 개인 키는 저장소에 넣지 않는다. 키를 바꾸면 `PROMOTE_KEYS` 에 새 kid 를 더하고 지난 kid 는 남겨 둔다. 지난 키를 받은 사람의 전직이 풀리지 않게 하기 위해서다.
 - 테마 조합 PR 은 축 값이 알려진 값인지, 소개가 쓰임새를 말하는지, 회사와 사람 이름이 없는지 보고 머지한다. 머지하면 `tools/issue-key.py issue --tier 4` 로 키를 만들어 PR 댓글로 준다.
 - 성장 기록에는 본문과 파일 경로를 남기지 않는다. 같은 문서인지는 경로의 해시로만 가린다.
+- 문체 배우기는 샘플 원문을 남기지 않는다. `learn` 은 재기만 하고, "내 문체" 문서는 사용자가 승인한 판만 `voice set` 으로 남긴다.
+- 홈 폴더에 깐 스킬은 이 저장소의 `suit.py` 를 그대로 부른다. 기본 작업 트리에서 고치는 중에 `suit.py` 가 깨지면 사용자의 실제 세션과 상태 줄도 함께 깨지므로, 큰 작업은 `git worktree` 로 따로 연 작업 트리에서 하고 끝난 뒤 main 에 넣는다.
 - 프로필은 `~/.config/docs-suit/` 에 두고 저장소에 넣지 않는다. export 를 시험할 때는 `--dest` 로 임시 폴더에 쓰고, 실제 홈 폴더의 스킬 자리에 쓰는 일은 사람에게 확인받은 뒤에 한다.

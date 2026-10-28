@@ -17,9 +17,10 @@ profiles = [
      "defaults": {"register": "haeyo", "exposure": "team"}, "audiences": {"professor": {"skeleton": "pcs"}}},
 ]
 extras = [
-    {"sets": {}, "chars": None, "fmt": "prompt", "revise": False},
+    {"sets": {}, "chars": None, "fmt": "prompt", "revise": False, "voice": None},
     {"sets": {"register": "polite", "exposure": "submit", "visual-deck": "contrast", "markup": "html"}, "chars": 800,
-     "fmt": "output-style", "revise": True},
+     "fmt": "output-style", "revise": True,
+     "voice": "- 문장은 결론으로 열고 근거를 뒤에 붙인다.\n- 목록 끝은 다음에 할 일로 맺는다.\n\n> 평균 대기 시간은 7분이었다."},
 ]
 aud_ids = list(th.audiences)
 cases = []
@@ -28,8 +29,8 @@ for i, (cls, kind) in enumerate(itertools.product([None] + list(th.classes), [No
     for prof, ex, talk in itertools.product(profiles, extras, [False, True] if kind is None else [False]):
         auds = [] if (i + len(cases)) % 3 else [aud_ids[i % len(aud_ids)]]
         text, _ = suit.compose(th, kind, auds or None, ex["sets"], prof, cls, ex["chars"], ex["fmt"], ex["revise"],
-                               talk=talk)
-        rv = suit.review(th, kind, auds or None, ex["sets"], prof, cls, ex["chars"], talk=talk)
+                               talk=talk, voice=ex["voice"])
+        rv = suit.review(th, kind, auds or None, ex["sets"], prof, cls, ex["chars"], talk=talk, voice=ex["voice"])
         cases.append({"cls": cls, "kind": kind, "auds": auds, "profile": prof, **ex, "talk": talk, "expected": text,
                       "review": rv})
 # 웹 캐릭터 만들기가 내려받게 하는 슬롯 파일. suit.py 가 읽는 꼴과 같아야 한다.

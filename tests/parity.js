@@ -10,8 +10,8 @@ const cases = all.compose;
 let bad = 0;
 for (const c of cases) {
   const r = C.resolve(c.kind, c.auds, c.sets, c.profile, c.cls, c.talk);
-  const js = C.compose(c.kind, r.auds, r.vals, c.chars, c.fmt, c.revise, r.cls, (c.profile || {}).persona);
-  const rv = C.review(c.kind, r.auds, r.vals, c.chars);
+  const js = C.compose(c.kind, r.auds, r.vals, c.chars, c.fmt, c.revise, r.cls, (c.profile || {}).persona, c.voice);
+  const rv = C.review(c.kind, r.auds, r.vals, c.chars, c.voice);
   if (js !== c.expected || rv !== c.review) {
     bad++;
     if (bad <= 3) console.log(`다름(${js !== c.expected ? "지침" : "검토"}): class=${c.cls} kind=${c.kind} audience=${c.auds} fmt=${c.fmt} talk=${c.talk}`);

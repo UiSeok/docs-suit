@@ -82,7 +82,10 @@
     }
 
     // suit.py rule_sections() 와 같다. compose 와 review 가 같이 쓴다. 앞에 나온 절이 이긴다.
-    function ruleSections(kind, vals, chars, revise) {
+    // voice 는 슬롯의 내 문체 문서다. 맨 끝에 실어 다른 규칙이 정하지 않은 곳만 채운다.
+    const VOICE_HEAD = "이 사람이 예전에 쓴 글에서 뽑은 버릇이다. 위의 규칙과 부딪치면 위의 규칙을 따르고, " +
+      "위의 규칙이 정하지 않은 곳에서만 따른다.";
+    function ruleSections(kind, vals, chars, revise, voice) {
       const out = [["공통 바닥", T.base]];
       if (revise) out.push(["다듬기", T.revise]);
       if (kind) out.push([`문서 종류 · ${T.kinds[kind].label}`, T.kindText[kind]]);
@@ -103,6 +106,7 @@
             "- AI 가 센 글자수는 틀리기 쉽다. 제출 전에 글자수 세기 도구로 다시 잰다."]);
         }
       }
+      if (voice) out.push(["내 문체", `${VOICE_HEAD}\n\n${voice}`]);
       return out;
     }
 
@@ -110,9 +114,9 @@
       return [kind ? T.kinds[kind].label : "일반 글", auds.map((a) => T.audiences[a].label).join(", ") || "정하지 않음"];
     }
 
-    function compose(kind, auds, vals, chars, fmt, revise, cls, persona) {
+    function compose(kind, auds, vals, chars, fmt, revise, cls, persona, voice) {
       const [kindLabel, audLabel] = labels(kind, auds);
-      const sections = ruleSections(kind, vals, chars, revise).map(([h, b]) => `## ${h}\n\n${b}`);
+      const sections = ruleSections(kind, vals, chars, revise, voice).map(([h, b]) => `## ${h}\n\n${b}`);
       const who = personaSection(cls, persona);
       const parts = [
         `# 글쓰기 테마 · ${kindLabel} · 독자 ${audLabel}`,
@@ -128,10 +132,10 @@
       return text;
     }
     // suit.py review() 와 같다. 쓴 사람과 같은 값으로 채점하되 페르소나는 싣지 않는다.
-    function review(kind, auds, vals, chars) {
+    function review(kind, auds, vals, chars, voice) {
       const [kindLabel, audLabel] = labels(kind, auds);
       const parts = [`# 검토 지침 · ${kindLabel} · 독자 ${audLabel}`, T.review]
-        .concat(ruleSections(kind, vals, chars, false).map(([h, b]) => `## 채점 기준 · ${h}\n\n${b}`));
+        .concat(ruleSections(kind, vals, chars, false, voice).map(([h, b]) => `## 채점 기준 · ${h}\n\n${b}`));
       parts.push("## 원문\n\n(과제 안내문, 채용 공고, 요청 메일처럼 이 글이 따라야 할 원문 전체. 없으면 비워 둔다)");
       parts.push("## 검토할 글\n\n(다 쓴 글 전체)");
       return parts.join("\n\n") + "\n";

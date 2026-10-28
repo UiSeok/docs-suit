@@ -315,6 +315,8 @@ def prepare(agent, item, base, glob):
         prof.write_text(suit.dump_yaml(PROFILE), encoding="utf-8")
     if item.get("folder"):
         suit.write_folder(item["folder"], proj)
+    if item.get("samples"):
+        shutil.copytree(HERE / "samples", proj / "samples")
     # serve 가 브라우저를 열면 돌리는 사람 화면에 탭이 뜬다. webbrowser 는 BROWSER 의 명령을 먼저 쓰므로 true 로 막는다.
     env = dict(os.environ, DOCS_SUIT_PROFILE=str(prof), DOCS_SUIT_HOME=str(tmp / "conf"),
                DOCS_SUIT_LOG=str(tmp / "calls.jsonl"), BROWSER="true")
@@ -410,6 +412,20 @@ def grade_flow(flow, tmp):
     files = {"profile": suit.read_slot(tmp / "profile.yaml"), "folder": suit.read_folder(tmp / "proj" / suit.FOLDER_FILE)}
     why = []
     for where, want in flow["expect"].items():
+        if where == "anywhere":
+            # 축 값을 기본값에 남겼든 독자별로 남겼든 맞다
+            places = [files["profile"].get("defaults") or {}] + list((files["profile"].get("audiences") or {}).values())
+            why += [f"프로필 어디에도 {axis}={value} 가 없다" for axis, value in want.items()
+                    if not any(isinstance(p, dict) and p.get(axis) == value for p in places)]
+            continue
+        if where == "voice":
+            voice = tmp / "profile.voice.md"
+            if not voice.exists():
+                why.append("내 문체 문서를 남기지 않았다")
+            else:
+                text = voice.read_text(encoding="utf-8")
+                why += [f"내 문체 문서에 샘플의 {w} 가 샜다" for w in want.get("leak", []) if w in text]
+            continue
         if where == "absent":
             why += [f"프로필에 {p} 가 남았다" for p in want if dig(files["profile"], p) is not None]
             continue
@@ -426,7 +442,8 @@ def load_flow(agent, flow, base):
     transcripts = [(tmp / f"transcript-{i}.jsonl").read_text(encoding="utf-8")
                    for i in range(1, len(flow["turns"]) + 1) if (tmp / f"transcript-{i}.jsonl").exists()]
     calls = read_calls(tmp)
-    shown = "; ".join(describe(c) for c in calls if c[:1] in (["bootstrap"], ["set"], ["profile"]) and len(c) > 1) or "-"
+    shown = "; ".join(describe(c) for c in calls
+                      if c[:1] in (["bootstrap"], ["set"], ["profile"], ["learn"], ["voice"]) and len(c) > 1) or "-"
     return flow, ok, shown, why, finish_meta(agent, tmp, transcripts, ok)
 
 
@@ -467,7 +484,10 @@ def expected(case):
 
 def flow_expected(flow):
     parts = [f"{'프로필' if w == 'profile' else '폴더 파일'} {p}={v}"
-             for w, want in flow["expect"].items() if w != "absent" for p, v in want.items()]
+             for w, want in flow["expect"].items() if w in ("profile", "folder") for p, v in want.items()]
+    parts += [f"프로필 어딘가에 {p}={v}" for p, v in flow["expect"].get("anywhere", {}).items()]
+    if "voice" in flow["expect"]:
+        parts.append("내 문체 문서, 샘플 이름과 수치 새지 않음")
     parts += [f"프로필에 {p} 없음" for p in flow["expect"].get("absent", [])]
     return ", ".join(parts)
 

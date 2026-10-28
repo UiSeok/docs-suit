@@ -121,4 +121,11 @@ FLOWS = [
     {"id": "flow-here",
      "turns": ["이 폴더에서는 앞으로 문서를 평어체로 써 줘. 다른 폴더는 지금처럼 두고."],
      "expect": {"folder": {"defaults.register": "plain"}, "absent": ["defaults.register"]}},
+    # samples 폴더의 글은 지어낸 이름과 수치를 담았다. 내 문체 문서에 이것이 새면 틀린다.
+    {"id": "flow-learn", "samples": True,
+     "turns": ["예전에 내가 쓴 글 네 편을 samples 폴더에 넣어 뒀어. 이걸로 내 글쓰기 스타일을 맞춰 줘. "
+               "모두 내가 직접 쓴 글이고 팀에 공유한 글이야.",
+               "좋아, 제안한 값은 다 남겨 줘. 내 문체 문서는 초안을 보여 줘.",
+               "그대로 저장해 줘."],
+     "expect": {"anywhere": {"register": "polite"}, "voice": {"leak": ["솔밭", "모락", "윤하", "12분", "15분"]}}},
 ]
