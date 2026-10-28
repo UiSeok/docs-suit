@@ -7,6 +7,8 @@
     ["cursor", "Cursor"], ["grok", "Grok Build"], ["web", "웹 채팅"]];
   const SLOT_RE = /^[\p{L}\p{N}_-]+$/u;  // suit.py 의 슬롯 이름 규칙과 같다
   const state = { cls: null, preset: null, hair: null, persona: {}, docs: [], agents: [], keep: null };
+  // 문체 배우기. 붙여 넣은 글은 화면에만 두고, 잰 결과와 사용자가 고른 축 값만 슬롯에 넣는다
+  const learn = { texts: [""], human: [], result: null, use: {} };
   const L = window.DocsSuitLocal;  // suit.py serve 로 띄웠으면 슬롯 파일을 바로 쓴다
   let T = null, C = null;
 
@@ -72,6 +74,9 @@
       data.audiences = {};
       for (const [k, v] of Object.entries(p.audiences || {})) data.audiences[k] = Object.assign({}, v);
     }
+    // 예전 글에서 배운 값은 조합의 값보다 앞선다. 사용자가 고른 것만 넣는다
+    const learned = learnedValues();
+    if (Object.keys(learned).length) data.defaults = Object.assign({}, data.defaults || {}, learned);
     return data;
   }
 
@@ -144,11 +149,134 @@
         if (key !== "facts") input.type = "text";
         input.value = state.persona[key] || "";
         input.placeholder = (q.hint || "").replace(/^예\) /, "");
-        input.addEventListener("input", () => { state.persona[key] = input.value; renderAside(); });
+        input.addEventListener("input", () => {
+          state.persona[key] = input.value;
+          if (key === "call") $("styleTitle").textContent = `5. ${C.cleanText(input.value) || "나"}만의 글쓰기 스타일`;
+          renderAside();
+        });
         label.appendChild(input);
       }
       box.appendChild(label);
     }
+  }
+
+  function learnedValues() {
+    const out = {};
+    const plan = (learn.result && learn.result.plan) || {};
+    for (const [axis, x] of Object.entries(plan)) if (x.value && learn.use[axis] !== false) out[axis] = x.value;
+    return out;
+  }
+
+  function renderLearn() {
+    const call = C.cleanText(state.persona.call || "");
+    $("styleTitle").textContent = `5. ${call || "나"}만의 글쓰기 스타일`;
+    const box = $("learn");
+    box.textContent = "";
+    if (!L) {
+      const p = document.createElement("p");
+      p.className = "hint";
+      p.textContent = "이 칸은 suit.py serve 로 띄운 화면에서 씁니다. 에이전트에게 \"예전 글로 내 문체 맞춰 줘\" 라고 해도 됩니다.";
+      box.appendChild(p);
+      return;
+    }
+    learn.texts.forEach((text, i) => {
+      const label = document.createElement("label");
+      label.textContent = `글 ${i + 1}`;
+      const ta = document.createElement("textarea");
+      ta.className = "sample";
+      ta.value = text;
+      ta.placeholder = "예전에 쓴 보고서나 메일, 글 한 편을 붙여 넣습니다";
+      ta.addEventListener("input", () => { learn.texts[i] = ta.value; });
+      label.appendChild(ta);
+      const sample = learn.result && learn.result.samples[i];
+      if (sample) {
+        const info = document.createElement("span");
+        info.className = "hint";
+        const parts = [`${sample.chars.toLocaleString()}자`];
+        if (sample.register) parts.push(`어법 ${C.label("register", sample.register)}`);
+        if (sample.voice) parts.push(`문체 ${C.label("voice", sample.voice)}`);
+        info.textContent = parts.join(" · ");
+        label.appendChild(info);
+        if (sample.suspect || sample.vouched) {
+          const w = document.createElement("label");
+          w.className = "inline";
+          const cb = document.createElement("input");
+          cb.type = "checkbox";
+          cb.checked = learn.human.indexOf(i) >= 0;
+          cb.addEventListener("change", () => {
+            if (cb.checked) learn.human.push(i); else learn.human = learn.human.filter((x) => x !== i);
+          });
+          w.append(cb, ` AI 가 쓴 글의 표지(${sample.ai.join(", ")})가 있어 제안에서 뺐습니다. 직접 쓴 글이면 체크하고 다시 잽니다`);
+          label.appendChild(w);
+        }
+        if (sample.secret) {
+          const s = document.createElement("span");
+          s.className = "warn";
+          s.textContent = "키나 비밀번호로 보이는 값이 있습니다. 이 글은 다른 곳에 옮기지 마세요.";
+          label.appendChild(s);
+        }
+      }
+      box.appendChild(label);
+    });
+    const row = document.createElement("div");
+    row.className = "actions";
+    const more = document.createElement("button");
+    more.type = "button";
+    more.className = "btn";
+    more.textContent = "글 더하기";
+    more.disabled = learn.texts.length >= 6;
+    more.addEventListener("click", () => { learn.texts.push(""); renderLearn(); });
+    const run = document.createElement("button");
+    run.type = "button";
+    run.className = "btn primary";
+    run.textContent = "문체 재기";
+    run.addEventListener("click", async () => {
+      // 빈 칸을 먼저 걷어야 엔진이 돌려준 글 번호와 칸 번호가 맞는다
+      learn.texts = learn.texts.filter((x) => x.trim());
+      if (!learn.texts.length) learn.texts = [""];
+      try {
+        learn.result = await L.api("/api/learn", { texts: learn.texts, human: learn.human });
+        learn.use = {};
+      } catch (e) { learn.result = null; $("status").textContent = e.message; }
+      renderLearn();
+      renderAside();
+    });
+    row.append(more, run);
+    box.appendChild(row);
+    if (!learn.result) return;
+    const plan = learn.result.plan;
+    const out = document.createElement("div");
+    out.className = "learned";
+    const head = document.createElement("p");
+    head.innerHTML = `<b>제안</b> · 사람이 쓴 것으로 보는 글 ${learn.result.chars.toLocaleString()}자`;
+    out.appendChild(head);
+    if (!Object.keys(plan).length) {
+      const p = document.createElement("p");
+      p.className = "hint";
+      p.textContent = "축 값을 정할 만큼 글이 모이지 않았습니다. 같은 사람이 쓴 글을 두세 편 더 붙여 넣어 보세요.";
+      out.appendChild(p);
+    }
+    for (const [axis, x] of Object.entries(plan)) {
+      const l = document.createElement("label");
+      l.className = "inline";
+      if (x.value) {
+        const cb = document.createElement("input");
+        cb.type = "checkbox";
+        cb.checked = learn.use[axis] !== false;
+        cb.addEventListener("change", () => { learn.use[axis] = cb.checked; renderAside(); });
+        l.append(cb, ` ${T.axes[axis].label} ${C.label(axis, x.value)} · ${x.note}`);
+      } else {
+        l.textContent = `${T.axes[axis].label} · ${x.note}`;
+      }
+      out.appendChild(l);
+    }
+    const tip = document.createElement("p");
+    tip.className = "hint";
+    tip.textContent = learn.result.voice_ok
+      ? "글이 넉넉합니다. 저장한 뒤 에이전트에게 \"내 문체 문서 만들어 줘\" 라고 하면 축에 잡히지 않는 버릇까지 정리해 줍니다."
+      : "축 값만 제안했습니다. 세 편 넘게, 2천 자 넘게 모이면 에이전트가 버릇까지 담은 내 문체 문서를 만들 수 있습니다.";
+    out.appendChild(tip);
+    box.appendChild(out);
   }
 
   function renderAgents() {
@@ -229,6 +357,7 @@
     renderPresets();
     renderBases();
     renderPersona();
+    renderLearn();
     renderAgents();
     renderAside();
   }

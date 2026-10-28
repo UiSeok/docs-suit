@@ -11,56 +11,73 @@
   <header>
     <h1>docs-suit</h1>
     <p class="nav"><b>테마 고르기</b> · <a href="create.html">캐릭터 만들기</a></p>
-    <p>문서에 입힐 옷을 고릅니다. 클래스와 문서 종류를 정하고, 같은 예문을 값마다 다르게 써 본 카드를 보며 마음에 드는 쪽을 누르세요.</p>
+    <p>문서 종류마다 테마 조합이 따로 있습니다. 왼쪽에서 종류를 고르고, 같은 예문을 값마다 다르게 써 본 카드를 보며 마음에 드는 쪽을 누르세요.</p>
   </header>
   <div id="local"></div>
-  <div class="layout">
-    <div>
-      <section class="step">
+  <p class="ctx" id="ctx" hidden></p>
+  <div class="layout3">
+    <nav class="kindlist" aria-label="문서 종류">
+      <section class="step web-only">
         <h2>클래스</h2>
-        <p class="note" id="classDesc"></p>
         <div class="chips" id="classes"></div>
       </section>
-      <section class="step">
-        <h2>무엇을 쓰나요 <span class="now">★ 는 클래스의 주력 문서</span></h2>
-        <div class="chips" id="kinds"></div>
-      </section>
-      <section class="step">
-        <h2>누가 읽나요</h2>
-        <div class="chips" id="auds"></div>
-      </section>
+      <h2>문서 종류</h2>
+      <div id="kinds"></div>
+    </nav>
+    <div class="combo">
+      <h2 class="kindtitle" id="kindTitle"></h2>
+      <p class="note" id="kindNote"></p>
+      <div class="audrow"><span>독자로 미리 보기</span><div class="chips small" id="auds"></div></div>
       <div id="gallery"></div>
+      <details class="more" id="more">
+        <summary id="moreSum">나머지 축</summary>
+        <div id="gallery2"></div>
+      </details>
     </div>
-    <aside class="out" aria-label="조립된 지침">
-      <h2>조립된 지침</h2>
-      <div class="row">
-        <label><input type="radio" name="fmt" value="prompt" checked> 붙여 넣기용</label>
-        <label><input type="radio" name="fmt" value="output-style"> Claude Code output style</label>
-      </div>
-      <div class="row">
-        <label>글자수 <input id="chars" type="number" min="100" step="100" placeholder="공백 포함"></label>
-        <label><input type="checkbox" id="revise"> 원문 다듬기</label>
-      </div>
-      <textarea id="out" readonly spellcheck="false"></textarea>
-      <div class="actions">
-        <button type="button" class="btn primary" id="copy">복사</button>
-        <button type="button" class="btn" id="copyReview">검토 지침 복사</button>
-        <button type="button" class="btn" id="download">.md 로 저장</button>
-        <button type="button" class="btn" id="save">고른 값을 내 기본값으로</button>
-        <label class="local-only"><input type="checkbox" id="here"> 실행한 폴더에만</label>
-        <button type="button" class="btn" id="reset">초기화</button>
-      </div>
-      <div class="status" id="status" aria-live="polite"></div>
+    <aside class="out" aria-label="고른 값">
+      <section class="local-only pickbox">
+        <h2>고른 값</h2>
+        <ul class="picked" id="picked"></ul>
+        <div class="actions">
+          <button type="button" class="btn primary" id="apply">이번 문서에만 적용</button>
+          <button type="button" class="btn" id="save">이 종류에 저장</button>
+        </div>
+        <div class="row">
+          <label><input type="checkbox" id="here"> 실행한 폴더에서만</label>
+          <button type="button" class="btn link" id="reset">고른 것 지우기</button>
+          <button type="button" class="btn link" id="clearKind" hidden>이 종류를 기본으로 되돌리기</button>
+        </div>
+        <div class="status" id="status" aria-live="polite"></div>
+      </section>
+      <details class="guide" id="guide">
+        <summary>조립된 지침 보기·복사</summary>
+        <div class="row">
+          <label><input type="radio" name="fmt" value="prompt" checked> 붙여 넣기용</label>
+          <label><input type="radio" name="fmt" value="output-style"> Claude Code output style</label>
+        </div>
+        <div class="row">
+          <label>글자수 <input id="chars" type="number" min="100" step="100" placeholder="공백 포함"></label>
+          <label><input type="checkbox" id="revise"> 원문 다듬기</label>
+        </div>
+        <textarea id="out" readonly spellcheck="false"></textarea>
+        <div class="actions">
+          <button type="button" class="btn primary" id="copy">복사</button>
+          <button type="button" class="btn" id="copyReview">검토 지침 복사</button>
+          <button type="button" class="btn" id="download">.md 로 저장</button>
+          <button type="button" class="btn web-only" id="webSave">이 종류에 저장</button>
+        </div>
+        <div class="status web-only" id="webStatus" aria-live="polite"></div>
+        <div class="where">
+          붙여 넣는 자리
+          <ul>
+            <li>ChatGPT: 맞춤형 지침, 프로젝트 지침</li>
+            <li>Claude: 프로젝트 지침, 스타일의 "직접 설명"</li>
+            <li>Gemini: Gem 지침</li>
+            <li>Claude Code: output style 로 저장해 <code>~/.claude/output-styles/</code></li>
+          </ul>
+        </div>
+      </details>
       <div class="warn" id="warns" aria-live="polite"></div>
-      <div class="where">
-        붙여 넣는 자리
-        <ul>
-          <li>ChatGPT: 맞춤형 지침, 프로젝트 지침</li>
-          <li>Claude: 프로젝트 지침, 스타일의 "직접 설명"</li>
-          <li>Gemini: Gem 지침</li>
-          <li>Claude Code: output style 로 저장해 <code>~/.claude/output-styles/</code></li>
-        </ul>
-      </div>
     </aside>
   </div>
 </main>

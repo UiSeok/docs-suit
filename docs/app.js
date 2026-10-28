@@ -1,17 +1,17 @@
-// 웹 고르개 화면. 조립은 core.js 가 하고, 데이터는 themes.json 하나다.
-// 축마다 같은 예문을 값별로 써 본 보기 카드를 보이고, 카드를 누르면 그 값을 고른다. 다시 누르면 자동으로 돌아간다.
-// 개인 기본값은 이 브라우저의 localStorage 에만 남는다.
+// 테마 고르기 화면. 문서 종류가 맨 위의 구분이고, 종류마다 축 값의 조합을 고른다. 조립은 core.js 가 하고, 데이터는 themes.json 하나다.
+// 축마다 같은 예문을 값별로 써 본 보기 카드를 보이고, 카드를 누르면 그 값을 고른다. 다시 누르면 고르기 전으로 돌아간다.
+// suit.py serve 로 띄우면 "이번 문서에만" 은 에이전트에게 넘기고 "이 종류에 저장" 은 슬롯의 종류별 값에 쓴다.
+// GitHub Pages 로 열면 종류별 값을 이 브라우저의 localStorage 에만 남긴다.
 (function () {
   "use strict";
   const KEY = "docs-suit.personal";
   const $ = (id) => document.getElementById(id);
-  // 화면에 보이는 축 순서. 글에 바로 드러나는 축을 앞에 둔다.
-  const SHOW = ["voice", "register", "skeleton", "terms", "length", "markup", "sources", "exposure", "ai-disclosure",
-    "diagram", "emphasis", "visual-deck", "visual-doc"];
-  const state = { cls: null, kind: null, aud: null, sets: {} };
+  // 자주 바꾸는 축을 앞에 두고, 나머지는 접어 둔다
+  const MAIN = ["register", "voice", "length", "skeleton", "terms", "emphasis"];
+  const MORE = ["markup", "diagram", "sources", "exposure", "ai-disclosure", "visual-deck", "visual-doc"];
+  const state = { cls: null, kind: undefined, aud: null, sets: {}, ctx: null };
   let T = null, C = null;
 
-  // suit.py serve 로 띄웠으면 브라우저 저장소 대신 실행한 폴더 기준 슬롯을 읽고 쓴다
   const L = window.DocsSuitLocal;
   const local = { profile: null, slot: null };
   function loadPersonal() {
@@ -21,6 +21,7 @@
   function savePersonal(p) {
     try { localStorage.setItem(KEY, JSON.stringify(p)); return true; } catch (e) { return false; }
   }
+  function savedKinds() { return loadPersonal().kinds || {}; }
 
   // ---------------------------------------------------------------- 보기용 작은 마크다운
   function esc(s) { return String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
@@ -96,95 +97,173 @@
     b.setAttribute("aria-pressed", String(pressed));
     b.addEventListener("click", onClick);
     box.appendChild(b);
+    return b;
   }
 
-  function buildChips() {
+  function mainKinds() { return state.cls ? T.classes[state.cls].kinds : []; }
+
+  // 처음 열 종류. 에이전트가 넘긴 종류, 클래스의 주력 문서 첫 번째, 첫 종류 순이다
+  function firstKind() {
+    if (state.ctx && state.ctx.fromAgent) return state.ctx.kind;
+    return mainKinds()[0] || Object.keys(T.kinds)[0];
+  }
+
+  function buildKinds() {
     const c = $("classes");
     c.textContent = "";
-    chip(c, "고르지 않음", state.cls === null, () => { state.cls = null; render(); });
     for (const [key, v] of Object.entries(T.classes)) {
-      chip(c, v.label, state.cls === key, () => {
-        state.cls = key;
-        if (!state.kind || v.kinds.indexOf(state.kind) < 0) state.kind = v.kinds[0];
-        render();
-      });
+      chip(c, v.label, state.cls === key, () => { state.cls = state.cls === key ? null : key; state.kind = firstKind(); render(); });
     }
-    $("classDesc").textContent = state.cls ? T.classes[state.cls].desc : "클래스를 고르면 그 직업의 기본 말투와 주력 문서가 정해집니다.";
-    const k = $("kinds");
-    k.textContent = "";
-    chip(k, "일반 글", state.kind === null, () => { state.kind = null; render(); });
-    const main = state.cls ? T.classes[state.cls].kinds : [];
-    const order = main.concat(Object.keys(T.kinds).filter((x) => main.indexOf(x) < 0));
-    for (const key of order) {
-      const lab = T.kinds[key].label + (main.indexOf(key) >= 0 ? " ★" : "");
-      chip(k, lab, state.kind === key, () => { state.kind = key; render(); });
-    }
+    const box = $("kinds");
+    box.textContent = "";
+    const mine = savedKinds();
+    const main = mainKinds();
+    const group = (title, keys, fold) => {
+      if (!keys.length) return;
+      // 주력이 아닌 종류는 접어 둔다. 지금 고른 종류가 그 안에 있으면 펼친다
+      let into = box;
+      if (fold) {
+        into = document.createElement("details");
+        into.className = "kfold";
+        into.open = keys.indexOf(state.kind) >= 0 || box.dataset.open === "1";
+        into.addEventListener("toggle", () => { box.dataset.open = into.open ? "1" : ""; });
+        const s = document.createElement("summary");
+        s.className = "kgroup";
+        s.textContent = `${title} ${keys.length}가지`;
+        into.appendChild(s);
+        box.appendChild(into);
+      } else {
+        const h = document.createElement("p");
+        h.className = "kgroup";
+        h.textContent = title;
+        box.appendChild(h);
+      }
+      const wrap = document.createElement("div");
+      wrap.className = "kinds";
+      into.appendChild(wrap);
+      for (const key of keys) {
+        const b = document.createElement("button");
+        b.type = "button";
+        b.className = "kind";
+        b.setAttribute("aria-pressed", String(state.kind === key));
+        const lab = key ? T.kinds[key].label : "일반 글";
+        b.innerHTML = `<span>${esc(lab)}</span>` + (key && mine[key] ? '<span class="tag">내 조합</span>' : "");
+        b.addEventListener("click", () => { state.kind = key; state.sets = {}; render(); });
+        wrap.appendChild(b);
+      }
+    };
+    const others = Object.keys(T.kinds).filter((k) => main.indexOf(k) < 0);
+    group(state.cls ? `${T.classes[state.cls].label}의 주력 문서` : "", main.length ? main : others);
+    if (main.length) group("다른 문서", others, true);
+    group("종류 없는 글", [null]);
+  }
+
+  function buildHead() {
+    const k = state.kind;
+    $("kindTitle").textContent = k ? T.kinds[k].label : "일반 글";
+    const mine = k && savedKinds()[k];
+    $("kindNote").textContent = !k
+      ? "종류 없는 글은 말투와 모양을 요청과 대화에서 맞춥니다. 고른 값은 이번 문서에만 씁니다."
+      : mine ? "이 종류에 저장한 조합으로 씁니다. 카드를 눌러 바꾸고 저장하면 다음 문서부터 그 값을 씁니다."
+        : "지금은 이 종류가 권하는 조합입니다. 마음에 안 드는 축의 카드를 누르세요.";
     const a = $("auds");
     a.textContent = "";
-    const def = state.kind && T.kinds[state.kind].audience
-      ? T.kinds[state.kind].audience.map((x) => T.audiences[x].label).join(", ") : "없음";
-    chip(a, `문서 종류의 기본 (${def})`, state.aud === null, () => { state.aud = null; render(); });
+    const def = k && T.kinds[k].audience ? T.kinds[k].audience.map((x) => T.audiences[x].label).join(", ") : "없음";
+    chip(a, `기본 (${def})`, state.aud === null, () => { state.aud = null; render(); });
     for (const [key, v] of Object.entries(T.audiences)) chip(a, v.label, state.aud === key, () => { state.aud = key; render(); });
   }
 
-  function buildGallery(vals) {
-    const g = $("gallery");
-    const keepScroll = {};
-    g.querySelectorAll(".cards").forEach((row) => { keepScroll[row.dataset.axis] = row.scrollLeft; });
-    g.textContent = "";
-    const kspec = state.kind ? T.kinds[state.kind] : {};
-    for (const axis of SHOW) {
-      const [v, src] = vals[axis];
-      const sec = document.createElement("section");
-      sec.className = "step";
-      const h = document.createElement("h2");
-      h.innerHTML = `${esc(T.axes[axis].label)} <span class="now">지금 <b>${esc(C.label(axis, v))}</b> · ${esc(C.SRC[src])}</span>`;
-      sec.appendChild(h);
-      const locked = kspec[axis] && axis !== "exposure";
-      let note = "";
-      if (locked) note = "이 축은 문서 종류가 정합니다.";
-      else if (axis === "visual-deck" && state.kind !== "slides") note = "발표 PPT 를 고를 때만 지침에 실립니다.";
-      else if (axis === "visual-doc" && vals.markup[0] !== "html") note = "출력 형식을 HTML 로 고르면 지침에 실립니다.";
-      else if (src === "talk") note = "일반 글은 이 축을 미리 정하지 않고 AI 가 요청과 대화에서 읽어 맞춥니다. 카드를 고르면 그 값으로 정합니다.";
-      else if (axis === "exposure") note = "개인정보를 지키는 축이라 더 조심하는 쪽으로만 바꿀 수 있습니다. 팀 안에서만 볼 글이면 독자를 바꿉니다.";
-      if (note) {
-        const n = document.createElement("p");
-        n.className = "note";
-        n.textContent = note;
-        sec.appendChild(n);
-      }
-      const row = document.createElement("div");
-      row.className = "cards";
-      row.dataset.axis = axis;
-      for (const [value, lab] of Object.entries(T.axes[axis].values)) {
-        const b = document.createElement("button");
-        b.type = "button";
-        const chosen = state.sets[axis] === value, active = v === value;
-        b.className = "card" + (active ? " active" : "") + (chosen ? " chosen" : "");
-        b.disabled = !!locked;
-        b.setAttribute("aria-pressed", String(chosen));
-        b.setAttribute("aria-label", `${T.axes[axis].label} ${lab}${active ? ", 지금 쓰는 값" : ""}`);
-        const kind = axis === "visual-doc" ? " frame" : axis === "visual-deck" ? " slide" : "";
-        b.innerHTML = `<span class="cl"><span>${esc(lab)}</span><span class="badge">${chosen ? "고름" : active ? "자동" : ""}</span></span>` +
-          `<span class="pv${kind}">${preview(axis, value)}</span>`;
-        b.addEventListener("click", () => {
-          if (state.sets[axis] === value) delete state.sets[axis];
-          else state.sets[axis] = value;
-          render();
-        });
-        row.appendChild(b);
-      }
-      sec.appendChild(row);
-      g.appendChild(sec);
-      if (keepScroll[axis]) row.scrollLeft = keepScroll[axis];
+  function axisSection(axis, vals, kspec) {
+    const [v, src] = vals[axis];
+    const sec = document.createElement("section");
+    sec.className = "step";
+    const h = document.createElement("h2");
+    h.innerHTML = `${esc(T.axes[axis].label)} <span class="now">지금 <b>${esc(C.label(axis, v))}</b> · ${esc(C.SRC[src])}</span>`;
+    sec.appendChild(h);
+    const locked = kspec[axis] && axis !== "exposure";
+    let note = "";
+    if (locked) note = "이 축은 문서 종류의 틀이 정합니다.";
+    else if (src === "talk") note = "정하지 않으면 AI 가 요청과 대화에서 읽어 맞춥니다.";
+    else if (axis === "exposure") note = "개인정보를 지키는 축이라 더 조심하는 쪽으로만 바꿀 수 있습니다.";
+    if (note) {
+      const n = document.createElement("p");
+      n.className = "note";
+      n.textContent = note;
+      sec.appendChild(n);
     }
+    if (locked) return sec;
+    const row = document.createElement("div");
+    row.className = "cards";
+    row.dataset.axis = axis;
+    for (const [value, lab] of Object.entries(T.axes[axis].values)) {
+      const b = document.createElement("button");
+      b.type = "button";
+      const chosen = state.sets[axis] === value, active = v === value;
+      b.className = "card" + (active ? " active" : "") + (chosen ? " chosen" : "");
+      b.setAttribute("aria-pressed", String(chosen));
+      b.setAttribute("aria-label", `${T.axes[axis].label} ${lab}${active ? ", 지금 쓰는 값" : ""}`);
+      const kind = axis === "visual-doc" ? " frame" : axis === "visual-deck" ? " slide" : "";
+      b.innerHTML = `<span class="cl"><span>${esc(lab)}</span><span class="badge">${chosen ? "고름" : active ? "지금" : ""}</span></span>` +
+        `<span class="pv${kind}">${preview(axis, value)}</span>`;
+      b.addEventListener("click", () => {
+        if (state.sets[axis] === value) delete state.sets[axis];
+        else state.sets[axis] = value;
+        render();
+      });
+      row.appendChild(b);
+    }
+    sec.appendChild(row);
+    return sec;
+  }
+
+  function buildGallery(vals) {
+    const keep = {};
+    document.querySelectorAll(".cards").forEach((row) => { keep[row.dataset.axis] = row.scrollLeft; });
+    const kspec = state.kind ? T.kinds[state.kind] : {};
+    const shown = (axis) => (axis !== "visual-deck" || state.kind === "slides") && (axis !== "visual-doc" || vals.markup[0] === "html");
+    for (const [id, axes] of [["gallery", MAIN], ["gallery2", MORE]]) {
+      const g = $(id);
+      g.textContent = "";
+      for (const axis of axes.filter(shown)) g.appendChild(axisSection(axis, vals, kspec));
+    }
+    const rest = MORE.filter(shown);
+    const picked = rest.filter((a) => state.sets[a]).length;
+    $("moreSum").textContent = `나머지 축 ${rest.length}개` + (picked ? ` · 고른 것 ${picked}개` : "") + ` (${rest.map((a) => T.axes[a].label).join(", ")})`;
+    document.querySelectorAll(".cards").forEach((row) => {
+      if (keep[row.dataset.axis]) row.scrollLeft = keep[row.dataset.axis];
+      row.classList.toggle("overflow", row.scrollWidth > row.clientWidth + 4);
+    });
+  }
+
+  function buildPicked() {
+    const ul = $("picked");
+    ul.textContent = "";
+    const keys = Object.keys(state.sets);
+    if (!keys.length) {
+      const li = document.createElement("li");
+      li.className = "muted";
+      li.textContent = "아직 고른 카드가 없습니다.";
+      ul.appendChild(li);
+    }
+    for (const axis of keys) {
+      const li = document.createElement("li");
+      li.textContent = `${T.axes[axis].label} · ${C.label(axis, state.sets[axis])}`;
+      ul.appendChild(li);
+    }
+    $("apply").disabled = !keys.length && !(state.ctx && state.ctx.fromAgent);
+    $("save").disabled = !keys.length || !state.kind;
+    $("save").title = state.kind ? "" : "종류 없는 글은 저장하지 않습니다";
+    $("clearKind").hidden = !(state.kind && savedKinds()[state.kind]);
   }
 
   function render() {
+    if (state.kind === undefined) state.kind = firstKind();
     const auds = state.aud ? [state.aud] : [];
     const r = C.resolve(state.kind, auds, state.sets, loadPersonal(), state.cls, true);
-    buildChips();
+    buildKinds();
+    buildHead();
     buildGallery(r.vals);
+    buildPicked();
     $("warns").textContent = r.warns.join(" ");
     const chars = parseInt($("chars").value, 10) || null;
     const fmt = document.querySelector("input[name=fmt]:checked").value;
@@ -195,15 +274,27 @@
   async function copy(text, done) {
     try {
       await navigator.clipboard.writeText(text);
-      $("status").textContent = done;
+      $("webStatus").textContent = done;
     } catch (e) {
       $("out").select();
-      $("status").textContent = "복사하지 못했습니다. 지침 칸을 선택해 두었으니 Ctrl+C 로 복사하세요.";
+      $("webStatus").textContent = "복사하지 못했습니다. 지침 칸을 선택해 두었으니 Ctrl+C 로 복사하세요.";
     }
   }
 
+  // GitHub Pages 판의 "이 종류에 저장". 이 브라우저에만 남긴다
+  function webSave() {
+    if (!state.kind) { $("webStatus").textContent = "종류 없는 글은 저장하지 않습니다."; return; }
+    const p = loadPersonal();
+    p.kinds = Object.assign({}, p.kinds || {});
+    p.kinds[state.kind] = Object.assign({}, p.kinds[state.kind] || {}, state.sets);
+    const ok = savePersonal(p);
+    state.sets = {};
+    $("webStatus").textContent = ok ? `이 브라우저에 ${T.kinds[state.kind].label} 조합으로 저장했습니다.` : "저장하지 못했습니다. 브라우저 저장소가 막혀 있습니다.";
+    render();
+  }
+
   function wire() {
-    document.querySelectorAll("aside input").forEach((el) => el.addEventListener("input", render));
+    document.querySelectorAll("aside .guide input").forEach((el) => el.addEventListener("input", render));
     $("copy").addEventListener("click", () => copy($("out").value, "복사했습니다."));
     $("copyReview").addEventListener("click", () => copy(state.review,
       "검토 지침을 복사했습니다. 새 대화에 붙여 넣고 원문과 다 쓴 글을 빈자리에 채웁니다."));
@@ -215,39 +306,49 @@
       a.click();
       URL.revokeObjectURL(a.href);
     });
+    $("webSave").addEventListener("click", webSave);
+    $("apply").addEventListener("click", async () => {
+      try {
+        const auds = state.aud ? [state.aud] : (state.ctx ? state.ctx.audiences : []);
+        const sets = Object.assign({}, state.ctx && state.ctx.kind === state.kind ? state.ctx.sets : {}, state.sets);
+        const r = await L.api("/api/pick", { kind: state.kind, audiences: auds, sets });
+        $("status").textContent = r.message;
+      } catch (e) { $("status").textContent = e.message; }
+    });
     $("save").addEventListener("click", async () => {
-      if (L) {
-        try {
-          const r = await L.api("/api/defaults", { slot: local.slot, here: $("here").checked, defaults: { ...state.sets } });
-          state.sets = {};
-          applyLocal(r.state);
-          $("status").textContent = r.message;
-        } catch (e) { $("status").textContent = e.message; }
-        return;
-      }
-      const ok = savePersonal({ defaults: { ...state.sets } });
-      $("status").textContent = ok ? "고른 값을 이 브라우저의 내 기본값으로 저장했습니다." : "저장하지 못했습니다. 브라우저 저장소가 막혀 있습니다.";
-      render();
-    });
-    $("reset").addEventListener("click", () => {
-      if (L) {
+      try {
+        const r = await L.api("/api/defaults", { slot: local.slot, here: $("here").checked, kind: state.kind, defaults: { ...state.sets } });
         state.sets = {};
-        $("status").textContent = "고른 값을 지웠습니다. 슬롯에 저장된 값은 그대로입니다.";
-        render();
-        return;
-      }
-      savePersonal({});
-      state.sets = {};
-      $("chars").value = "";
-      $("status").textContent = "고른 값과 내 기본값을 지웠습니다.";
-      render();
+        applyLocal(r.state);
+        $("status").textContent = `${r.message}. 다음 ${T.kinds[state.kind].label}부터 이 조합으로 씁니다.`;
+      } catch (e) { $("status").textContent = e.message; }
     });
+    $("clearKind").addEventListener("click", async () => {
+      try {
+        const r = await L.api("/api/defaults", { slot: local.slot, here: $("here").checked, kind: state.kind, clear: true });
+        applyLocal(r.state);
+        $("status").textContent = `${T.kinds[state.kind].label}를 종류가 권하는 조합으로 되돌렸습니다.`;
+      } catch (e) { $("status").textContent = e.message; }
+    });
+    $("reset").addEventListener("click", () => { state.sets = {}; $("status").textContent = ""; render(); });
   }
 
   function applyLocal(st) {
     local.profile = st.merged || {};
     local.slot = st.slot;
     state.cls = (local.profile.profile || {}).class || state.cls;
+    if (st.context && !state.ctx) {
+      state.ctx = Object.assign({ fromAgent: !!(st.context.kind || st.context.audiences.length) }, st.context);
+      if (state.ctx.fromAgent) {
+        state.kind = st.context.kind;
+        state.aud = st.context.audiences.length === 1 ? st.context.audiences[0] : null;
+        const c = $("ctx");
+        c.hidden = false;
+        c.textContent = `지금 쓰는 문서: ${st.context.kind ? T.kinds[st.context.kind].label : "일반 글"}` +
+          (st.context.audiences.length ? ` · 독자 ${st.context.audiences.map((x) => T.audiences[x].label).join(", ")}` : "") +
+          ". 에이전트가 이 문서 기준으로 화면을 열었습니다. 고른 뒤 \"이번 문서에만 적용\" 을 누르고 대화창에 \"골랐어\" 라고 하면 다시 씁니다.";
+      }
+    }
     L.banner(st, async (name) => {
       try {
         state.sets = {};
@@ -263,8 +364,9 @@
     wire();
     if (L) {
       document.body.classList.add("is-local");
-      $("save").textContent = "고른 값을 슬롯에 저장";
       try { applyLocal(await L.api("/api/state")); } catch (e) { $("status").textContent = e.message; }
+    } else {
+      $("guide").open = true;
     }
     render();
   })

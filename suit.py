@@ -50,7 +50,9 @@ profiles/<이름>.yaml 이다. 폴더의 .docs-suit.yaml 은 쓸 슬롯과 그 �
   python3 suit.py growth on|off                     캐릭터 키우기를 켜고 끈다. 기록은 지우지 않는다
   python3 suit.py status [--size face|full|line]    상태 줄에 캐릭터를 그린다. 표준 입력의 JSON 에서 작업 폴더를 읽는다
   python3 suit.py widget [--cwd 폴더] [--split] [--once]  터미널 옆 칸의 캐릭터 창. 기록이 바뀌면 다시 그린다
-  python3 suit.py serve [--page index|create] [--detach]  화면을 로컬에 띄워 고른 값을 바로 슬롯에 쓴다
+  python3 suit.py serve [--page index|create] [--kind K] [--audience A] [--set 축=값]... [--detach]
+                                               화면을 로컬에 띄운다. 테마 고르기는 지금 문서의 종류로 열린다
+  python3 suit.py picked [--json] [--clear]    테마 고르기에서 "이번 문서에만" 으로 고른 값을 compose 인자로 낸다
   python3 suit.py bundle                            웹 고르개용 docs/themes.json 을 만든다
   python3 suit.py selftest
 
@@ -1719,9 +1721,10 @@ description: 문서를 쓰거나 다듬거나 검토할 때 docs-suit 테마를 
    - "팀장님께 쓰는 글" 처럼 읽는 사람을 말했으면 `--audience <독자>` 를, "업무 보고는" 처럼 문서 종류를 말했으면 `--kind <종류>` 를 붙인다. 문서 종류가 권하는 값은 기본값을 이기지만 `--audience` 와 `--kind` 로 남긴 값에는 진다.
    - 이 폴더에서만 그렇게 쓰고 싶어 하면 `--here` 를 붙여 폴더 파일 `.docs-suit.yaml` 에 남긴다.
    - 종류 없는 글은 프로필 값을 쓰지 않으니, 그런 글에서 잡은 말투는 그 대화에서만 지키고, 남겨 달라고 하면 종류가 있는 글에만 먹는다고 알려 준다.
-   - 카드를 보며 고르고 싶어 하면 `{run} serve --detach` 로 테마 고르기 화면을 띄우고 주소를 알려 준다.
+   - 카드를 보며 고르고 싶어 하면 지금 문서의 compose 인자를 붙여 `{run} serve --detach --kind <종류> [--audience …] [--set …]` 로 테마 고르기 화면을 띄우고 주소를 알려 준다. 화면은 그 문서 종류로 열린다.
+   - 사용자가 화면에서 "이번 문서에만" 을 누르고 골랐다고 하면 `{run} picked` 가 내는 인자로 다시 조립해 그 문서를 고쳐 쓴다. "이 종류에 저장" 을 눌렀으면 슬롯의 종류별 값에 남았으니 같은 인자로 다시 조립하면 된다.
 8. 사용자가 캐릭터를 보여 달라고 하면 `{run} card --color never` 의 출력을 보여 준다. 꾸며 달라고 하면 `{run} look` 으로 열린 부위를 보고 `{run} look <부위> <값>` 을 부른다. 캐릭터 키우기를 끄거나 켜 달라고 하면 `{run} growth off` 나 `{run} growth on` 을 부른다. 성장 기록과 승급 키, 슬롯의 `look:` 절은 사용자가 부탁해도 직접 고치지 않는다. 레벨은 문서를 써서 오르고, 3차와 4차 전직은 저장소에 기여하고 받은 승급 키를 `{run} promote <키>` 로 넣어야 열린다고 알려 준다.
-9. 사용자가 화면을 열어 달라고 하거나 화면에서 고르겠다고 하면 사용자에게 명령을 시키지 않고 직접 띄운 뒤 나온 주소를 알려 준다. 화면은 두 가지다. 말투나 분량 같은 테마 값을 카드로 견줘 고르려면 `{run} serve --detach` 로 테마 고르기 화면을 띄운다. 처음 세팅하거나 클래스와 캐릭터를 고르려면 `{run} serve --page create --detach` 로 캐릭터 만들기 화면을 띄운다. 어느 쪽인지 모르면 프로필이 없을 때는 캐릭터 만들기 화면을, 있을 때는 테마 고르기 화면을 띄운다.
+9. 사용자가 화면을 열어 달라고 하거나 화면에서 고르겠다고 하면 사용자에게 명령을 시키지 않고 직접 띄운 뒤 나온 주소를 알려 준다. 화면은 두 가지다. 말투나 분량 같은 테마 값을 카드로 견줘 고르려면 `{run} serve --detach` 로 테마 고르기 화면을 띄운다. 쓰고 있는 문서가 있으면 7번처럼 그 문서의 `--kind` 와 `--audience`, `--set` 을 붙인다. 처음 세팅하거나 클래스와 캐릭터를 고르려면 `{run} serve --page create --detach` 로 캐릭터 만들기 화면을 띄운다. 어느 쪽인지 모르면 프로필이 없을 때는 캐릭터 만들기 화면을, 있을 때는 테마 고르기 화면을 띄운다.
 10. 사용자가 예전에 쓴 글로 문체를 맞춰 달라고 하거나 bootstrap 중에 글을 주면 아래 순서로 배운다. 원문은 어디에도 저장하지 않는다.
    - 파일이면 경로를 그대로 넘기고, 붙여 넣은 글이면 `-` 를 쓰고 heredoc 으로 넘긴다. check 처럼 다른 명령과 잇지 않는다.
      ```sh
@@ -2703,8 +2706,35 @@ def clean_slot(th, data, old=None):
     return out
 
 
-def make_server(th, cwd, port=0):
-    """(서버, 열쇠). 서버는 127.0.0.1 에서만 받는다."""
+def serve_context(th, kind=None, audience=None, sets=None):
+    """에이전트가 넘긴 지금 문서의 맥락. 테마 고르기 화면이 이 종류와 독자로 열린다. 모르는 값은 거절한다."""
+    if kind and kind not in th.kinds:
+        raise Missing(f"모르는 문서 종류: {kind}")
+    auds = _auds(audience) or []
+    for x in auds:
+        if x not in th.audiences:
+            raise Missing(f"모르는 독자: {x}")
+    vals = _sets(sets) if isinstance(sets, list) else dict(sets or {})
+    for axis, value in vals.items():
+        th.known(axis, value)
+    return {"kind": kind or None, "audiences": auds, "sets": vals}
+
+
+def picked_path():
+    return config_dir() / "picked.json"
+
+
+def picked_args(pick):
+    """고른 값을 compose 와 check 에 그대로 붙일 인자로 바꾼다."""
+    out = [f"--kind {pick['kind']}"] if pick.get("kind") else []
+    if pick.get("audiences"):
+        out.append("--audience " + ",".join(pick["audiences"]))
+    out += [f"--set {k}={v}" for k, v in sorted((pick.get("sets") or {}).items())]
+    return " ".join(out)
+
+
+def make_server(th, cwd, port=0, context=None):
+    """(서버, 열쇠). 서버는 127.0.0.1 에서만 받는다. context 는 에이전트가 넘긴 지금 문서의 맥락이다."""
     token = secrets.token_urlsafe(18)
     seen = {"at": time.time()}
 
@@ -2741,7 +2771,7 @@ def make_server(th, cwd, port=0):
                 if self.allowed(True):
                     slot = (parse_qs(url.query).get("slot") or [None])[0]
                     try:
-                        self.send(200, serve_state(th, cwd, slot))
+                        self.send(200, {**serve_state(th, cwd, slot), "context": context or serve_context(th)})
                     except Missing as e:
                         self.send(400, {"ok": False, "message": str(e)})
                 return
@@ -2780,16 +2810,25 @@ def make_server(th, cwd, port=0):
                 if kind and kind not in th.kinds:
                     raise Missing(f"모르는 문서 종류: {kind}")
                 place = lambda d: d.setdefault("kinds", {}).setdefault(kind, {}) if kind else d.setdefault("defaults", {})
+
+                def put(d):
+                    # clear 는 그 종류에 남긴 값을 지워 종류가 권하는 조합으로 되돌린다
+                    if body.get("clear") and kind:
+                        (d.get("kinds") or {}).pop(kind, None)
+                        if not d.get("kinds"):
+                            d.pop("kinds", None)
+                    else:
+                        place(d).update(sets)
                 if body.get("here"):
                     data = read_folder(Path(cwd) / FOLDER_FILE)
-                    place(data).update(sets)
+                    put(data)
                     where = write_folder(data, cwd)
                 else:
                     target = profile_source(slot, start=cwd)[0]
                     data = read_slot(target)
                     if not data:
                         raise Missing("이 슬롯이 아직 없다. 캐릭터 만들기에서 먼저 만든다")
-                    place(data).update(sets)
+                    put(data)
                     target.write_text(dump_yaml(data), encoding="utf-8")
                     where = target
                 return {"ok": True, "message": f"저장했다: {where}", "state": serve_state(th, cwd, slot)}
@@ -2812,6 +2851,27 @@ def make_server(th, cwd, port=0):
                     written = export(th, data["profile"]["agents"], say=lambda m: None)
                     notes.append("스킬을 깔았다: " + ", ".join(str(w) for w in written) if written else "깔 스킬이 없다")
                 return {"ok": True, "message": " · ".join(notes), "state": serve_state(th, cwd, name)}
+            if path == "/api/pick":
+                # 테마 고르기의 "이번 문서에만". 슬롯에는 쓰지 않고, 에이전트가 suit.py picked 로 읽어 다시 조립한다
+                ctx = serve_context(th, body.get("kind"), ",".join(body.get("audiences") or []), body.get("sets") or {})
+                pick = {"at": datetime.now().isoformat(timespec="seconds"), "cwd": cwd, **ctx}
+                picked_path().parent.mkdir(parents=True, exist_ok=True)
+                picked_path().write_text(json.dumps(pick, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
+                return {"ok": True, "message": "골랐다. 대화창에 \"골랐어\" 라고 하면 에이전트가 이 값으로 다시 쓴다", "args": picked_args(pick)}
+            if path == "/api/learn":
+                # 캐릭터 만들기에서 붙여 넣은 예전 글을 잰다. 원문은 재기만 하고 어디에도 남기지 않는다
+                texts = [x for x in (body.get("texts") or []) if isinstance(x, str) and x.strip()]
+                if not texts:
+                    raise Missing("잴 글이 없다. 예전에 쓴 글을 붙여 넣는다")
+                human = set(body.get("human") or [])
+                samples = []
+                for i, text in enumerate(texts):
+                    x = learn_sample(th, f"글 {i + 1}", text, False)
+                    if i in human and x["suspect"]:
+                        x["suspect"], x["vouched"] = False, True
+                    samples.append(x)
+                plan, voice_ok, chars = learn_plan(samples)
+                return {"ok": True, "samples": samples, "plan": plan, "voice_ok": voice_ok, "chars": chars}
             if path == "/api/stop":
                 threading.Thread(target=self.server.shutdown, daemon=True).start()
                 return {"ok": True, "message": "화면 서버를 껐다. 이 탭은 닫아도 된다"}
@@ -2849,14 +2909,35 @@ def free_port(prefer=8790, fixed=False):
     raise OSError(f"{prefer} 번 포트는 다른 프로그램이 쓰고 있다. --port 를 빼면 빈 포트를 고른다" if fixed else "빈 포트를 찾지 못했다")
 
 
+def cmd_picked(a, th):
+    """테마 고르기에서 "이번 문서에만" 으로 고른 값을 compose 인자로 낸다."""
+    path = picked_path()
+    if not path.exists():
+        print("고른 값이 없다. 화면에서 \"이번 문서에만\" 을 누르고 다시 부른다")
+        return 1
+    pick = json.loads(path.read_text(encoding="utf-8"))
+    if a.clear:
+        path.unlink()
+    if a.json:
+        print(json.dumps({**pick, "args": picked_args(pick)}, ensure_ascii=False, indent=1))
+        return 0
+    age = (datetime.now() - datetime.fromisoformat(pick["at"])).total_seconds() / 60
+    print(f"{pick['at'][11:16]} 에 고른 값이다" + (f". {int(age)}분 전이라 지금 문서의 것이 맞는지 확인한다" if age > 60 else ""))
+    print(picked_args(pick) or "고른 값이 없다. 화면이 연 종류와 독자 그대로다")
+    return 0
+
+
 def cmd_serve(a, th):
     """초기 세팅이나 테마를 바꿀 때 띄우는 로컬 화면. --detach 는 뒤에서 띄우고 바로 돌아온다."""
     cwd = os.path.abspath(os.path.expanduser(a.cwd or os.getcwd()))
+    context = serve_context(th, a.kind, a.audience, a.set)
     port = free_port(a.port or 8790, fixed=bool(a.port))
     url = f"http://127.0.0.1:{port}/{a.page}.html"
     if a.detach:
         # 포트가 비어 있는 것을 위에서 봤으니, 이 포트에 연결되면 띄운 서버다. 서버가 먼저 끝나면 뜨지 못한 것이다.
         args = [sys.executable, str(HERE / "suit.py"), "serve", "--port", str(port), "--cwd", cwd, "--page", a.page, "--no-open"]
+        args += (["--kind", a.kind] if a.kind else []) + (["--audience", a.audience] if a.audience else [])
+        args += [x for s in a.set or [] for x in ("--set", s)]
         child = subprocess.Popen(args, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                                  start_new_session=True)
         for _ in range(30):
@@ -2870,7 +2951,7 @@ def cmd_serve(a, th):
             child.kill()
             raise OSError("화면 서버가 3초 안에 뜨지 않았다")
     else:
-        httpd, _ = make_server(th, cwd, port)
+        httpd, _ = make_server(th, cwd, port, context)
     _, slot, _, why = profile_source(None, start=cwd)
     reason = {"env": "환경 변수", "arg": "--profile", "folder": "폴더 파일", "current": "profile use", "default": "기본 슬롯"}[why]
     print(f"docs-suit 화면: {url}\n실행한 폴더 {cwd} · 슬롯 {slot or '-'} ({reason}). 화면에서 다른 슬롯도 고를 수 있다.\n"
@@ -3518,6 +3599,8 @@ def selftest(th):
             code, _ = req("/api/defaults", {"defaults": {"voice": "prose"}, "kind": "work-report"})
             check(code == 200 and read_slot(slot_path("default")).get("kinds") == {"work-report": {"voice": "prose"}},
                   "테마 고르기에서 고른 문서 종류의 값으로 남기지 못한다")
+            code, _ = req("/api/defaults", {"kind": "work-report", "clear": True})
+            check(code == 200 and "kinds" not in read_slot(slot_path("default")), "문서 종류에 남긴 값을 지우지 못한다")
             code, _ = req("/api/slot", {"slot": "web", "useHere": True, "data": {
                 "profile": {"class": "student"}, "persona": {"call": '민수 "님"', "docs": ["report"]}, "look": {"hair": "bob"}}})
             web = read_slot(slot_path("web"))
@@ -3526,6 +3609,25 @@ def selftest(th):
                   f"캐릭터 만들기의 슬롯을 쓰지 못하거나 폴더 파일을 남기지 않았다: {code}")
             state = json.loads(req("/api/state")[1])
             check(state["slot"] == "web" and state["why"] == "folder", "폴더 파일이 고른 슬롯을 상태에 싣지 않는다")
+            check(state["context"] == {"kind": None, "audiences": [], "sets": {}}, "맥락 없이 띄운 화면의 상태가 다르다")
+            # 이번 문서에만: 슬롯은 두고 고른 값을 picked 로 넘긴다
+            before = read_slot(slot_path("web"))
+            code, body = req("/api/pick", {"kind": "biz-report", "audiences": ["manager"], "sets": {"voice": "prose"}})
+            check(code == 200 and json.loads(body)["args"] == "--kind biz-report --audience manager --set voice=prose"
+                  and read_slot(slot_path("web")) == before, "이번 문서에만 고른 값을 넘기지 못하거나 슬롯을 바꿨다")
+            check(json.loads(picked_path().read_text(encoding="utf-8"))["sets"] == {"voice": "prose"}
+                  and quiet(cmd_picked, argparse.Namespace(json=False, clear=True), th) == 0 and not picked_path().exists()
+                  and quiet(cmd_picked, argparse.Namespace(json=False, clear=False), th) == 1,
+                  "picked 가 고른 값을 읽지 못하거나 --clear 로 지우지 못한다")
+            check(req("/api/pick", {"kind": "nope"})[0] == 400, "모르는 문서 종류를 넘겼다")
+            # 문체 재기: 잰 값만 돌려주고 원문은 돌려주거나 남기지 않는다
+            essay = "정류장 대기 시간을 사흘 동안 쟀다. 출근 시간대 평균은 12분이었다. 다른 시간대의 두 배다.\n\n" * 2
+            code, body = req("/api/learn", {"texts": [essay, essay]})
+            got = json.loads(body) if code == 200 else {}
+            check(code == 200 and got["plan"].get("register", {}).get("value") == "plain" and "정류장" not in body,
+                  f"문체 재기가 다르거나 원문을 돌려준다: {code}")
+            check(not any(f.is_file() and "정류장" in f.read_text(encoding="utf-8", errors="ignore")
+                          for f in Path(td).rglob("*")), "문체 재기가 원문을 파일로 남겼다")
         finally:
             if httpd:
                 httpd.shutdown()
@@ -3667,6 +3769,12 @@ def main(argv=None):
     sv.add_argument("--page", choices=("index", "create"), default="index", help="처음 열 화면")
     sv.add_argument("--detach", action="store_true", help="뒤에서 띄우고 바로 돌아온다. 에이전트가 쓸 때 붙인다")
     sv.add_argument("--no-open", action="store_true", help="브라우저를 열지 않는다")
+    sv.add_argument("--kind", help="지금 쓰는 문서 종류. 테마 고르기가 이 종류로 열린다")
+    sv.add_argument("--audience", help="지금 문서의 독자. 쉼표로 잇는다")
+    sv.add_argument("--set", action="append", metavar="축=값", help="지금 문서에 대화로 정한 값")
+    pk = sub.add_parser("picked")
+    pk.add_argument("--json", action="store_true")
+    pk.add_argument("--clear", action="store_true", help="읽은 뒤 지운다")
     st = sub.add_parser("status", parents=[slot])
     st.add_argument("--size", choices=("face", "full", "line"), default="face", help="face 는 얼굴, full 은 온몸, line 은 한 줄")
     st.add_argument("--cwd", help="이 폴더 기준으로 슬롯을 고른다. 주지 않으면 표준 입력의 JSON 이나 지금 폴더")
@@ -3680,7 +3788,7 @@ def main(argv=None):
         return {"bootstrap": cmd_bootstrap, "profile": cmd_profile, "list": cmd_list, "get": cmd_get,
                 "compose": cmd_compose, "set": cmd_set, "export": cmd_export, "check": cmd_check, "review": cmd_review,
                 "card": cmd_card, "learn": cmd_learn, "voice": cmd_voice,
-                "look": cmd_look, "preset": cmd_preset, "promote": cmd_promote, "growth": cmd_growth, "status": cmd_status, "widget": cmd_widget, "serve": cmd_serve,
+                "look": cmd_look, "preset": cmd_preset, "promote": cmd_promote, "growth": cmd_growth, "status": cmd_status, "widget": cmd_widget, "serve": cmd_serve, "picked": cmd_picked,
                 "bundle": cmd_bundle}[a.cmd](a, th)
     except Missing as e:
         print(f"오류: {e}", file=sys.stderr)
