@@ -14,7 +14,8 @@ th = suit.Themes(ROOT / "themes" / suit.DEFAULT_LANG)
 profiles = [
     {},
     {"persona": {"call": "민수 님", "affiliation": "백엔드, 2년 차", "facts": "지도 시각화를 좋아한다", "docs": ["pr"]},
-     "defaults": {"register": "haeyo", "exposure": "team"}, "audiences": {"professor": {"skeleton": "pcs"}}},
+     "defaults": {"register": "haeyo", "exposure": "team"}, "audiences": {"professor": {"skeleton": "pcs"}},
+     "kinds": {"work-report": {"voice": "prose", "exposure": "public"}, "report": {"skeleton": "chrono", "length": "brief"}}},
 ]
 extras = [
     {"sets": {}, "chars": None, "fmt": "prompt", "revise": False, "voice": None},

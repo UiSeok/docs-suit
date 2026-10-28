@@ -12,7 +12,7 @@
       return vals[0];
     }
 
-    // suit.py resolve() 와 같은 순서: kind > arg > profile-audience > prefer > profile > audience > class > default
+    // suit.py resolve() 와 같은 순서: kind > arg > profile-kind > profile-audience > prefer > profile > audience > class > default
     // talk 이면 종류 없는 글의 문체 축은 직접 고른 값으로만 정하고, 없으면 [null, "talk"] 로 남겨 대화로 정하게 한다.
     function resolve(kind, auds, sets, profile, cls, talk) {
       const warns = [];
@@ -22,6 +22,8 @@
       if (!auds.length && kspec.audience) auds = kspec.audience.slice();
       const pDef = profile.defaults || {};
       const pAud = profile.audiences || {};
+      const pKindRaw = kind && profile.kinds ? profile.kinds[kind] : null;
+      const pKind = pKindRaw && typeof pKindRaw === "object" ? pKindRaw : {};
       const prefer = (kind && T.prefer[kind]) || {};
       const cDef = cls ? T.classes[cls].defaults : {};
       const out = {};
@@ -32,7 +34,7 @@
           for (const [c, s] of [[fixed, "kind"], [fromAudiences(axis, auds, T.audiences), "audience"], [cDef[axis], "class"], [T.defaults[axis], "default"]]) {
             if (c) { base = c; src = s; break; }
           }
-          for (const [c, s] of [[sets[axis], "arg"], [fromAudiences(axis, auds, pAud), "profile-audience"], [pDef[axis], "profile"]]) {
+          for (const [c, s] of [[sets[axis], "arg"], [pKind[axis], "profile-kind"], [fromAudiences(axis, auds, pAud), "profile-audience"], [pDef[axis], "profile"]]) {
             if (!c || T.exposureStrict.indexOf(c) < 0) continue;
             if (T.exposureStrict.indexOf(c) < T.exposureStrict.indexOf(base)) { base = c; src = s; }
             else if (c !== base) warns.push(`공개 범위는 더 조심하는 쪽으로만 바뀌어 ${c} 대신 ${base} 를 씁니다. 팀 안에서만 볼 글이면 독자에서 팀원·동료나 동료 개발자를 고릅니다`);
@@ -49,7 +51,7 @@
           out[axis] = sets[axis] ? [sets[axis], "arg"] : [null, "talk"];
           continue;
         }
-        const chain = [[sets[axis], "arg"], [fromAudiences(axis, auds, pAud), "profile-audience"], [prefer[axis], "prefer"],
+        const chain = [[sets[axis], "arg"], [pKind[axis], "profile-kind"], [fromAudiences(axis, auds, pAud), "profile-audience"], [prefer[axis], "prefer"],
           [pDef[axis], "profile"], [fromAudiences(axis, auds, T.audiences), "audience"], [cDef[axis], "class"], [T.defaults[axis], "default"]];
         for (const [c, s] of chain) {
           if (!c) continue;
@@ -61,7 +63,7 @@
       return { vals: out, auds, cls, warns };
     }
 
-    const SRC = { kind: "문서 종류가 고정", arg: "직접 고름", "profile-audience": "내 독자 설정", prefer: "문서 종류가 권함",
+    const SRC = { kind: "문서 종류가 고정", arg: "직접 고름", "profile-kind": "내 문서 종류 설정", "profile-audience": "내 독자 설정", prefer: "문서 종류가 권함",
       profile: "내 기본값", audience: "독자", class: "클래스", default: "중립 기본값", talk: "대화로 정함" };
 
     function label(axis, v) {

@@ -101,7 +101,7 @@ TEMPLATE = "template"
 TALK_KEEP = ("exposure", "markup", "visual-doc", "visual-deck")
 CONFIG_DEFAULT = "~/.config/docs-suit"  # 기본 슬롯은 profile.yaml, 이름 붙은 슬롯은 profiles/<이름>.yaml
 FOLDER_FILE = ".docs-suit.yaml"
-FOLDER_KEYS = ("profile", "defaults", "audiences")
+FOLDER_KEYS = ("profile", "defaults", "audiences", "kinds")
 PRESET_HEAD = ("# docs-suit 테마 조합. suit.py preset use <이름> 으로 내 슬롯에 입힌다.\n"
                "# 공개 저장소에 올라가므로 페르소나와 회사, 사람 이름은 넣지 않는다.")
 SLOT_RE = re.compile(r"^[\w-]+$")
@@ -414,14 +414,15 @@ def merge_folder(profile, folder):
     out = dict(profile)
     defaults = dict(profile.get("defaults") or {})
     defaults.update(folder.get("defaults") or {})
-    auds = {k: dict(v) for k, v in (profile.get("audiences") or {}).items() if isinstance(v, dict)}
-    for k, v in (folder.get("audiences") or {}).items():
-        if isinstance(v, dict):
-            auds.setdefault(k, {}).update(v)
     if defaults:
         out["defaults"] = defaults
-    if auds:
-        out["audiences"] = auds
+    for key in ("audiences", "kinds"):  # 독자별 값과 문서 종류별 값은 같은 꼴로 겹친다
+        both = {k: dict(v) for k, v in (profile.get(key) or {}).items() if isinstance(v, dict)}
+        for k, v in (folder.get(key) or {}).items():
+            if isinstance(v, dict):
+                both.setdefault(k, {}).update(v)
+        if both:
+            out[key] = both
     return out
 
 
@@ -458,7 +459,8 @@ def _from_audiences(axis, auds, table):
 
 def resolve(th, kind=None, audiences=None, sets=None, profile=None, cls=None, warn=lambda m: None, talk=False):
     """축마다 (값, 출처) 와 쓴 독자, 쓴 클래스를 돌려준다.
-    출처: kind · arg · profile-audience · prefer · profile · audience · class · default · talk.
+    출처: kind · arg · profile-kind · profile-audience · prefer · profile · audience · class · default · talk.
+    profile-kind 는 set --kind 로 남긴 문서 종류별 값이다. 종류가 권하는 값을 이기게 하려고 둔다.
     talk 이면 종류 없는 글의 문체 축은 인자로만 정하고, 인자가 없으면 (None, "talk") 로 남겨 대화로 정하게 한다.
     슬롯 전체의 테마를 보이는 card, status, 웹 채팅용 지침은 talk 없이 부른다."""
     sets = sets or {}
@@ -478,6 +480,9 @@ def resolve(th, kind=None, audiences=None, sets=None, profile=None, cls=None, wa
 
     p_defaults = profile.get("defaults", {})
     p_auds = profile.get("audiences", {})
+    p_kind = (profile.get("kinds") or {}).get(kind) or {} if kind else {}
+    if not isinstance(p_kind, dict):
+        p_kind = {}
     prefer = th.prefer.get(kind, {}) if kind else {}
     cdef = th.classes[cls]["defaults"] if cls else {}
     out = {}
@@ -490,7 +495,8 @@ def resolve(th, kind=None, audiences=None, sets=None, profile=None, cls=None, wa
                 if cand:
                     base, src = cand, s
                     break
-            for cand, s in ((sets.get(axis), "arg"), (_from_audiences(axis, auds, p_auds), "profile-audience"),
+            for cand, s in ((sets.get(axis), "arg"), (p_kind.get(axis), "profile-kind"),
+                            (_from_audiences(axis, auds, p_auds), "profile-audience"),
                             (p_defaults.get(axis), "profile")):
                 if not cand or cand not in EXPOSURE_STRICT:
                     continue
@@ -511,6 +517,7 @@ def resolve(th, kind=None, audiences=None, sets=None, profile=None, cls=None, wa
             continue
         chain = (
             (sets.get(axis), "arg"),
+            (p_kind.get(axis), "profile-kind"),
             (_from_audiences(axis, auds, p_auds), "profile-audience"),
             (prefer.get(axis), "prefer"),
             (p_defaults.get(axis), "profile"),
@@ -1707,7 +1714,7 @@ description: 문서를 쓰거나 다듬거나 검토할 때 docs-suit 테마를 
    ```
    `✗` 가 나온 줄이 있으면 그 줄이 말하는 대로 한 번 고쳐 쓰고 같은 명령을 다시 부른다. `△` 는 제안이다. 본문을 보고 고칠 만한 것만 고치고, 고치지 않아도 검사는 통과다. 답에 보이는 본문은 마지막으로 검사에 넘긴 본문과 글자 하나까지 같게 둔다. 보일 때 제목을 굵게 바꾸는 식으로 손대지 않는다. 출력에 `성장:` 으로 시작하는 줄이 있으면 본문과 떨어뜨려 답의 맨 끝에 그 줄만 그대로 옮긴다. 이 줄은 check 만 만들 수 있으니 지어내지 않고, 문서 본문에도 넣지 않는다. `[확인 필요: …]` 표시가 남았으면 모아서 보여 준다.
 6. 사용자가 다 쓴 글을 검토해 달라고 할 때만 `{run} review <본문 파일|-> --kind <종류> [--audience …] [--set …] [--source <원문 파일>]` 을 부른다. 원문은 과제 안내문이나 채용 공고처럼 글이 따라야 할 자료다. 앞선 대화를 모르는 서브에이전트를 새로 띄울 수 있으면 출력 전체를 그 에이전트에게 넘기고, 받은 지적을 그대로 보인다. 띄울 수 없으면 출력을 보여 주고 새 대화에 붙여 넣으라고 권한다. 지적대로 본문을 고칠지는 사용자에게 묻는다.
-7. 사용자가 말투나 모양이 마음에 안 든다고 하면 어느 축의 문제인지 짚고, 그 축의 다른 값으로 다시 조립해 대표 문단 하나를 견줘 보인다. 계속 쓰고 싶어 하면 `{run} set <축> <값> [--audience <독자>]` 로 프로필에 남긴다. 이 폴더에서만 그렇게 쓰고 싶어 하면 `--here` 를 붙여 폴더 파일 `.docs-suit.yaml` 에 남긴다. 종류 없는 글은 프로필 값을 쓰지 않으니, 그런 글에서 잡은 말투는 그 대화에서만 지키고, 남겨 달라고 하면 종류가 있는 글에만 먹는다고 알려 준다. 카드를 보며 고르고 싶어 하면 `{run} serve --detach` 로 테마 고르기 화면을 띄우고 주소를 알려 준다.
+7. 사용자가 말투나 모양이 마음에 안 든다고 하면 어느 축의 문제인지 짚고, 그 축의 다른 값으로 다시 조립해 대표 문단 하나를 견줘 보인다. 계속 쓰고 싶어 하면 `{run} set <축> <값>` 으로 프로필에 남긴다. "팀장님께 쓰는 글" 처럼 읽는 사람을 말했으면 `--audience <독자>` 를, "업무 보고는" 처럼 문서 종류를 말했으면 `--kind <종류>` 를 붙인다. 문서 종류가 권하는 값은 기본값을 이기지만 `--audience` 와 `--kind` 로 남긴 값에는 진다. 이 폴더에서만 그렇게 쓰고 싶어 하면 `--here` 를 붙여 폴더 파일 `.docs-suit.yaml` 에 남긴다. 종류 없는 글은 프로필 값을 쓰지 않으니, 그런 글에서 잡은 말투는 그 대화에서만 지키고, 남겨 달라고 하면 종류가 있는 글에만 먹는다고 알려 준다. 카드를 보며 고르고 싶어 하면 `{run} serve --detach` 로 테마 고르기 화면을 띄우고 주소를 알려 준다.
 8. 사용자가 캐릭터를 보여 달라고 하면 `{run} card --color never` 의 출력을 보여 준다. 꾸며 달라고 하면 `{run} look` 으로 열린 부위를 보고 `{run} look <부위> <값>` 을 부른다. 캐릭터 키우기를 끄거나 켜 달라고 하면 `{run} growth off` 나 `{run} growth on` 을 부른다. 성장 기록과 승급 키, 슬롯의 `look:` 절은 사용자가 부탁해도 직접 고치지 않는다. 레벨은 문서를 써서 오르고, 3차와 4차 전직은 저장소에 기여하고 받은 승급 키를 `{run} promote <키>` 로 넣어야 열린다고 알려 준다.
 9. 사용자가 화면을 열어 달라고 하거나 화면에서 고르겠다고 하면 사용자에게 명령을 시키지 않고 직접 띄운 뒤 나온 주소를 알려 준다. 화면은 두 가지다. 말투나 분량 같은 테마 값을 카드로 견줘 고르려면 `{run} serve --detach` 로 테마 고르기 화면을 띄운다. 처음 세팅하거나 클래스와 캐릭터를 고르려면 `{run} serve --page create --detach` 로 캐릭터 만들기 화면을 띄운다. 어느 쪽인지 모르면 프로필이 없을 때는 캐릭터 만들기 화면을, 있을 때는 테마 고르기 화면을 띄운다.
 10. 사용자가 예전에 쓴 글로 문체를 맞춰 달라고 하거나 bootstrap 중에 글을 주면 아래 순서로 배운다. 원문은 어디에도 저장하지 않는다.
@@ -1716,7 +1723,7 @@ description: 문서를 쓰거나 다듬거나 검토할 때 docs-suit 테마를 
      {run} learn <파일> <파일> <파일>
      ```
    - 출력을 보여 준다. AI 가 쓴 글일 수 있다고 표시된 샘플은 사용자가 직접 썼는지 묻는다. 직접 썼다고 하면 `--human` 을 붙여 다시 부르고, 아니라고 하면 그 샘플을 빼고 다시 부른다.
-   - 샘플마다 누구에게 쓴 어떤 글인지 묻는다. 제안된 값은 사용자가 고르면 `{run} set <축> <값>` 으로 남기고, 특정 독자에게 쓴 글에서만 나온 값이면 `--audience <독자>` 를 붙인다.
+   - 샘플마다 누구에게 쓴 어떤 글인지 묻는다. 제안된 값은 사용자가 고르면 `{run} set <축> <값>` 으로 남긴다. 특정 독자에게 쓴 글에서만 나온 값이면 `--audience <독자>` 를, 특정 문서 종류에서만 나온 값이면 `--kind <종류>` 를 붙인다.
    - 출력에 내 문체 문서를 쓸 수 있다고 나오면 `{run} learn --guide` 의 지침대로 초안을 쓰고 보여 준다. 사용자가 고치거나 승인한 판만 `{run} voice set -` 에 heredoc 으로 넘긴다. 이 문서는 조립한 지침의 맨 끝에 실린다.
    - 사용자가 내 문체 문서를 보거나 지워 달라고 하면 `{run} voice` 나 `{run} voice clear` 를 부른다.
 """
@@ -2020,6 +2027,7 @@ def cmd_compose(a, th):
 
 
 def cmd_set(a, th):
+    kind = getattr(a, "kind", None)  # 예전 호출처럼 --kind 없이 불러도 된다
     if a.unset == (a.value is not None):
         raise Missing("값을 주거나 --unset 중 하나만 쓴다")
     if a.value is not None:
@@ -2028,24 +2036,29 @@ def cmd_set(a, th):
         raise Missing(f"모르는 축: {a.axis}")
     if a.audience and a.audience not in th.audiences:
         raise Missing(f"모르는 독자: {a.audience}")
+    if kind and a.audience:
+        raise Missing("--kind 와 --audience 는 함께 쓰지 않는다. 누구에게 쓰는 글이면 --audience, 어떤 문서면 --kind 다")
+    if kind and kind not in th.kinds:
+        raise Missing(f"모르는 문서 종류: {kind}")
     # 쓸 때는 폴더 값을 얹지 않은 원본에 쓴다. --here 는 지금 폴더의 폴더 파일에 쓴다.
     data = read_folder(Path.cwd() / FOLDER_FILE, warn_stderr) if a.here else read_slot(profile_path(a.profile), warn_stderr)
     data.setdefault("defaults", {})
-    data.setdefault("audiences", {})
-    if a.audience:
-        prof = data["audiences"].get(a.audience)
+    group, key = ("audiences", a.audience) if a.audience else ("kinds", kind) if kind else (None, None)
+    if group:
+        data.setdefault(group, {})
+        prof = data[group].get(key)
         target = prof if isinstance(prof, dict) else {}
-        data["audiences"][a.audience] = target
+        data[group][key] = target
     else:
         target = data["defaults"]
     if a.unset:
         target.pop(a.axis, None)
-        if a.audience and not target:
-            data["audiences"].pop(a.audience)
+        if group and not target:
+            data[group].pop(key)
     else:
         target[a.axis] = a.value
     p = write_folder(data) if a.here else write_profile(data, a.profile)
-    where = f"독자 {a.audience}" if a.audience else "기본값"
+    where = f"독자 {a.audience}" if a.audience else f"문서 종류 {kind}" if kind else "기본값"
     print(f"{'폴더 파일' if a.here else '프로필'} {p} 의 {where} 에 {a.axis}={'(지움)' if a.unset else a.value}")
     return 0
 
@@ -2161,7 +2174,7 @@ def cmd_learn(a, th):
     for axis, v in plan.items():
         if v["value"]:
             print(f"- {th.axes[axis]['label']} {th.label(axis, v['value'])}: {v['note']}. "
-                  f"남기려면 suit.py set {axis} {v['value']} [--audience <독자>]")
+                  f"남기려면 suit.py set {axis} {v['value']} [--audience <독자> | --kind <종류>]")
         else:
             each = ", ".join(f"{n} {th.label(axis, val)}" for n, val in v["by_sample"].items())
             print(f"- {th.axes[axis]['label']}: {v['note']} ({each})")
@@ -2673,6 +2686,15 @@ def clean_slot(th, data, old=None):
             th.known(axis, value)
     out["defaults"] = dict(defaults)
     out["audiences"] = {k: dict(v) for k, v in auds.items()}
+    # 문서 종류별 값은 화면이 보내지 않으면 있던 값을 남긴다. set --kind 로 남긴 값이 다시 저장할 때 사라지지 않게 한다
+    kinds = data.get("kinds") if data.get("kinds") is not None else old.get("kinds") or {}
+    for kind, vals in kinds.items():
+        if kind not in th.kinds or not isinstance(vals, dict):
+            raise Missing(f"모르는 문서 종류: {kind}")
+        for axis, value in vals.items():
+            th.known(axis, value)
+    if kinds:
+        out["kinds"] = {k: dict(v) for k, v in kinds.items()}
     return out
 
 
@@ -2745,19 +2767,24 @@ def make_server(th, cwd, port=0):
             slot = body.get("slot") or None
             if path == "/api/defaults":
                 # 테마 고르기에서 고른 값을 슬롯이나 실행한 폴더의 폴더 파일 기본값에 얹는다
+                # kind 를 주면 그 문서 종류의 값으로 남겨, 종류가 권하는 값을 이기게 한다
                 sets = body.get("defaults") or {}
                 for axis, value in sets.items():
                     th.known(axis, value)
+                kind = body.get("kind")
+                if kind and kind not in th.kinds:
+                    raise Missing(f"모르는 문서 종류: {kind}")
+                place = lambda d: d.setdefault("kinds", {}).setdefault(kind, {}) if kind else d.setdefault("defaults", {})
                 if body.get("here"):
                     data = read_folder(Path(cwd) / FOLDER_FILE)
-                    data.setdefault("defaults", {}).update(sets)
+                    place(data).update(sets)
                     where = write_folder(data, cwd)
                 else:
                     target = profile_source(slot, start=cwd)[0]
                     data = read_slot(target)
                     if not data:
                         raise Missing("이 슬롯이 아직 없다. 캐릭터 만들기에서 먼저 만든다")
-                    data.setdefault("defaults", {}).update(sets)
+                    place(data).update(sets)
                     target.write_text(dump_yaml(data), encoding="utf-8")
                     where = target
                 return {"ok": True, "message": f"저장했다: {where}", "state": serve_state(th, cwd, slot)}
@@ -3111,6 +3138,14 @@ def selftest(th):
         check(vals["skeleton"] == ("imrad", "prefer"), "프로필 기본값이 종류가 권하는 값을 이겼다")
         vals, _, _ = resolve(th, kind="report", profile={"audiences": {"professor": {"skeleton": "pcs"}}})
         check(vals["skeleton"] == ("pcs", "profile-audience"), "프로필의 독자별 값이 권하는 값을 이기지 못한다")
+        kprof = {"defaults": {"voice": "prose"}, "kinds": {"work-report": {"voice": "prose", "exposure": "public"}},
+                 "audiences": {"manager": {"voice": "bullet"}}}
+        vals, _, _ = resolve(th, kind="work-report", profile=kprof)
+        check(vals["voice"] == ("prose", "profile-kind"), "문서 종류별 값이 독자별 값이나 권하는 값을 이기지 못한다")
+        check(vals["exposure"][0] == "public", "문서 종류별 공개 범위가 더 조심하는 쪽으로 먹지 않는다")
+        check(resolve(th, kind="email", profile=kprof)[0]["voice"][1] != "profile-kind", "다른 종류의 값이 샜다")
+        check(merge_folder({"kinds": {"pr": {"voice": "prose"}}}, {"kinds": {"pr": {"register": "plain"}}})["kinds"]
+              == {"pr": {"voice": "prose", "register": "plain"}}, "폴더 파일의 문서 종류별 값을 겹치지 못한다")
         vals, _, _ = resolve(th, audiences=["teammate", "professor"])
         check(vals["exposure"][0] == "submit" and vals["terms"][0] == "explained", "독자 여럿의 합치기가 다르다")
         vals, _, cls = resolve(th, cls="developer")
@@ -3475,6 +3510,9 @@ def selftest(th):
             check(code == 200 and read_slot(slot_path("default")).get("defaults") == {"register": "haeyo"},
                   "테마 고르기의 값을 실행한 폴더 기준 슬롯에 쓰지 못한다")
             check(req("/api/defaults", {"defaults": {"register": "nope"}})[0] == 400, "모르는 값을 슬롯에 썼다")
+            code, _ = req("/api/defaults", {"defaults": {"voice": "prose"}, "kind": "work-report"})
+            check(code == 200 and read_slot(slot_path("default")).get("kinds") == {"work-report": {"voice": "prose"}},
+                  "테마 고르기에서 고른 문서 종류의 값으로 남기지 못한다")
             code, _ = req("/api/slot", {"slot": "web", "useHere": True, "data": {
                 "profile": {"class": "student"}, "persona": {"call": '민수 "님"', "docs": ["report"]}, "look": {"hair": "bob"}}})
             web = read_slot(slot_path("web"))
@@ -3551,7 +3589,8 @@ def main(argv=None):
     s.add_argument("axis")
     s.add_argument("value", nargs="?")
     s.add_argument("--unset", action="store_true")
-    s.add_argument("--audience")
+    s.add_argument("--audience", help="이 독자에게 쓰는 글에만 쓴다")
+    s.add_argument("--kind", help="이 문서 종류에만 쓴다. 문서 종류가 권하는 값을 이긴다")
     s.add_argument("--here", action="store_true", help="슬롯 대신 지금 폴더의 .docs-suit.yaml 에 쓴다")
     e = sub.add_parser("export", parents=[slot])
     e.add_argument("--agent", required=True, help="claude, agents, codex, antigravity, cursor, grok, web, all")
