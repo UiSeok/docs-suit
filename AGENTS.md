@@ -54,7 +54,7 @@ python3 tests/agent/run.py --agent claude --regrade <기록 폴더>  # 에이전
 
 SKILL.md 문구나 문서 종류, 독자를 바꿨으면 돌리고 `--record` 로 결과를 갱신한다. 새 문서 종류를 더하면 `cases.py` 에도 케이스를 하나 더한다. 에이전트 로그인이 필요하고 돌릴 때마다 사용료가 들어서 CI 에는 넣지 않는다.
 
-실행기는 홈 폴더의 스킬과 프로필을 건드리지 않는다. 케이스마다 임시 폴더에 프로젝트 단위 스킬과 시험 프로필을 두고, `DOCS_SUIT_LOG` 로 suit.py 호출 인자를 모아 채점한다. Claude Code 는 사용자 설정과 개인 스킬, MCP 를 끄고 돌려서 처음 설치한 사람과 조건을 맞춘다.
+실행기는 홈 폴더의 스킬과 프로필을 건드리지 않는다. 케이스마다 임시 폴더에 프로젝트 단위 스킬과 시험 프로필을 두고, `DOCS_SUIT_LOG` 로 suit.py 호출 인자를 모아 채점한다. Claude Code 는 사용자 설정과 개인 스킬, MCP 를 끄고 돌려서 처음 설치한 사람과 조건을 맞춘다. 평소에는 suit.py 호출과 읽기만 허락하고, pptx 나 docx 를 만들어 달라는 케이스에서만 파일 쓰기와 `python3`, `pandoc` 실행을 더 허락한다.
 
 Antigravity CLI 는 한 번 실행 모드에서 확인 창을 띄우지 못해 명령을 거절하고, 작업 폴더 단위 설정이 없다. 그래서 `~/.gemini/antigravity-cli/settings.json` 의 `permissions.allow` 에 `command(python3 <suit.py 절대 경로>)` 를 더한 뒤 돌린다. Codex CLI 는 exec 모드가 샌드박스 안에서 확인 없이 돌아서 따로 설정하지 않는다. 다만 이 샌드박스는 포트 열기를 막아 화면 케이스에서 서버가 뜨지 않으므로, 화면 케이스는 알맞은 화면을 `--detach` 로 불렀는지만 잰다.
 

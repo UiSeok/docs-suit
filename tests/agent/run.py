@@ -39,13 +39,18 @@ RUN = f"python3 {SUIT}"
 
 
 # ---------------------------------------------------------------- 에이전트
-def claude_cmd(ask, tmp, model, session=None, keep=False):
+# 문서 파일을 만들어 달라는 케이스에서만 파일 쓰기와 문서를 만드는 도구를 더 허락한다. 임시 작업 폴더 안에서 돈다.
+FILE_TOOLS = ("Write", "Edit", "Bash(python3:*)", "Bash(pandoc:*)")
+
+
+def claude_cmd(ask, tmp, model, session=None, keep=False, files=False):
     # 사용자 설정과 개인 스킬, 전역 CLAUDE.md, MCP 를 끄고 처음 설치한 사람과 같은 조건으로 돌린다.
+    allow = [f"Bash({RUN}:*)", "Bash(date:*)", "Read", "Skill"] + (list(FILE_TOOLS) if files else [])
+    deny = [] if files else ["--disallowedTools", "Write", "Edit"]
     return ["claude", "-p", ask, "--output-format", "stream-json", "--verbose",
             "--setting-sources", "project,local", "--strict-mcp-config",
             "--settings", '{"disableAllHooks": true}',
-            "--allowedTools", f"Bash({RUN}:*)", "Bash(date:*)", "Read", "Skill",
-            "--disallowedTools", "Write", "Edit"] + (["--model", model] if model else []) + \
+            "--allowedTools"] + allow + deny + (["--model", model] if model else []) + \
         (["--resume", session] if session else [])
 
 
@@ -71,7 +76,7 @@ def claude_meta(out):
     return meta
 
 
-def antigravity_cmd(ask, tmp, model, session=None, keep=False):
+def antigravity_cmd(ask, tmp, model, session=None, keep=False, files=False):
     # 한 번 실행 모드는 확인 창을 띄우지 못해 명령을 거절한다. 작업 폴더 단위 설정이 없으므로
     # ~/.gemini/antigravity-cli/settings.json 의 permissions.allow 에 command(python3 <suit.py 절대 경로>) 가 있어야 한다.
     return ["agy", "-p", ask, "--output-format", "stream-json", "--print-timeout", "900s"] + \
@@ -99,7 +104,7 @@ def antigravity_meta(out):
     return meta
 
 
-def codex_cmd(ask, tmp, model, session=None, keep=False):
+def codex_cmd(ask, tmp, model, session=None, keep=False, files=False):
     # exec 모드는 확인을 묻지 않고 샌드박스 안에서 돌린다. suit.py 가 호출 기록을 쓰도록 임시 폴더를 쓰기 자리에 더하고,
     # 사용자 config.toml 은 읽지 않는다. 여러 턴 흐름은 세션을 이어 가야 해서 그때만 세션을 남긴다.
     common = ["--json", "--skip-git-repo-check", "--ignore-user-config"] + (["--model", model] if model else [])
@@ -301,7 +306,8 @@ def file_checks(ext, tmp, vals, chars, kind):
         text, _ = suit.doc_file_text(made[-1])
     except ValueError as e:
         return out + [("file", False, f"파일을 읽지 못했다: {e}")]
-    return out + suit.check_doc(text, vals, chars, kind, th)
+    # 엔진의 check 처럼 문서 파일은 마크다운 기호가 새어 나올 일이 없어 출력 형식을 재지 않는다
+    return out + suit.check_doc(text, {k: v for k, v in vals.items() if k != "markup"}, chars, kind, th)
 
 
 def doc_summary(checks):
@@ -314,9 +320,9 @@ def doc_summary(checks):
 
 
 # ---------------------------------------------------------------- 실행
-def invoke(agent, ask, tmp, proj, env, model, session=None, keep=False):
+def invoke(agent, ask, tmp, proj, env, model, session=None, keep=False, files=False):
     try:
-        p = subprocess.run(AGENTS[agent]["cmd"](ask, tmp, model, session, keep), cwd=proj, env=env,
+        p = subprocess.run(AGENTS[agent]["cmd"](ask, tmp, model, session, keep, files), cwd=proj, env=env,
                            stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=900)
         return p.stdout, p.stderr
     except subprocess.TimeoutExpired as e:
@@ -401,7 +407,7 @@ def load_case(agent, case, base):
 def run_case(agent, case, base, model, glob=False):
     tmp, proj, env = prepare(agent, case, base, glob)
     t0 = time.time()
-    out, err = invoke(agent, case["ask"], tmp, proj, env, model, keep=True)
+    out, err = invoke(agent, case["ask"], tmp, proj, env, model, keep=True, files=bool(case.get("file")))
     stop_servers(proj)
     (tmp / "transcript.jsonl").write_text(out, encoding="utf-8")
     (tmp / "stderr.txt").write_text(err or "", encoding="utf-8")
@@ -410,7 +416,8 @@ def run_case(agent, case, base, model, glob=False):
     made = case.get("file") and any(f for f in proj.rglob(f"*{case['file']}") if ".agents" not in f.parts)
     if vals and first["session"] and not made and not doc_text(first["reply"], proj):
         env2 = dict(env, DOCS_SUIT_LOG=str(tmp / "calls-2.jsonl"))
-        out2, err2 = invoke(agent, FOLLOWUP, tmp, proj, env2, model, first["session"], keep=True)
+        out2, err2 = invoke(agent, FOLLOWUP, tmp, proj, env2, model, first["session"], keep=True,
+                            files=bool(case.get("file")))
         (tmp / "transcript-2.jsonl").write_text(out2, encoding="utf-8")
         (tmp / "stderr.txt").write_text((err or "") + "\n" + (err2 or ""), encoding="utf-8")
     case, ok, shown, why, meta = load_case(agent, case, base)
