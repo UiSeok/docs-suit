@@ -145,6 +145,7 @@
       if (locked) note = "이 축은 문서 종류가 정합니다.";
       else if (axis === "visual-deck" && state.kind !== "slides") note = "발표 PPT 를 고를 때만 지침에 실립니다.";
       else if (axis === "visual-doc" && vals.markup[0] !== "html") note = "출력 형식을 HTML 로 고르면 지침에 실립니다.";
+      else if (src === "talk") note = "일반 글은 이 축을 미리 정하지 않고 AI 가 요청과 대화에서 읽어 맞춥니다. 카드를 고르면 그 값으로 정합니다.";
       else if (axis === "exposure") note = "개인정보를 지키는 축이라 더 조심하는 쪽으로만 바꿀 수 있습니다. 팀 안에서만 볼 글이면 독자를 바꿉니다.";
       if (note) {
         const n = document.createElement("p");
@@ -181,7 +182,7 @@
 
   function render() {
     const auds = state.aud ? [state.aud] : [];
-    const r = C.resolve(state.kind, auds, state.sets, loadPersonal(), state.cls);
+    const r = C.resolve(state.kind, auds, state.sets, loadPersonal(), state.cls, true);
     buildChips();
     buildGallery(r.vals);
     $("warns").textContent = r.warns.join(" ");

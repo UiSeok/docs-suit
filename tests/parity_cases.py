@@ -24,11 +24,14 @@ extras = [
 aud_ids = list(th.audiences)
 cases = []
 for i, (cls, kind) in enumerate(itertools.product([None] + list(th.classes), [None] + list(th.kinds))):
-    for prof, ex in itertools.product(profiles, extras):
+    # 종류 없는 글은 대화로 정하는 조립과 슬롯 전체의 테마를 보이는 조립을 둘 다 견준다
+    for prof, ex, talk in itertools.product(profiles, extras, [False, True] if kind is None else [False]):
         auds = [] if (i + len(cases)) % 3 else [aud_ids[i % len(aud_ids)]]
-        text, _ = suit.compose(th, kind, auds or None, ex["sets"], prof, cls, ex["chars"], ex["fmt"], ex["revise"])
-        rv = suit.review(th, kind, auds or None, ex["sets"], prof, cls, ex["chars"])
-        cases.append({"cls": cls, "kind": kind, "auds": auds, "profile": prof, **ex, "expected": text, "review": rv})
+        text, _ = suit.compose(th, kind, auds or None, ex["sets"], prof, cls, ex["chars"], ex["fmt"], ex["revise"],
+                               talk=talk)
+        rv = suit.review(th, kind, auds or None, ex["sets"], prof, cls, ex["chars"], talk=talk)
+        cases.append({"cls": cls, "kind": kind, "auds": auds, "profile": prof, **ex, "talk": talk, "expected": text,
+                      "review": rv})
 # 웹 캐릭터 만들기가 내려받게 하는 슬롯 파일. suit.py 가 읽는 꼴과 같아야 한다.
 slots = [
     {"profile": {"class": "office", "lang": "ko", "agents": ["claude", "codex"]},

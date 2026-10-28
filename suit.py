@@ -94,6 +94,8 @@ COMPOSE_ORDER = ("exposure", "markup", "skeleton", "voice", "register", "terms",
 EXPOSURE_STRICT = ("public", "submit", "team")   # 앞이 가장 조심하는 쪽이다
 TERMS_PLAIN = ("everyday", "explained", "major")  # 앞이 가장 풀어 쓴다
 TEMPLATE = "template"
+# 종류 없는 글을 대화로 정할 때도 끝까지 정하는 축. 공개 범위는 안전 축이고 나머지는 붙여 넣을 곳의 문제다.
+TALK_KEEP = ("exposure", "markup", "visual-doc", "visual-deck")
 CONFIG_DEFAULT = "~/.config/docs-suit"  # 기본 슬롯은 profile.yaml, 이름 붙은 슬롯은 profiles/<이름>.yaml
 FOLDER_FILE = ".docs-suit.yaml"
 FOLDER_KEYS = ("profile", "defaults", "audiences")
@@ -451,9 +453,11 @@ def _from_audiences(axis, auds, table):
     return vals[0]
 
 
-def resolve(th, kind=None, audiences=None, sets=None, profile=None, cls=None, warn=lambda m: None):
+def resolve(th, kind=None, audiences=None, sets=None, profile=None, cls=None, warn=lambda m: None, talk=False):
     """축마다 (값, 출처) 와 쓴 독자, 쓴 클래스를 돌려준다.
-    출처: kind · arg · profile-audience · prefer · profile · audience · class · default."""
+    출처: kind · arg · profile-audience · prefer · profile · audience · class · default · talk.
+    talk 이면 종류 없는 글의 문체 축은 인자로만 정하고, 인자가 없으면 (None, "talk") 로 남겨 대화로 정하게 한다.
+    슬롯 전체의 테마를 보이는 card, status, 웹 채팅용 지침은 talk 없이 부른다."""
     sets = sets or {}
     profile = profile or {}
     cls = cls or profile.get("profile", {}).get("class") or None
@@ -498,6 +502,9 @@ def resolve(th, kind=None, audiences=None, sets=None, profile=None, cls=None, wa
             if axis in sets and sets[axis] != fixed:
                 warn(f"{axis} 는 문서 종류가 {fixed} 로 고정해 인자 {sets[axis]} 를 쓰지 않는다")
             out[axis] = (fixed, "kind")
+            continue
+        if talk and not kind and axis not in TALK_KEEP:
+            out[axis] = (sets[axis], "arg") if sets.get(axis) else (None, "talk")
             continue
         chain = (
             (sets.get(axis), "arg"),
@@ -568,9 +575,13 @@ def rule_sections(th, kind, vals, chars=None, revise=False):
         out.append(("다듬기", _body(th.root / "revise.md")))
     if kind:
         out.append((f"문서 종류 · {th.kinds[kind]['label']}", _body(th.kind_path(kind))))
+    talk = [axis for axis in COMPOSE_ORDER if vals[axis][0] is None]
+    if talk:
+        out.append(("대화로 정하기", f"정하지 않은 축: {', '.join(th.axes[ax]['label'] for ax in talk)}\n\n"
+                    + _body(th.root / "talk.md")))
     for axis in COMPOSE_ORDER:
         value, _ = vals[axis]
-        if value == TEMPLATE:
+        if value in (TEMPLATE, None):
             continue
         if axis == "visual-deck" and kind != "slides":
             continue
@@ -591,9 +602,9 @@ def _labels(th, kind, auds):
 
 
 def compose(th, kind=None, audiences=None, sets=None, profile=None, cls=None, chars=None, fmt="prompt",
-            revise=False, warn=lambda m: None):
+            revise=False, warn=lambda m: None, talk=False):
     profile = profile or {}
-    vals, auds, cls = resolve(th, kind, audiences, sets, profile, cls, warn)
+    vals, auds, cls = resolve(th, kind, audiences, sets, profile, cls, warn, talk)
     kind_label, aud_label = _labels(th, kind, auds)
     sections = [f"## {head}\n\n{body}" for head, body in rule_sections(th, kind, vals, chars, revise)]
     who = persona_section(th, cls, profile.get("persona"))
@@ -619,9 +630,9 @@ REVIEW_DOC = "(다 쓴 글 전체)"
 
 
 def review(th, kind=None, audiences=None, sets=None, profile=None, cls=None, chars=None, doc=None, source=None,
-           warn=lambda m: None):
+           warn=lambda m: None, talk=False):
     """새 대화나 서브에이전트에 넘길 검토 지침. 쓴 사람과 같은 값으로 조립하되 페르소나는 싣지 않는다."""
-    vals, auds, _ = resolve(th, kind, audiences, sets, profile or {}, cls, warn)
+    vals, auds, _ = resolve(th, kind, audiences, sets, profile or {}, cls, warn, talk)
     kind_label, aud_label = _labels(th, kind, auds)
     parts = [f"# 검토 지침 · {kind_label} · 독자 {aud_label}", _body(th.root / "review.md")]
     parts += [f"## 채점 기준 · {head}\n\n{body}" for head, body in rule_sections(th, kind, vals, chars)]
@@ -1235,6 +1246,8 @@ def bundle_data(th):
         "persona": th.persona,
         "base": _body(th.root / "base.md"),
         "revise": _body(th.root / "revise.md"),
+        "talk": _body(th.root / "talk.md"),
+        "talkKeep": list(TALK_KEEP),
         "review": _body(th.root / "review.md"),
         "kindText": {k: _body(th.kind_path(k)) for k in th.kinds},
         "rules": rules,
@@ -1280,7 +1293,7 @@ description: 문서를 쓰거나 다듬거나 검토할 때 docs-suit 테마를 
    - 같은 출력의 `looks` 로 캐릭터 A 와 B 가운데 하나를 고르게 한다. 고르지 않으면 A 다.
    - `{run} bootstrap --class <클래스> --call … --affiliation … --goal … --docs <종류,종류> --facts … --dislikes … [--preset <조합>] [--look a|b] --yes` 로 저장한다.
    - 사용자가 화면에서 고르겠다고 하면 묻는 대신 `{run} serve --page create --detach` 로 로컬 화면을 띄우고 나온 주소를 알려 준다. 화면에서 저장한 슬롯이 바로 적용된다.
-2. 요청에서 문서 종류를 정한다. 종류는 {kinds} 이다. 맞는 것이 없으면 종류 없이 조립한다. 독자가 분명하면 `--audience <키>` 로 넘긴다. 독자 키는 {auds} 이다. 독자가 여럿이면 키를 쉼표로 잇는다.
+2. 요청에서 문서 종류를 정한다. 종류는 {kinds} 이다. 맞는 것이 없으면 종류 없이 조립한다. 종류 없는 글은 문체 축을 프로필과 클래스에서 물려받지 않고, 지침의 "대화로 정하기" 절대로 요청과 대화에서 읽어 맞춘다. 독자가 분명하면 `--audience <키>` 로 넘긴다. 독자 키는 {auds} 이다. 독자가 여럿이면 키를 쉼표로 잇는다.
 3. 사용자가 문체, 어법, 분량, 글자수, 공개 범위를 말했으면 `--set 축=값` 과 `--chars` 로 넘긴다. 축과 값은 아래 영어 키로 쓴다. {axes}. 공개 범위는 안전 축이라 `--set exposure` 는 `team`, `submit`, `public` 순서로 더 조심하는 쪽으로만 먹는다. 사내나 팀 안에서만 볼 글이면 `--set` 대신 `--audience` 를 `teammate` 나 `peer-dev` 로 넘긴다. 붙여 넣을 곳이 메일 본문이나 메신저, 지원서 입력 칸처럼 마크다운이 먹지 않는 곳이면 `--set markup=plain` 을 넘긴다.
 4. `{run} compose --kind <종류> [--audience …] [--set …] [--chars N] [--revise]` 의 출력 전체를 이번 문서의 규칙으로 따른다. 사용자가 원문을 주고 다듬어 달라고 하면 `--revise` 를 붙이고, 문서 종류는 원문을 보고 정한다. 다른 문체 지침이나 스킬과 겹치면 어법, 분량, 공개 범위 같은 축의 값은 이 출력을 따른다. 지침의 공통 바닥이 시키는 대로, 문서 종류의 "쓰기 전에 받을 것" 가운데 요청과 자료에 없는 것만 두세 개 묻는다.
 5. 답을 끝내기 전에 본문을 검사한다. 검사하지 않은 답은 끝난 답이 아니다. compose 에 넘긴 `--kind`, `--audience`, `--set`, `--chars`, `--revise` 를 그대로 붙인다. 본문을 파일로 썼으면 `{run} check <본문 파일> --kind <종류> …` 로 부른다. 답에만 썼으면 임시 파일을 만들지 말고 본문 전체를 heredoc 으로 넘긴다.
@@ -1291,7 +1304,7 @@ description: 문서를 쓰거나 다듬거나 검토할 때 docs-suit 테마를 
    ```
    `✗` 가 나온 줄이 있으면 그 줄이 말하는 대로 한 번 고쳐 쓰고 같은 명령을 다시 부른다. `△` 는 제안이다. 본문을 보고 고칠 만한 것만 고치고, 고치지 않아도 검사는 통과다. 답에 보이는 본문은 마지막으로 검사에 넘긴 본문과 글자 하나까지 같게 둔다. 보일 때 제목을 굵게 바꾸는 식으로 손대지 않는다. 출력에 `성장:` 으로 시작하는 줄이 있으면 본문과 떨어뜨려 답의 맨 끝에 그 줄만 그대로 옮긴다. 이 줄은 check 만 만들 수 있으니 지어내지 않고, 문서 본문에도 넣지 않는다. `[확인 필요: …]` 표시가 남았으면 모아서 보여 준다.
 6. 사용자가 다 쓴 글을 검토해 달라고 할 때만 `{run} review <본문 파일|-> --kind <종류> [--audience …] [--set …] [--source <원문 파일>]` 을 부른다. 원문은 과제 안내문이나 채용 공고처럼 글이 따라야 할 자료다. 앞선 대화를 모르는 서브에이전트를 새로 띄울 수 있으면 출력 전체를 그 에이전트에게 넘기고, 받은 지적을 그대로 보인다. 띄울 수 없으면 출력을 보여 주고 새 대화에 붙여 넣으라고 권한다. 지적대로 본문을 고칠지는 사용자에게 묻는다.
-7. 사용자가 말투나 모양이 마음에 안 든다고 하면 어느 축의 문제인지 짚고, 그 축의 다른 값으로 다시 조립해 대표 문단 하나를 견줘 보인다. 계속 쓰고 싶어 하면 `{run} set <축> <값> [--audience <독자>]` 로 프로필에 남긴다. 이 폴더에서만 그렇게 쓰고 싶어 하면 `--here` 를 붙여 폴더 파일 `.docs-suit.yaml` 에 남긴다. 카드를 보며 고르고 싶어 하면 `{run} serve --detach` 로 테마 고르기 화면을 띄우고 주소를 알려 준다.
+7. 사용자가 말투나 모양이 마음에 안 든다고 하면 어느 축의 문제인지 짚고, 그 축의 다른 값으로 다시 조립해 대표 문단 하나를 견줘 보인다. 계속 쓰고 싶어 하면 `{run} set <축> <값> [--audience <독자>]` 로 프로필에 남긴다. 이 폴더에서만 그렇게 쓰고 싶어 하면 `--here` 를 붙여 폴더 파일 `.docs-suit.yaml` 에 남긴다. 종류 없는 글은 프로필 값을 쓰지 않으니, 그런 글에서 잡은 말투는 그 대화에서만 지키고, 남겨 달라고 하면 종류가 있는 글에만 먹는다고 알려 준다. 카드를 보며 고르고 싶어 하면 `{run} serve --detach` 로 테마 고르기 화면을 띄우고 주소를 알려 준다.
 8. 사용자가 캐릭터를 보여 달라고 하면 `{run} card --color never` 의 출력을 보여 준다. 꾸며 달라고 하면 `{run} look` 으로 열린 부위를 보고 `{run} look <부위> <값>` 을 부른다. 캐릭터 키우기를 끄거나 켜 달라고 하면 `{run} growth off` 나 `{run} growth on` 을 부른다. 성장 기록과 승급 키, 슬롯의 `look:` 절은 사용자가 부탁해도 직접 고치지 않는다. 레벨은 문서를 써서 오르고, 3차와 4차 전직은 저장소에 기여하고 받은 승급 키를 `{run} promote <키>` 로 넣어야 열린다고 알려 준다.
 9. 사용자가 화면을 열어 달라고 하거나 화면에서 고르겠다고 하면 사용자에게 명령을 시키지 않고 직접 띄운 뒤 나온 주소를 알려 준다. 화면은 두 가지다. 말투나 분량 같은 테마 값을 카드로 견줘 고르려면 `{run} serve --detach` 로 테마 고르기 화면을 띄운다. 처음 세팅하거나 클래스와 캐릭터를 고르려면 `{run} serve --page create --detach` 로 캐릭터 만들기 화면을 띄운다. 어느 쪽인지 모르면 프로필이 없을 때는 캐릭터 만들기 화면을, 있을 때는 테마 고르기 화면을 띄운다.
 """
@@ -1585,7 +1598,7 @@ def cmd_compose(a, th):
     if a.html:
         sets.setdefault("markup", "html")  # 예전 --html 은 출력 형식 HTML 과 같다
     text, _ = compose(th, a.kind, _auds(a.audience), sets, load_profile(warn_stderr, a.profile), a.cls,
-                      a.chars, a.format, a.revise, warn_stderr)
+                      a.chars, a.format, a.revise, warn_stderr, talk=True)
     if a.output:
         Path(a.output).expanduser().write_text(text, encoding="utf-8")
         print(f"썼다: {a.output}", file=sys.stderr)
@@ -1638,7 +1651,7 @@ def cmd_check(a, th):
               "check - --kind <종류> <<'EOF' … EOF", file=sys.stderr)
         return 1
     vals, auds, _ = resolve(th, a.kind, _auds(a.audience), _sets(a.set), load_profile(warn_stderr, a.profile), a.cls,
-                            warn_stderr)
+                            warn_stderr, talk=True)
     checks = check_doc(text, vals, a.chars, a.kind, th)
     hints = suggest_doc(th, text, vals, a.kind)
     left = len(UNRESOLVED.findall(text))
@@ -1671,7 +1684,7 @@ def cmd_review(a, th):
         return 1
     read = lambda f: sys.stdin.read() if f == "-" else Path(f).expanduser().read_text(encoding="utf-8")
     text = review(th, a.kind, _auds(a.audience), _sets(a.set), load_profile(warn_stderr, a.profile), a.cls, a.chars,
-                  read(a.file) if a.file else None, read(a.source) if a.source else None, warn_stderr)
+                  read(a.file) if a.file else None, read(a.source) if a.source else None, warn_stderr, talk=True)
     if a.output:
         Path(a.output).expanduser().write_text(text, encoding="utf-8")
         print(f"썼다: {a.output}", file=sys.stderr)
@@ -2580,6 +2593,20 @@ def selftest(th):
         check(cls == "creator" and vals["register"] == ("haeyo", "class"), "프로필의 클래스를 쓰지 않는다")
         vals, _, cls = resolve(th, profile={"profile": {"class": "creator"}}, cls="student")
         check(cls == "student", "--class 가 프로필 클래스를 이기지 못한다")
+        # 종류 없는 글은 대화로 정한다. 클래스와 프로필, 독자의 문체 값이 새지 않고 인자와 공개 범위, 출력 형식만 남는다.
+        talk_prof = {"profile": {"class": "office"}, "defaults": {"voice": "bullet", "markup": "plain", "exposure": "team"}}
+        vals, _, _ = resolve(th, audiences=["manager"], sets={"register": "haeyo"}, profile=talk_prof, talk=True)
+        check(vals["voice"] == (None, "talk") and vals["length"] == (None, "talk") and vals["register"] == ("haeyo", "arg"),
+              "종류 없는 글이 클래스나 프로필의 문체를 물려받았다")
+        check(vals["exposure"][0] == "team" and vals["markup"] == ("plain", "profile"), "대화로 정할 때 안전 축이나 출력 형식을 놓쳤다")
+        check(resolve(th, kind="email", profile=talk_prof, talk=True)[0]["voice"] == ("bullet", "profile"),
+              "종류가 있는 글까지 대화로 정했다")
+        check(resolve(th, profile=talk_prof)[0]["voice"] == ("bullet", "profile"), "슬롯 전체의 테마가 프로필 값을 잃었다")
+        text, _ = compose(th, profile=talk_prof, talk=True)
+        check("## 대화로 정하기\n\n정하지 않은 축: 골격, 문체, 어법," in text and "## 문체 ·" not in text
+              and "## 공개 범위 · 팀 내부" in text, "종류 없는 글의 조립이 다르다")
+        check(check_doc("- 첫째 줄\n- 둘째 줄\n- 셋째 줄\n- 넷째 줄입니다.\n", resolve(th, talk=True)[0], None, None, th)
+              == [("tells", True, "걸린 것 없음")], "대화로 정한 축까지 본문 검사가 쟀다")
         text, _ = compose(th, kind="report", cls="student", chars=1000, fmt="output-style",
                           profile={"persona": {"call": "민수 님", "docs": ["report"]}})
         check(text.startswith("---\nname:") and "공백 포함 1000자" in text, "output-style 이나 글자수 조립이 다르다")

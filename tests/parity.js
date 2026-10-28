@@ -9,12 +9,12 @@ const all = JSON.parse(execFileSync("python3", [path.join(__dirname, "parity_cas
 const cases = all.compose;
 let bad = 0;
 for (const c of cases) {
-  const r = C.resolve(c.kind, c.auds, c.sets, c.profile, c.cls);
+  const r = C.resolve(c.kind, c.auds, c.sets, c.profile, c.cls, c.talk);
   const js = C.compose(c.kind, r.auds, r.vals, c.chars, c.fmt, c.revise, r.cls, (c.profile || {}).persona);
   const rv = C.review(c.kind, r.auds, r.vals, c.chars);
   if (js !== c.expected || rv !== c.review) {
     bad++;
-    if (bad <= 3) console.log(`다름(${js !== c.expected ? "지침" : "검토"}): class=${c.cls} kind=${c.kind} audience=${c.auds} fmt=${c.fmt}`);
+    if (bad <= 3) console.log(`다름(${js !== c.expected ? "지침" : "검토"}): class=${c.cls} kind=${c.kind} audience=${c.auds} fmt=${c.fmt} talk=${c.talk}`);
   }
 }
 // 웹 캐릭터 만들기의 슬롯 파일과 캐릭터 그림

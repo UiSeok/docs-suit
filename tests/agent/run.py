@@ -207,7 +207,8 @@ def grade(case, calls):
     if (a.kind or "") not in kinds:
         why.append(f"종류가 {a.kind or '없음'} 이다")
     try:
-        vals, auds, _ = suit.resolve(th, a.kind or None, suit._auds(a.audience), suit._sets(a.set), case_profile(case), a.cls)
+        vals, auds, _ = suit.resolve(th, a.kind or None, suit._auds(a.audience), suit._sets(a.set), case_profile(case), a.cls,
+                                    talk=True)
     except suit.Missing as e:
         return False, shown, f"엔진이 거절했다: {e}", None, None
     if case.get("audience") and case["audience"] not in auds:

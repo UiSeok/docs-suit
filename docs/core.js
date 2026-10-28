@@ -13,7 +13,8 @@
     }
 
     // suit.py resolve() 와 같은 순서: kind > arg > profile-audience > prefer > profile > audience > class > default
-    function resolve(kind, auds, sets, profile, cls) {
+    // talk 이면 종류 없는 글의 문체 축은 직접 고른 값으로만 정하고, 없으면 [null, "talk"] 로 남겨 대화로 정하게 한다.
+    function resolve(kind, auds, sets, profile, cls, talk) {
       const warns = [];
       profile = profile || {};
       cls = cls || (profile.profile && profile.profile.class) || null;
@@ -44,6 +45,10 @@
           out[axis] = [fixed, "kind"];
           continue;
         }
+        if (talk && !kind && T.talkKeep.indexOf(axis) < 0) {
+          out[axis] = sets[axis] ? [sets[axis], "arg"] : [null, "talk"];
+          continue;
+        }
         const chain = [[sets[axis], "arg"], [fromAudiences(axis, auds, pAud), "profile-audience"], [prefer[axis], "prefer"],
           [pDef[axis], "profile"], [fromAudiences(axis, auds, T.audiences), "audience"], [cDef[axis], "class"], [T.defaults[axis], "default"]];
         for (const [c, s] of chain) {
@@ -57,9 +62,12 @@
     }
 
     const SRC = { kind: "문서 종류가 고정", arg: "직접 고름", "profile-audience": "내 독자 설정", prefer: "문서 종류가 권함",
-      profile: "내 기본값", audience: "독자", class: "클래스", default: "중립 기본값" };
+      profile: "내 기본값", audience: "독자", class: "클래스", default: "중립 기본값", talk: "대화로 정함" };
 
-    function label(axis, v) { return v === "template" ? "문서 종류의 틀" : (T.axes[axis].values[v] || v); }
+    function label(axis, v) {
+      if (v === null) return "정하지 않음";
+      return v === "template" ? "문서 종류의 틀" : (T.axes[axis].values[v] || v);
+    }
 
     function personaSection(cls, persona) {
       persona = persona || {};
@@ -78,9 +86,13 @@
       const out = [["공통 바닥", T.base]];
       if (revise) out.push(["다듬기", T.revise]);
       if (kind) out.push([`문서 종류 · ${T.kinds[kind].label}`, T.kindText[kind]]);
+      const talk = T.composeOrder.filter((axis) => vals[axis][0] === null);
+      if (talk.length) {
+        out.push(["대화로 정하기", `정하지 않은 축: ${talk.map((axis) => T.axes[axis].label).join(", ")}\n\n` + T.talk]);
+      }
       for (const axis of T.composeOrder) {
         const v = vals[axis][0];
-        if (v === "template") continue;
+        if (v === "template" || v === null) continue;
         if (axis === "visual-deck" && kind !== "slides") continue;
         if (axis === "visual-doc" && vals.markup[0] !== "html") continue;
         out.push([`${T.axes[axis].label} · ${label(axis, v)}`, T.rules[`${axis}/${v}`]]);
