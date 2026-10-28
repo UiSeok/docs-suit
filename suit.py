@@ -1111,6 +1111,24 @@ def voice_text(name=None, start=None):
     return p.read_text(encoding="utf-8").strip() if p.exists() else ""
 
 
+VOICE_QUOTE = re.compile(r'"([^"\n]{2,40})"|“([^”\n]{2,40})”|‘([^’\n]{2,40})’|\'([^\'\n]{2,40})\'')
+
+
+def voice_overlap(voice, samples):
+    """내 문체 문서가 샘플에서 그대로 옮긴 표현. 따옴표로 든 예와 숫자가 섞인 어절을 샘플 원문에서 찾는다.
+    버릇을 설명하는 말은 샘플과 겹쳐도 되지만, 예로 든 문구와 수치는 샘플의 내용이 새는 길이라 따로 잡는다."""
+    flat = lambda t: " ".join(t.split())
+    pool = [flat(x) for x in samples]
+    cands = [next(g for g in m.groups() if g) for m in VOICE_QUOTE.finditer(voice)]
+    cands += [w.strip(".,()[]`*") for w in voice.split() if re.search(r"\d", w)]
+    out = []
+    for c in cands:
+        c = flat(c)
+        if len(c) >= 2 and c not in out and any(c in x for x in pool):
+            out.append(c)
+    return out
+
+
 def clean_voice(th, text):
     """저장할 내 문체 문서를 다듬는다. 맨 앞 제목은 떼고, 다른 제목은 지침의 절을 깨지 않게 ### 로 낮춘다."""
     lines = text.strip().splitlines()
@@ -1732,7 +1750,7 @@ description: 문서를 쓰거나 다듬거나 검토할 때 docs-suit 테마를 
      ```
    - 출력을 보여 준다. AI 가 쓴 글일 수 있다고 표시된 샘플은 사용자가 직접 썼는지 묻는다. 직접 썼다고 하면 `--human` 을 붙여 다시 부르고, 아니라고 하면 그 샘플을 빼고 다시 부른다.
    - 샘플마다 누구에게 쓴 어떤 글인지 묻는다. 제안된 값은 사용자가 고르면 `{run} set <축> <값>` 으로 남긴다. 특정 독자에게 쓴 글에서만 나온 값이면 `--audience <독자>` 를, 특정 문서 종류에서만 나온 값이면 `--kind <종류>` 를 붙인다.
-   - 출력에 내 문체 문서를 쓸 수 있다고 나오면 `{run} learn --guide` 의 지침대로 초안을 쓰고 보여 준다. 사용자가 고치거나 승인한 판만 `{run} voice set -` 에 heredoc 으로 넘긴다. 이 문서는 조립한 지침의 맨 끝에 실린다.
+   - 출력에 내 문체 문서를 쓸 수 있다고 나오면 `{run} learn --guide` 의 지침대로 초안을 쓰고 보여 준다. 사용자가 고치거나 승인한 판만 `{run} voice set - --samples <learn 에 넘긴 파일들>` 에 heredoc 으로 넘긴다. 엔진이 샘플에서 그대로 옮긴 문구와 수치를 찾으면 저장하지 않으니, 그 예를 중립 소재로 새로 쓴다. 버릇 자체를 가리키는 말이라 사용자가 그대로 두자고 하면 `--keep` 을 붙인다. 이 문서는 조립한 지침의 맨 끝에 실린다.
    - 사용자가 내 문체 문서를 보거나 지워 달라고 하면 `{run} voice` 나 `{run} voice clear` 를 부른다.
 """
 
@@ -2020,6 +2038,26 @@ def cmd_get(a, th):
     return 0
 
 
+def check_hint_text(a):
+    """compose 출력 끝에 붙이는 검사 안내. 에이전트가 본문을 쓰기 직전에 읽는 자리라서, 넘긴 인자 그대로 check 명령을 적는다."""
+    cmd = ["python3", str(HERE / "suit.py"), "check", "-"]
+    for flag, value in (("--profile", a.profile), ("--class", a.cls), ("--kind", a.kind), ("--audience", a.audience)):
+        if value:
+            cmd += [flag, value]
+    for item in a.set or []:
+        cmd += ["--set", item]
+    if a.html:
+        cmd += ["--set", "markup=html"]
+    if a.chars:
+        cmd += ["--chars", str(a.chars)]
+    if a.revise:
+        cmd.append("--revise")
+    line = " ".join(shlex.quote(x) for x in cmd)
+    return ("\n---\n\n다 쓴 본문은 답으로 내기 전에 아래 명령으로 잰다. 다른 명령과 잇지 않고 따로 부른다. "
+            "본문을 파일로 썼으면 `-` 자리에 파일 경로를 넘긴다. ✗ 가 나오면 한 번 고쳐 쓰고 다시 잰다.\n\n"
+            f"```sh\n{line} <<'EOF'\n(본문 전체)\nEOF\n```\n")
+
+
 def cmd_compose(a, th):
     sets = _sets(a.set)
     if a.html:
@@ -2031,6 +2069,8 @@ def cmd_compose(a, th):
         print(f"썼다: {a.output}", file=sys.stderr)
     else:
         sys.stdout.write(text)
+    if a.format == "prompt":
+        sys.stdout.write(check_hint_text(a))
     return 0
 
 
@@ -2206,6 +2246,11 @@ def cmd_voice(a, th):
             raise Missing("저장할 문서를 넘긴다. 파일 경로를 쓰거나, - 를 쓰고 heredoc 으로 넘긴다")
         raw = sys.stdin.read() if a.file == "-" else Path(a.file).expanduser().read_text(encoding="utf-8")
         text = clean_voice(th, raw)
+        if a.samples:
+            leaked = voice_overlap(text, [doc_file_text(f)[0] for f in a.samples])
+            if leaked and not a.keep:
+                raise Missing("내 문체 문서에 샘플에서 그대로 옮긴 표현이 있다: " + ", ".join(f"「{x}」" for x in leaked)
+                              + ". 같은 버릇을 보이는 예를 중립 소재로 새로 쓴다. 버릇 자체를 가리키는 말이라 사용자가 남기자고 하면 --keep 을 붙인다")
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(text + "\n", encoding="utf-8")
         print(f"내 문체 문서를 남겼다: {path} ({len(text)}자). 이제 조립하는 지침의 맨 끝에 실린다")
@@ -3524,6 +3569,11 @@ def selftest(th):
                 if v is not None:
                     os.environ[k] = v
 
+    hint = check_hint_text(argparse.Namespace(profile=None, cls=None, kind="email", audience="professor",
+                                              set=["markup=plain"], html=False, chars=700, revise=True))
+    check("check - --kind email --audience professor --set markup=plain --chars 700 --revise <<'EOF'" in hint,
+          "compose 끝의 검사 안내가 넘긴 인자를 그대로 싣지 않는다")
+
     # 문체 배우기. 샘플을 재서 축 값을 제안하고, AI 글로 보이는 샘플은 빼고, 원문은 어디에도 남기지 않는다
     human = "- 평일 아침 사흘 동안 대기 시간을 쟀습니다.\n- 평균은 7분이었습니다.\n- 출근 시간이 가장 길었습니다.\n- 다음 주에 저녁을 재겠습니다.\n"
     machine = ("정류장 대기 시간은 단순한 숫자를 넘어 삶과 직결됩니다. 다양한 데이터를 쓰면, 효율적인 개선이 가능하며, "
@@ -3537,6 +3587,9 @@ def selftest(th):
           and not voice_ok, f"샘플에서 제안한 축 값이 다르거나, 짧은 샘플로 내 문체 문서를 권했다: {plan}")
     mixed, _, _ = learn_plan([got[0], dict(got[1], register="plain")])
     check(mixed["register"]["value"] is None and "by_sample" in mixed["register"], "어법이 다른 샘플을 한 값으로 합쳤다")
+    check(voice_overlap('- 수는 "열에 하나" 처럼 쓴다.\n- 결론을 먼저 쓴다. 12분 같은 수치를 붙인다.', ["기록은 열에\n하나 정도였다. 평균 12분이었다."])
+          == ["열에 하나", "12분"] and voice_overlap('- "결론으로 연다".', ["다른 글"]) == [],
+          "내 문체 문서가 샘플에서 옮긴 문구와 수치를 잡지 못한다")
     check(clean_voice(th, "# 내 문체\n\n## 보기\n- 결론으로 연다.") == "### 보기\n- 결론으로 연다.",
           "내 문체 문서의 제목을 다듬지 못한다")
     for bad in ("", "가" * (VOICE_MAX_CHARS + 1), "- 결론으로 연다.\npassword: hunter2xyz"):
@@ -3734,6 +3787,8 @@ def main(argv=None):
     vo = sub.add_parser("voice", parents=[slot], help="슬롯의 내 문체 문서를 보거나 남기거나 지운다")
     vo.add_argument("action", nargs="?", choices=("show", "set", "clear"), default="show")
     vo.add_argument("file", nargs="?", help="set 할 문서. - 이면 표준 입력")
+    vo.add_argument("--samples", nargs="+", metavar="샘플", help="learn 에 넘긴 샘플. 문서가 샘플의 문구와 수치를 옮겼는지 재고, 옮겼으면 저장하지 않는다")
+    vo.add_argument("--keep", action="store_true", help="샘플과 겹친 표현이 버릇 자체를 가리키는 말이라 사용자가 남기자고 했을 때만 붙인다")
     ca = sub.add_parser("card", parents=[slot])
     ca.add_argument("--json", action="store_true")
     ca.add_argument("--color", choices=("auto", "always", "never"), default="auto",

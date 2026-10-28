@@ -271,8 +271,9 @@ def doc_text(reply, proj):
     if mail:
         return mail.group(0)
     # 질문이 여럿이고 본문의 [확인 필요] 표시가 없으면 질문만 하고 멈춘 것이다. 백틱 안의 표시는 표시 방식을 설명한 말이다.
+    # 요청 표현이 한 번뿐이어도 답이 짧으면 자료를 달라고 하고 멈춘 것이다. "보내 주시면 쓰겠습니다" 같은 꼴이다.
     asks = len(re.findall(r"\?|주세요|여쭤|여쭙|주시면", reply))
-    if asks >= 2 and not suit.UNRESOLVED.search(reply):
+    if not suit.UNRESOLVED.search(reply) and (asks >= 2 or (asks and len(reply) < 400)):
         return ""
     # --- 로 나뉜 답은 본문과 덧붙인 안내가 섞여 있다. [확인 필요] 표시가 가장 많은 조각을 본문으로 본다.
     parts = re.split(r"^---\s*$", reply, flags=re.M)
