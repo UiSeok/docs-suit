@@ -515,6 +515,7 @@
     "장학생",
     "수석"
    ],
+   "icon": "🎒",
    "defaults": {
     "visual-deck": "paper",
     "register": "plain",
@@ -538,6 +539,7 @@
     "최종 합격",
     "신입 사원"
    ],
+   "icon": "📝",
    "defaults": {
     "register": "polite",
     "voice": "bullet",
@@ -561,6 +563,7 @@
     "박사후연구원",
     "예비교수"
    ],
+   "icon": "🔬",
    "defaults": {
     "visual-deck": "paper",
     "terms": "major",
@@ -586,6 +589,7 @@
     "테크 리드",
     "아키텍트"
    ],
+   "icon": "💻",
    "defaults": {
     "visual-deck": "contrast",
     "voice": "bullet",
@@ -611,6 +615,7 @@
     "PM",
     "프로덕트 리드"
    ],
+   "icon": "📋",
    "defaults": {
     "voice": "bullet",
     "register": "polite",
@@ -636,6 +641,7 @@
     "차장",
     "부장"
    ],
+   "icon": "💼",
    "defaults": {
     "voice": "bullet",
     "register": "polite",
@@ -659,6 +665,7 @@
     "인기 작가",
     "베스트셀러 작가"
    ],
+   "icon": "🎨",
    "defaults": {
     "voice": "prose",
     "register": "haeyo",

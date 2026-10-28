@@ -176,7 +176,7 @@ Claude Code 는 화면 맨 아래 상태 줄에 캐릭터를 그릴 수 있습�
 "statusLine": {"type": "command", "command": "python3 <docs-suit 경로>/suit.py status"}
 ```
 
-이미 쓰는 상태 줄 스크립트가 있으면 바꾸지 말고, 스크립트가 받은 JSON 을 그대로 넘기는 줄을 끝에 더합니다. 예를 들어 `input=$(cat)` 으로 받는 스크립트라면 `printf '%s' "$input" | python3 <docs-suit 경로>/suit.py status` 입니다. 스크립트의 마지막 명령이 0 이 아닌 코드로 끝나면 Claude Code 가 상태 줄을 통째로 비우므로, `[ … ] && …` 꼴로 끝내지 말고 `if` 문을 씁니다. 기본은 작은 얼굴과 칭호, 레벨, 경험치를 한 줄로 그립니다. `--size face` 는 얼굴과 글을 일곱 줄로, `--size full` 은 온몸을 그립니다. 슬롯이 없거나 캐릭터 키우기를 끈 폴더에서는 아무것도 그리지 않습니다.
+이미 쓰는 상태 줄 스크립트가 있으면 바꾸지 말고, 스크립트가 받은 JSON 을 그대로 넘기는 줄을 끝에 더합니다. 예를 들어 `input=$(cat)` 으로 받는 스크립트라면 `printf '%s' "$input" | python3 <docs-suit 경로>/suit.py status` 입니다. 스크립트의 마지막 명령이 0 이 아닌 코드로 끝나면 Claude Code 가 상태 줄을 통째로 비우므로, `[ … ] && …` 꼴로 끝내지 말고 `if` 문을 씁니다. 기본은 클래스 이모지와 칭호, 레벨, 경험치를 한 줄로 그리고, 전직할 때마다 이모지 뒤에 ⭐ 를 하나씩 더합니다. `--size face` 는 얼굴과 글을 일곱 줄로, `--size full` 은 온몸을 그립니다. 슬롯이 없거나 캐릭터 키우기를 끈 폴더에서는 아무것도 그리지 않습니다.
 
 Antigravity CLI 도 `~/.gemini/antigravity-cli/settings.json` 의 `statusLine` 에 같은 명령을 걸 수 있다고 문서에 나와 있지만 아직 직접 확인하지 않았습니다.
 

@@ -282,7 +282,7 @@ class Themes:
             f = Path(stem)
             meta = c.get("class", {})
             self.classes[f.stem] = {"label": meta.get("label", f.stem), "desc": meta.get("desc", ""),
-                                    "kinds": meta.get("kinds", []), "titles": meta.get("titles", []),
+                                    "kinds": meta.get("kinds", []), "titles": meta.get("titles", []), "icon": meta.get("icon", ""),
                                     "defaults": c.get("defaults", {})}
         pq = self.root / "persona.yaml"
         self.persona = parse_yaml(pq.read_text(encoding="utf-8")).get("questions", {}) if pq.exists() else {}
@@ -1631,13 +1631,8 @@ def status_cwd(text):
     return (ws or {}).get("current_dir") or data.get("cwd") if isinstance(data, dict) else None
 
 
-# 한 줄 상태에 그릴 작은 얼굴. 온몸 그림에서 머리 줄과 눈 줄을 골라 뽑는다. 반 칸 블록 한 줄이 픽셀 두 줄이다.
-# 옆 열은 단발과 긴 머리가 눈 옆에 머리카락을 내리는 자리라 머리 모양이 조금 드러난다.
-TINY_FACE = ((5, 8), (1, 2, 5, 7, 8, 10, 13, 14))
-
-
 def status_lines(th, slot_data, slot, state, depth, size="line", held=()):
-    """상태 줄에 그릴 캐릭터. line 은 작은 얼굴과 글 한 줄, face 는 얼굴과 세 줄, full 은 온몸이다."""
+    """상태 줄에 그릴 캐릭터. line 은 클래스 이모지와 글 한 줄, face 는 얼굴과 세 줄, full 은 온몸이다."""
     cls = (slot_data.get("profile") or {}).get("class")
     name = (slot_data.get("persona") or {}).get("call") or slot or "이름 없음"
     title = title_of(th, cls, state["tier"])
@@ -1645,12 +1640,12 @@ def status_lines(th, slot_data, slot, state, depth, size="line", held=()):
     bar = f"Lv.{state['level']} {'█' * filled}{'░' * (10 - filled)} " + (
         f"{state['into']}/{state['need']}" if state["need"] else "최고 레벨")
     head = (f"[{title}] " if title else "") + name
+    if size == "line":
+        # 도트 그림은 한 줄에 담으면 알아볼 수 없어 이모지로 대신한다. 전직 차수는 표시를 이어 붙여 센다
+        icon = (th.classes.get(cls) or {}).get("icon", "") + str(th.growth.get("mark") or "") * state["tier"]
+        return [(f"{icon} " if icon else "") + f"{head} · {bar}"]
     if not depth or not th.look:
         return [f"{head} · {bar}"]
-    if size == "line":
-        grid = look_grid(th, look_of(th, slot_data, state["tier"]))
-        rows, cols = TINY_FACE
-        return [render_grid([[grid[r][c] for c in cols] for r in rows], depth)[0] + f" {head} · {bar}"]
     nxt = next(((t, lv, keyed) for t, lv, keyed in promote_rules(th) if t == state["tier"] + 1), None)
     info = [head + (f" · {th.classes[cls]['label']}" if cls in th.classes else ""), bar]
     if nxt:
@@ -3134,6 +3129,7 @@ def selftest(th):
         problems.append("growth.yaml 의 promote 는 `차수: {level: 레벨}` 꼴이어야 한다")
     for k, v in th.classes.items():
         check(len(v["titles"]) == len(promote) + 1, f"클래스 {k} 의 칭호는 기본과 전직 차수만큼 {len(promote) + 1}개다")
+        check(len(v["icon"]) == 1, f"클래스 {k} 의 icon 은 이모지 한 글자다")
 
     for k, v in th.presets.items():
         check(SLOT_RE.match(k) and v.get("label") and v.get("desc") and v.get("by"),
@@ -3500,7 +3496,7 @@ def selftest(th):
             state = growth_state(th, [])
             face = status_lines(th, data, "work", state, 24, "face")
             line = status_lines(th, data, "work", state, 24, "line")
-            check(len(face) == 7 and "[" in face[2] + face[3] and len(line) == 1 and "▀" in line[0] and "Lv.1" in line[0],
+            check(len(face) == 7 and "[" in face[2] + face[3] and line == [f"{th.classes['office']['icon']} [{th.classes['office']['titles'][0]}] 회사 · Lv.1 ░░░░░░░░░░ 0/50"],
                   f"상태 줄 캐릭터가 다르다: {len(face)}줄")
             wide, narrow = widget_frame(th, str(sub), 120, 24), widget_frame(th, str(sub), 30, 24)
             check(len(wide) == 12 and len(narrow) > 12 and narrow[13].startswith("["),
@@ -3849,7 +3845,7 @@ def main(argv=None):
     pk.add_argument("--json", action="store_true")
     pk.add_argument("--clear", action="store_true", help="읽은 뒤 지운다")
     st = sub.add_parser("status", parents=[slot])
-    st.add_argument("--size", choices=("line", "face", "full"), default="line", help="line 은 작은 얼굴과 한 줄, face 는 얼굴, full 은 온몸")
+    st.add_argument("--size", choices=("line", "face", "full"), default="line", help="line 은 클래스 이모지와 한 줄, face 는 얼굴, full 은 온몸")
     st.add_argument("--cwd", help="이 폴더 기준으로 슬롯을 고른다. 주지 않으면 표준 입력의 JSON 이나 지금 폴더")
     sub.add_parser("bundle")
     sub.add_parser("selftest")

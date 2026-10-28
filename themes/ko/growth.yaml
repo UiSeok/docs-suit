@@ -30,3 +30,5 @@ promote:
   2: {level: 20}
   3: {level: 30, key: true}
   4: {level: 50, key: true}
+
+mark: ⭐  # 상태 줄에서 클래스 이모지 뒤에 전직 차수만큼 잇는다
