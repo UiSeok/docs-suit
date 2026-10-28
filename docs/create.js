@@ -383,7 +383,9 @@
     state.agents = (meta.agents || []).slice();
     state.preset = null;
     state.keep = st.exists ? { defaults: prof.defaults || {}, audiences: prof.audiences || {} } : null;
-    $("slot").value = st.slot && st.slot !== "default" ? st.slot : "";
+    // 캐릭터는 폴더마다 따로 키운다. 폴더에 이은 슬롯이 없으면 폴더 이름으로 새 슬롯을 제안하고 이 폴더에 잇는다
+    $("slot").value = st.why === "folder" || st.why === "arg" ? st.slot : st.suggest || "";
+    $("useHere").checked = true;
     L.banner(st, async (name) => {
       try { fill(await L.api(`/api/state?slot=${encodeURIComponent(name)}`)); } catch (e) { $("status").textContent = e.message; }
     });

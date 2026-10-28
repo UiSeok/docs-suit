@@ -21,7 +21,7 @@ bootstrap 은 네 단계를 묻습니다.
 3. 쓰는 AI 도구 고르기. 고른 도구에 docs-suit 스킬을 설치합니다.
 4. 머리 모양 고르기. 옷 색과 소품, 옷은 클래스마다 전직하면서 열립니다.
 
-답은 기본 슬롯인 `~/.config/docs-suit/profile.yaml` 에 남습니다. 저장소 밖이라 실수로 커밋되지 않습니다. 에이전트에게 "docs-suit 세팅해 줘" 라고 해도 됩니다. 스킬이 같은 질문을 대신 묻고 `bootstrap --class … --yes` 로 저장합니다.
+답은 기본 슬롯인 `~/.config/docs-suit/profile.yaml` 에 남습니다. 저장소 밖이라 실수로 커밋되지 않습니다. 에이전트에게 "docs-suit 세팅해 줘" 라고 하면 스킬이 같은 질문을 대신 묻고, 그 폴더 이름으로 새 슬롯을 만들어 폴더에 잇습니다. 캐릭터는 폴더마다 따로 자라고, 상태 줄에도 그 폴더의 캐릭터만 뜹니다. 다른 폴더에서 만든 캐릭터가 있으면 그 캐릭터를 이어 쓸지 먼저 묻습니다.
 
 ## 클래스
 
@@ -110,6 +110,7 @@ python3 suit.py voice                                # 지금 문서를 본다. 
 
 ```sh
 python3 suit.py bootstrap --profile work   # work 슬롯을 새로 만든다
+python3 suit.py bootstrap --profile work --here   # work 슬롯을 만들고 이 폴더에 잇는다
 python3 suit.py profile list               # 슬롯 목록. * 가 지금 쓰는 슬롯
 python3 suit.py profile use work           # 어느 폴더에서든 work 슬롯을 쓴다
 cd ~/작업폴더

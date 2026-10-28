@@ -26,6 +26,7 @@ profiles/<이름>.yaml 이다. 폴더의 .docs-suit.yaml 은 쓸 슬롯과 그 �
   python3 suit.py bootstrap                             처음 세팅. 클래스와 페르소나를 묻고 프로필을 만든다
   python3 suit.py bootstrap --class C [--call …] [--affiliation …] [--goal …] [--docs a,b]
                             [--facts …] [--dislikes …] [--agents a,b] [--hair 머리] [--preset 이름] --yes [--force]
+                            [--profile 슬롯 --here]   --here 는 지금 폴더가 이 슬롯을 쓰게 한다
   python3 suit.py bootstrap --questions                 에이전트가 대신 물을 때 쓸 질문 목록
   python3 suit.py profile [show|list]                   지금 쓰는 프로필 보기, 슬롯 목록
   python3 suit.py profile use <슬롯> [--here]           기본 슬롯을 바꾼다. --here 는 지금 폴더에 적는다
@@ -447,6 +448,23 @@ def write_folder(data, where=None):
     p = Path(where or os.getcwd()) / FOLDER_FILE
     p.write_text(dump_yaml(data, FOLDER_HEAD), encoding="utf-8")
     return p
+
+
+def bind_folder(name, where=None):
+    """폴더 파일이 슬롯 name 을 쓰게 한다. 폴더 파일에 있던 축 값은 그대로 둔다."""
+    data = read_folder(Path(where or os.getcwd()) / FOLDER_FILE, warn_stderr)
+    return write_folder({"profile": name, **{k: v for k, v in data.items() if k != "profile"}}, where)
+
+
+def suggest_slot(where=None):
+    """새 캐릭터의 슬롯 이름으로 제안할 이름. 폴더 이름에서 만들고, 이미 있는 슬롯과 겹치면 번호를 붙인다."""
+    base = re.sub(r"[^\w-]+", "-", Path(where or os.getcwd()).resolve().name).strip("-_") or "my"
+    if base == "default":
+        base = "my"
+    name, n = base, 2
+    while slot_path(name).exists():
+        name, n = f"{base}-{n}", n + 1
+    return name
 
 
 # ---------------------------------------------------------------- 값 정하기
@@ -1727,13 +1745,15 @@ description: 문서를 쓰거나 다듬거나 검토할 때 docs-suit 테마를 
 엔진은 `{run}` 이다. 출력은 마크다운 지침 한 장이고, 어떤 에이전트든 그대로 따르면 된다. 프로필은 폴더마다 다를 수 있으니 엔진은 사용자의 작업 폴더에서 부르고, 엔진 폴더로 옮겨 가서 부르지 않는다.
 
 1. `{run} profile` 로 프로필이 있는지 본다. 없으면 이번 문서는 중립 기본값으로 쓰고, 다 쓴 뒤 프로필을 만들면 다음 문서부터 호칭과 말투가 맞춰진다고 권한다. 사용자가 원하거나 세팅해 달라고 하면 bootstrap 을 대신 진행하고, 사용자의 답 없이 프로필을 저장하지 않는다.
+   - 캐릭터는 폴더마다 따로 키운다. `{run} bootstrap --questions` 의 `slots` 에 다른 폴더에서 만든 캐릭터가 있으면, 그 캐릭터를 이 폴더에서도 쓸지 새로 만들지 먼저 묻는다. 있던 캐릭터를 쓰겠다고 하면 `{run} profile use <슬롯> --here` 로 끝낸다.
    - `{run} list --classes` 로 클래스 일곱 가지를 보여 주고 하나 고르게 한다.
    - `{run} bootstrap --questions` 가 내는 페르소나 질문을 차례로 묻는다. 답하기 싫은 질문은 비워 둔다.
    - 같은 출력의 `presets` 에 고른 클래스의 조합이 있으면, 다른 사람이 기여한 테마 조합으로 시작할지 묻는다. 추천 표시가 붙은 조합을 앞에 보인다.
    - 같은 출력의 `hairs` 로 캐릭터의 머리 모양을 고르게 한다. 고르지 않으면 짧은 머리다. 옷 색과 소품, 옷은 클래스마다 전직할 때 열린다.
-   - 조합과 머리 모양은 페르소나 질문과 같은 메시지에서 함께 묻는다. 사용자가 나머지 질문을 건너뛰겠다고 하면 다시 묻지 않고 답한 것만으로 저장한다. 조합은 쓰지 않고 머리 모양은 기본값이다.
-   - `{run} bootstrap --class <클래스> --call … --affiliation … --goal … --docs <종류,종류> --facts … --dislikes … [--preset <조합>] [--hair <머리>] --yes` 로 저장한다.
-   - 사용자가 화면에서 고르겠다고 하면 묻는 대신 `{run} serve --page create --detach` 로 로컬 화면을 띄우고 나온 주소를 알려 준다. 화면에서 저장한 슬롯이 바로 적용된다.
+   - 같은 출력의 `slot` 을 새 캐릭터의 슬롯 이름으로 제안한다. 이 폴더 이름에서 만든 이름이고, 사용자가 바꾸면 글자, 숫자, -, _ 로 쓴다.
+   - 조합과 머리 모양, 슬롯 이름은 페르소나 질문과 같은 메시지에서 함께 묻는다. 사용자가 나머지 질문을 건너뛰겠다고 하면 다시 묻지 않고 답한 것만으로 저장한다. 조합은 쓰지 않고 머리 모양은 기본값이고 슬롯 이름은 제안한 이름이다.
+   - `{run} bootstrap --profile <슬롯> --here --class <클래스> --call … --affiliation … --goal … --docs <종류,종류> --facts … --dislikes … [--preset <조합>] [--hair <머리>] --yes` 로 저장한다. `--here` 가 이 폴더를 새 슬롯에 잇는다.
+   - 사용자가 화면에서 고르겠다고 하면 묻는 대신 `{run} serve --page create --detach` 로 로컬 화면을 띄우고 나온 주소를 알려 준다. 화면은 이 폴더 이름의 슬롯과 "실행한 폴더에서 이 슬롯 쓰기" 를 미리 채워 두고, 저장하면 바로 적용된다.
    - 저장한 뒤 답의 끝에 "<호칭>만의 글쓰기 스타일을 원하시면 예전에 작성하셨던 글 몇 개를 알려 주세요" 처럼 권한다. 호칭이 없으면 빼고 쓰고, 건너뛰어도 된다고 함께 말한다. 글을 받으면 10번대로 배운다.
 2. 요청에서 문서 종류를 정한다. 종류는 {kinds} 이다. 맞는 것이 없으면 종류 없이 조립한다. 종류 없는 글은 문체 축을 프로필과 클래스에서 물려받지 않고, 지침의 "대화로 정하기" 절대로 요청과 대화에서 읽어 맞춘다. 독자가 분명하면 `--audience <키>` 로 넘긴다. 독자 키는 {auds} 이다. 독자가 여럿이면 키를 쉼표로 잇는다.
 3. 사용자가 문체, 어법, 분량, 글자수, 공개 범위를 말했으면 `--set 축=값` 과 `--chars` 로 넘긴다. 축과 값은 아래 영어 키로 쓴다. {axes}. 공개 범위는 안전 축이라 `--set exposure` 는 `team`, `submit`, `public` 순서로 더 조심하는 쪽으로만 먹는다. 사내나 팀 안에서만 볼 글이면 `--set` 대신 `--audience` 를 `teammate` 나 `peer-dev` 로 넘긴다. 붙여 넣을 곳이 메일 본문이나 메신저, 지원서 입력 칸처럼 마크다운이 먹지 않는 곳이면 `--set markup=plain` 을 넘긴다.
@@ -1895,9 +1915,16 @@ def cmd_bootstrap(a, th):
                                        "class": th.presets[k].get("class"),
                                        "featured": str(th.presets[k].get("featured")) == "true"}
                                       for k in preset_order(th)],
-                          "hairs": dict(th.look.get("hair") or {})},
+                          "hairs": dict(th.look.get("hair") or {}),
+                          "slot": suggest_slot(),
+                          "slots": [{"name": f.stem, "class": (d.get("profile") or {}).get("class"),
+                                     "call": (d.get("persona") or {}).get("call")}
+                                    for f in sorted((config_dir() / "profiles").glob("*.yaml"))
+                                    for d in [read_slot(f)] if d]},
                          ensure_ascii=False, indent=1))
         return 0
+    if a.here and (not a.profile or a.profile == "default"):
+        raise Missing("--here 는 이 폴더에 적을 슬롯 이름을 --profile 로 함께 준다. 제안 이름은 bootstrap --questions 의 slot 이다")
     p = profile_path(a.profile)
     if p.exists() and not a.force:
         print(f"이미 프로필이 있다: {p}\n다시 만들려면 --force 를 붙인다. 지금 프로필은 `suit.py profile` 로 본다.")
@@ -1936,6 +1963,8 @@ def cmd_bootstrap(a, th):
     if p.exists():
         p.with_name(p.name + ".bak").write_text(p.read_text(encoding="utf-8"), encoding="utf-8")
     print(f"\n프로필을 저장했다: {write_profile(data, a.profile)}")
+    if a.here:
+        print(f"폴더 파일 {bind_folder(a.profile)} 이 슬롯 {a.profile} 을 쓴다. 이 폴더와 아래 폴더에서 이 캐릭터가 자란다")
     if agents:
         if not a.yes and _ask("고른 도구에 스킬을 설치할까? [Y/n] ", "y").lower() not in ("y", "yes", "ㅛ"):
             print("설치를 건너뛰었다. 나중에 `suit.py export --agent …` 로 설치한다.")
@@ -2010,9 +2039,7 @@ def cmd_profile(a, th):
             raise Missing("슬롯 이름을 준다: suit.py profile use <이름> [--here]")
         target = slot_path(a.name)
         if a.here:
-            data = read_folder(Path.cwd() / FOLDER_FILE, warn_stderr)
-            data = {"profile": a.name, **{k: v for k, v in data.items() if k != "profile"}}
-            print(f"폴더 파일 {write_folder(data)} 이 슬롯 {a.name} 을 쓴다")
+            print(f"폴더 파일 {bind_folder(a.name)} 이 슬롯 {a.name} 을 쓴다")
         else:
             current = config_dir() / "current"
             current.parent.mkdir(parents=True, exist_ok=True)
@@ -2702,7 +2729,7 @@ def serve_state(th, cwd, slot=None):
         d = read_slot(slot_path(n))
         slots.append({"name": n, "exists": bool(d), "class": (d.get("profile") or {}).get("class"),
                       "call": (d.get("persona") or {}).get("call")})
-    out = {"cwd": cwd, "slot": name, "path": str(path), "why": why, "exists": path.exists(),
+    out = {"cwd": cwd, "slot": name, "path": str(path), "why": why, "exists": path.exists(), "suggest": suggest_slot(cwd),
            "folders": [str(f) for f in folder], "slots": slots, "profile": data,
            "merged": load_profile(name=slot, start=cwd), "folderHere": read_folder(Path(cwd) / FOLDER_FILE)}
     if data and th.growth:
@@ -2907,9 +2934,7 @@ def make_server(th, cwd, port=0, context=None):
                 target.write_text(dump_yaml(data), encoding="utf-8")
                 notes = [f"저장했다: {target}"]
                 if body.get("useHere") and name != "default":
-                    folder = read_folder(Path(cwd) / FOLDER_FILE)
-                    folder = {"profile": name, **{k: v for k, v in folder.items() if k != "profile"}}
-                    notes.append(f"이 폴더가 슬롯 {name} 을 쓴다: {write_folder(folder, cwd)}")
+                    notes.append(f"이 폴더가 슬롯 {name} 을 쓴다: {bind_folder(name, cwd)}")
                 if body.get("install") and data["profile"].get("agents"):
                     written = export(th, data["profile"]["agents"], say=lambda m: None)
                     notes.append("스킬을 깔았다: " + ", ".join(str(w) for w in written) if written else "깔 스킬이 없다")
@@ -3385,7 +3410,7 @@ def selftest(th):
             ns = argparse.Namespace(questions=False, force=False, cls="developer", yes=True, profile=None,
                                     call='민수 "님"', affiliation="백엔드, 2년 차: 결제", goal=None,
                                     facts="#1 은 지도 시각화", dislikes=None, docs="pr,design-doc", agents="", hair="bob",
-                                    preset=next(iter(th.presets), None))
+                                    preset=next(iter(th.presets), None), here=False)
             quiet(cmd_bootstrap, ns, th)
             prof = load_profile(start=td)
             check(prof.get("profile", {}).get("class") == "developer", "bootstrap 이 클래스를 남기지 않았다")
@@ -3499,6 +3524,30 @@ def selftest(th):
                 finally:
                     sys.stdin = stdin
                 check(bool(out.getvalue()) == want, "상태 줄이 폴더 파일의 슬롯이 있는 곳에서만 캐릭터를 그리지 않는다")
+            # 새 폴더에서 대화로 세팅하면 폴더 이름의 새 슬롯을 만들고 그 폴더에 잇는다
+            fresh = Path(td) / "내 프로젝트 (2)"
+            fresh.mkdir()
+            check(suggest_slot(fresh) == "내-프로젝트-2" and suggest_slot(top) == "proj", "폴더 이름에서 슬롯 이름을 만들지 못한다")
+            write_profile({"profile": {"class": "office"}}, "proj")
+            check(suggest_slot(top) == "proj-2", "있는 슬롯과 겹치는 이름을 제안했다")
+            here, cwd_was = argparse.Namespace(questions=False, force=False, cls="student", yes=True, profile=None,
+                                               docs=None, agents="", hair=None, preset=None, here=True,
+                                               **{k: None for k in PERSONA_IN_PROMPT}), os.getcwd()
+            try:
+                os.chdir(fresh)
+                try:
+                    quiet(cmd_bootstrap, here, th)
+                    problems.append("bootstrap --here 가 슬롯 이름 없이 기본 슬롯을 폴더에 이었다")
+                except Missing:
+                    pass
+                here.profile = suggest_slot()
+                quiet(cmd_bootstrap, here, th)
+            finally:
+                os.chdir(cwd_was)
+            check(read_folder(fresh / FOLDER_FILE).get("profile") == "내-프로젝트-2"
+                  and profile_source(start=fresh)[1:4:2] == ("내-프로젝트-2", "folder")
+                  and read_slot(slot_path("내-프로젝트-2")).get("profile", {}).get("class") == "student",
+                  "bootstrap --here 가 새 슬롯을 만들어 이 폴더에 잇지 않았다")
             try:
                 slot_path("../x")
                 problems.append("슬롯 이름에 경로를 받았다")
@@ -3690,6 +3739,7 @@ def selftest(th):
                   f"캐릭터 만들기의 슬롯을 쓰지 못하거나 폴더 파일을 남기지 않았다: {code}")
             state = json.loads(req("/api/state")[1])
             check(state["slot"] == "web" and state["why"] == "folder", "폴더 파일이 고른 슬롯을 상태에 싣지 않는다")
+            check(SLOT_RE.match(state["suggest"]) and state["suggest"] != "default", "화면에 새 슬롯 이름을 제안하지 않는다")
             check(state["context"] == {"kind": None, "audiences": [], "sets": {}}, "맥락 없이 띄운 화면의 상태가 다르다")
             # 이번 문서에만: 슬롯은 두고 고른 값을 picked 로 넘긴다
             before = read_slot(slot_path("web"))
@@ -3754,6 +3804,7 @@ def main(argv=None):
     b.add_argument("--hair", help="처음 머리 모양. bootstrap --questions 의 hairs 에서 고른다")
     b.add_argument("--preset", help="이 테마 조합으로 시작한다. suit.py preset list 로 본다")
     b.add_argument("--yes", action="store_true", help="묻지 않고 진행한다")
+    b.add_argument("--here", action="store_true", help="지금 폴더의 .docs-suit.yaml 이 --profile 로 준 슬롯을 쓰게 한다")
     b.add_argument("--force", action="store_true", help="있는 프로필을 .bak 으로 남기고 새로 만든다")
     b.add_argument("--questions", action="store_true", help="클래스와 페르소나 질문 목록을 JSON 으로 낸다")
     pr = sub.add_parser("profile", parents=[slot])
