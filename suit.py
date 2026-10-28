@@ -78,7 +78,10 @@ import threading
 import time
 import unicodedata
 import webbrowser
+import xml.etree.ElementTree as ET
+import zipfile
 from datetime import datetime
+from html.parser import HTMLParser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
@@ -639,6 +642,241 @@ def review(th, kind=None, audiences=None, sets=None, profile=None, cls=None, cha
     parts.append("## 원문\n\n" + (source.strip() if source and source.strip() else REVIEW_SOURCE))
     parts.append("## 검토할 글\n\n" + (doc.strip() if doc and doc.strip() else REVIEW_DOC))
     return "\n\n".join(parts) + "\n"
+
+# ---------------------------------------------------------------- 문서 파일 읽기
+# check 와 review 는 마크다운과 텍스트 말고도 Office, 한글, HTML, PDF 문서에서 글을 뽑아 잰다. 제목은 #, 목록은 -,
+# 표는 |, 굵은 글씨는 ** 로 바꿔 마크다운 본문과 같은 기준으로 잰다. 슬라이드와 쪽 사이에는 --- 를 둔다.
+DOC_FILES = (".docx", ".pptx", ".hwpx", ".odt", ".odp", ".html", ".htm", ".pdf")
+DOC_OLD = {".doc": "docx", ".ppt": "pptx", ".hwp": "hwpx"}
+DOC_SHEETS = (".xlsx", ".xls", ".csv", ".ods")
+
+
+def _tag(el):
+    return el.tag.rsplit("}", 1)[-1]
+
+
+def _attr(el, name):
+    return next((v for k, v in el.attrib.items() if k.rsplit("}", 1)[-1] == name), None)
+
+
+def _kids(el, name):
+    return [c for c in el if _tag(c) == name]
+
+
+def _bold_runs(runs):
+    """[(글, 굵은가)] 를 잇는다. 이어진 굵은 조각은 ** 한 쌍으로 묶는다."""
+    out, bold = [], []
+    for text, b in runs + [("", False)]:
+        if b and text.strip():
+            bold.append(text)
+            continue
+        if bold:
+            joined = "".join(bold)
+            out.append(f"**{joined.strip()}**" if joined.strip() else joined)
+            bold = []
+        out.append(text)
+    return re.sub(r"[ \t]+", " ", "".join(out)).strip()
+
+
+def _table(rows):
+    # 표 머리의 굵은 글씨는 문서 서식이 넣는 것이라 강조로 세지 않는다
+    return [f"| {' | '.join(c.replace('**', '') for c in cells)} |" for cells in rows if any(cells)]
+
+
+def _docx_lines(root):
+    def para(p):
+        ppr = next(iter(_kids(p, "pPr")), None)
+        style = (_attr(next(iter(_kids(ppr, "pStyle")), ppr), "val") or "").lower() if ppr is not None else ""
+        runs = []
+        for r in p.iter():
+            if _tag(r) != "r":
+                continue
+            rpr = next(iter(_kids(r, "rPr")), None)
+            b = rpr is not None and any(_tag(x) == "b" and _attr(x, "val") not in ("0", "false") for x in rpr)
+            runs.append(("".join(x.text or "" if _tag(x) == "t" else " " for x in r if _tag(x) in ("t", "tab", "br")), b))
+        text = _bold_runs(runs)
+        if not text:
+            return None
+        if style.startswith(("heading", "title")) or "제목" in style:
+            return "# " + text.replace("**", "")
+        if (ppr is not None and _kids(ppr, "numPr")) or "list" in style:
+            return "- " + text
+        return text
+
+    def walk(el, out):
+        for c in el:
+            if _tag(c) == "p":
+                line = para(c)
+                if line:
+                    out.append(line)
+            elif _tag(c) == "tbl":
+                out += _table([[" ".join(filter(None, (para(p) for p in tc.iter() if _tag(p) == "p"))) for tc in _kids(tr, "tc")]
+                               for tr in _kids(c, "tr")])
+            else:
+                walk(c, out)
+        return out
+    return walk(root, [])
+
+
+def _pptx_lines(root):
+    def para(p, bullet):
+        runs = [("".join(x.text or "" for x in r if _tag(x) == "t") if _tag(r) != "br" else " ",
+                 _tag(r) != "br" and any(_tag(x) == "rPr" and _attr(x, "b") in ("1", "true") for x in r))
+                for r in p if _tag(r) in ("r", "fld", "br")]
+        text = _bold_runs(runs)
+        ppr = next(iter(_kids(p, "pPr")), None)
+        marks = {_tag(x) for x in ppr} if ppr is not None else set()
+        if text and "buNone" not in marks and (bullet or marks & {"buChar", "buAutoNum"}):
+            return "- " + text
+        return text
+
+    out = []
+    for el in root.iter():
+        if _tag(el) == "sp":
+            ph = next((x for x in el.iter() if _tag(x) == "ph"), None)
+            kind = _attr(ph, "type") if ph is not None else None
+            body = next((x for x in el if _tag(x) == "txBody"), None)
+            if body is None:
+                continue
+            paras = [para(p, ph is not None and kind in (None, "body", "obj")) for p in _kids(body, "p")]
+            if kind in ("title", "ctrTitle"):
+                title = " ".join(x.replace("**", "") for x in paras if x)
+                out += ["# " + title] if title else []
+            else:
+                out += [x for x in paras if x]
+        elif _tag(el) == "tbl":
+            out += _table([[" ".join(filter(None, (para(p, False) for p in tc.iter() if _tag(p) == "p"))) for tc in _kids(tr, "tc")]
+                           for tr in _kids(el, "tr")])
+    return out
+
+
+def _hwpx_lines(root):
+    def text(p):
+        return " ".join("".join(t.itertext()) for t in p.iter() if _tag(t) == "t").strip()
+
+    def walk(el, out):
+        for c in el:
+            if _tag(c) == "tbl":
+                out += _table([[" ".join(filter(None, (text(p) for p in tc.iter() if _tag(p) == "p"))) for tc in _kids(tr, "tc")]
+                               for tr in _kids(c, "tr")])
+            elif _tag(c) == "p" and not any(_tag(x) == "tbl" for x in c.iter()):
+                if text(c):
+                    out.append(text(c))
+            else:
+                walk(c, out)
+        return out
+    return walk(root, [])
+
+
+def _odf_lines(root):
+    def walk(el, out, item=False):
+        for c in el:
+            name = _tag(c)
+            if name == "page":
+                out.append("---")
+                walk(c, out)
+            elif name in ("h", "p"):
+                text = " ".join("".join(c.itertext()).split())
+                if text:
+                    out.append(("# " if name == "h" else "- " if item else "") + text)
+            elif name == "table":
+                out += _table([[" ".join("".join(tc.itertext()).split()) for tc in r if _tag(tc) == "table-cell"]
+                               for r in c.iter() if _tag(r) == "table-row"])
+            else:
+                walk(c, out, item or name == "list-item")
+        return out
+    return walk(root, [])
+
+
+class _HTMLText(HTMLParser):
+    BLOCK = {"p", "div", "li", "h1", "h2", "h3", "h4", "h5", "h6", "tr", "br", "section", "article", "blockquote"}
+
+    def __init__(self):
+        super().__init__()
+        self.lines, self.cur, self.cells, self.skip = [], "", None, 0
+
+    def flush(self):
+        text = " ".join(self.cur.split())
+        if text:
+            self.lines.append(text)
+        self.cur = ""
+
+    def handle_starttag(self, tag, attrs):
+        if tag in ("script", "style", "head"):
+            self.skip += 1
+        elif tag in ("b", "strong"):
+            self.cur += "**"
+        elif tag == "tr":
+            self.flush()
+            self.cells = []
+        elif tag in ("td", "th"):
+            self.cur = ""
+        elif tag in self.BLOCK:
+            self.flush()
+            self.cur = "# " if tag[0] == "h" and tag[1:].isdigit() else "- " if tag == "li" else ""
+
+    def handle_endtag(self, tag):
+        if tag in ("script", "style", "head"):
+            self.skip = max(0, self.skip - 1)
+        elif tag in ("b", "strong"):
+            self.cur += "**"
+        elif tag in ("td", "th") and self.cells is not None:
+            self.cells.append(" ".join(self.cur.split()))
+            self.cur = ""
+        elif tag == "tr" and self.cells is not None:
+            self.lines += _table([self.cells])
+            self.cells = None
+        elif tag in self.BLOCK:
+            self.flush()
+
+    def handle_data(self, data):
+        if not self.skip:
+            self.cur += data
+
+
+def doc_file_text(path):
+    """문서 파일의 글. (글, 문서 파일인가). 마크다운과 텍스트는 그대로 읽고, 읽지 못하는 형식은 까닭을 담아 ValueError 를 낸다."""
+    path = Path(path).expanduser()
+    ext = path.suffix.lower()
+    if ext in DOC_OLD:
+        raise ValueError(f"{ext} 는 옛 형식이라 읽지 못한다. {DOC_OLD[ext]} 로 저장해 넘긴다")
+    if ext in DOC_SHEETS:
+        raise ValueError(f"{ext} 는 표 파일이라 재지 않는다. 보고서나 발표 자료처럼 글이 든 문서를 넘긴다")
+    if ext not in DOC_FILES:
+        return path.read_text(encoding="utf-8"), False
+    if ext == ".pdf":
+        if not shutil.which("pdftotext"):
+            raise ValueError("PDF 를 읽으려면 pdftotext(poppler) 가 있어야 한다. 원본 문서 파일을 넘겨도 된다")
+        out = subprocess.run(["pdftotext", "-enc", "UTF-8", str(path), "-"], capture_output=True, text=True)
+        if out.returncode:
+            raise ValueError(f"PDF 를 읽지 못했다: {out.stderr.strip()}")
+        return "\n".join(ln.strip() for ln in out.stdout.replace("\f", "\n---\n").splitlines() if ln.strip()), True
+    if ext in (".html", ".htm"):
+        parser = _HTMLText()
+        parser.feed(path.read_text(encoding="utf-8", errors="replace"))
+        parser.flush()
+        return "\n".join(parser.lines), True
+    try:
+        z = zipfile.ZipFile(path)
+    except zipfile.BadZipFile:
+        raise ValueError(f"{path.name} 를 {ext} 문서로 열지 못했다")
+    with z:
+        names = z.namelist()
+        num = lambda n: int(re.search(r"(\d+)\.xml$", n).group(1)) if re.search(r"(\d+)\.xml$", n) else 0
+        if ext == ".docx":
+            parts, read = ["word/document.xml"], _docx_lines
+        elif ext == ".pptx":
+            parts, read = sorted((n for n in names if re.match(r"ppt/slides/slide\d+\.xml$", n)), key=num), _pptx_lines
+        elif ext == ".hwpx":
+            parts, read = sorted((n for n in names if re.match(r"Contents/section\d+\.xml$", n)), key=num), _hwpx_lines
+        else:
+            parts, read = ["content.xml"], _odf_lines
+        pages = []
+        for name in parts:
+            if name in names:
+                pages.append("\n".join(read(ET.fromstring(z.read(name)))))
+    return ("\n---\n" if ext == ".pptx" else "\n").join(pages), True
+
 
 # ---------------------------------------------------------------- 본문 검사
 # 조립된 값대로 썼는지 어림 기준으로 잰다. 기준은 대략값이라 틀림이 나오면 본문을 직접 읽어 확인한다.
@@ -1296,7 +1534,7 @@ description: 문서를 쓰거나 다듬거나 검토할 때 docs-suit 테마를 
 2. 요청에서 문서 종류를 정한다. 종류는 {kinds} 이다. 맞는 것이 없으면 종류 없이 조립한다. 종류 없는 글은 문체 축을 프로필과 클래스에서 물려받지 않고, 지침의 "대화로 정하기" 절대로 요청과 대화에서 읽어 맞춘다. 독자가 분명하면 `--audience <키>` 로 넘긴다. 독자 키는 {auds} 이다. 독자가 여럿이면 키를 쉼표로 잇는다.
 3. 사용자가 문체, 어법, 분량, 글자수, 공개 범위를 말했으면 `--set 축=값` 과 `--chars` 로 넘긴다. 축과 값은 아래 영어 키로 쓴다. {axes}. 공개 범위는 안전 축이라 `--set exposure` 는 `team`, `submit`, `public` 순서로 더 조심하는 쪽으로만 먹는다. 사내나 팀 안에서만 볼 글이면 `--set` 대신 `--audience` 를 `teammate` 나 `peer-dev` 로 넘긴다. 붙여 넣을 곳이 메일 본문이나 메신저, 지원서 입력 칸처럼 마크다운이 먹지 않는 곳이면 `--set markup=plain` 을 넘긴다.
 4. `{run} compose --kind <종류> [--audience …] [--set …] [--chars N] [--revise]` 의 출력 전체를 이번 문서의 규칙으로 따른다. 사용자가 원문을 주고 다듬어 달라고 하면 `--revise` 를 붙이고, 문서 종류는 원문을 보고 정한다. 다른 문체 지침이나 스킬과 겹치면 어법, 분량, 공개 범위 같은 축의 값은 이 출력을 따른다. 지침의 공통 바닥이 시키는 대로, 문서 종류의 "쓰기 전에 받을 것" 가운데 요청과 자료에 없는 것만 두세 개 묻는다.
-5. 답을 끝내기 전에 본문을 검사한다. 검사하지 않은 답은 끝난 답이 아니다. compose 에 넘긴 `--kind`, `--audience`, `--set`, `--chars`, `--revise` 를 그대로 붙인다. 본문을 파일로 썼으면 `{run} check <본문 파일> --kind <종류> …` 로 부른다. 답에만 썼으면 임시 파일을 만들지 말고 본문 전체를 heredoc 으로 넘긴다.
+5. 답을 끝내기 전에 본문을 검사한다. 검사하지 않은 답은 끝난 답이 아니다. compose 에 넘긴 `--kind`, `--audience`, `--set`, `--chars`, `--revise` 를 그대로 붙인다. 본문을 파일로 썼으면 `{run} check <본문 파일> --kind <종류> …` 로 부른다. docx, pptx, hwpx, pdf 같은 문서 파일을 만들었으면 원고가 따로 있어도 마지막에 만든 그 파일을 넘긴다. 엔진이 파일에서 글을 뽑아 잰다. 답에만 썼으면 임시 파일을 만들지 말고 본문 전체를 heredoc 으로 넘긴다.
    ```sh
    {run} check - --kind <종류> [--audience …] <<'EOF'
    (본문 전체)
@@ -1645,13 +1883,19 @@ def cmd_export(a, th):
 
 
 def cmd_check(a, th):
-    text = sys.stdin.read() if a.file == "-" else Path(a.file).expanduser().read_text(encoding="utf-8")
+    text, docfile = (sys.stdin.read(), False) if a.file == "-" else doc_file_text(a.file)
+    if docfile and not text.strip():
+        print(f"오류: {a.file} 에서 글을 찾지 못했다. 그림으로만 된 문서면 본문을 heredoc 으로 넘긴다", file=sys.stderr)
+        return 1
     if not text.strip():
         print("오류: 본문이 비어 있다. 파일 경로를 주거나, - 를 쓰고 본문 전체를 heredoc 으로 넘긴다: "
               "check - --kind <종류> <<'EOF' … EOF", file=sys.stderr)
         return 1
     vals, auds, _ = resolve(th, a.kind, _auds(a.audience), _sets(a.set), load_profile(warn_stderr, a.profile), a.cls,
                             warn_stderr, talk=True)
+    if docfile:
+        # 문서 파일은 마크다운 기호가 새어 나올 일이 없어 출력 형식을 재지 않는다
+        vals = {k: v for k, v in vals.items() if k != "markup"}
     checks = check_doc(text, vals, a.chars, a.kind, th)
     hints = suggest_doc(th, text, vals, a.kind)
     left = len(UNRESOLVED.findall(text))
@@ -1682,7 +1926,7 @@ def cmd_review(a, th):
     if a.file == "-" and a.source == "-":
         print("오류: 본문과 원문을 둘 다 표준 입력으로 받을 수 없다. 원문은 파일로 넘긴다", file=sys.stderr)
         return 1
-    read = lambda f: sys.stdin.read() if f == "-" else Path(f).expanduser().read_text(encoding="utf-8")
+    read = lambda f: sys.stdin.read() if f == "-" else doc_file_text(f)[0]
     text = review(th, a.kind, _auds(a.audience), _sets(a.set), load_profile(warn_stderr, a.profile), a.cls, a.chars,
                   read(a.file) if a.file else None, read(a.source) if a.source else None, warn_stderr, talk=True)
     if a.output:
@@ -2623,6 +2867,33 @@ def selftest(th):
               and rv.rstrip().endswith(REVIEW_DOC), "검토 지침이 다르거나 페르소나가 실렸다")
         rv = review(th, kind="email", doc="본문이다.\n", source="공고다.")
         check(rv.rstrip().endswith("본문이다.") and "## 원문\n\n공고다." in rv, "검토 지침에 본문과 원문을 넣지 못한다")
+        # 문서 파일 읽기. 가장 작은 docx 와 pptx 를 만들어 제목, 목록, 굵은 글씨, 표, 슬라이드 경계가 마크다운 꼴로 나오는지 본다.
+        with tempfile.TemporaryDirectory() as td:
+            w = 'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"'
+            with zipfile.ZipFile(Path(td) / "a.docx", "w") as z:
+                z.writestr("word/document.xml", f'<w:document {w}><w:body>'
+                           '<w:p><w:pPr><w:pStyle w:val="Heading1"/></w:pPr><w:r><w:t>제목</w:t></w:r></w:p>'
+                           '<w:p><w:r><w:t xml:space="preserve">본문은 </w:t></w:r><w:r><w:rPr><w:b/></w:rPr><w:t>굵게</w:t></w:r>'
+                           '<w:r><w:t xml:space="preserve"> 씁니다.</w:t></w:r></w:p>'
+                           '<w:p><w:pPr><w:numPr/></w:pPr><w:r><w:t>항목</w:t></w:r></w:p>'
+                           '<w:tbl><w:tr><w:tc><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>칸</w:t></w:r></w:p></w:tc></w:tr></w:tbl>'
+                           '</w:body></w:document>')
+            a = 'xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"'
+            p = 'xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"'
+            with zipfile.ZipFile(Path(td) / "a.pptx", "w") as z:
+                for n, title in ((2, "둘째"), (10, "열째")):
+                    z.writestr(f"ppt/slides/slide{n}.xml", f'<p:sld {p} {a}><p:cSld><p:spTree>'
+                               f'<p:sp><p:nvSpPr><p:nvPr><p:ph type="title"/></p:nvPr></p:nvSpPr><p:txBody><a:p><a:r><a:t>{title}</a:t></a:r></a:p></p:txBody></p:sp>'
+                               '<p:sp><p:nvSpPr><p:nvPr><p:ph idx="1"/></p:nvPr></p:nvSpPr><p:txBody><a:p><a:r><a:t>요점</a:t></a:r></a:p></p:txBody></p:sp>'
+                               '</p:spTree></p:cSld></p:sld>')
+            check(doc_file_text(Path(td) / "a.docx") == ("# 제목\n본문은 **굵게** 씁니다.\n- 항목\n| 칸 |", True), "docx 에서 글을 다르게 뽑는다")
+            check(doc_file_text(Path(td) / "a.pptx") == ("# 둘째\n- 요점\n---\n# 열째\n- 요점", True), "pptx 에서 글을 다르게 뽑는다")
+            (Path(td) / "a.hwp").write_bytes(b"")
+            try:
+                doc_file_text(Path(td) / "a.hwp")
+                check(False, "옛 한글 파일을 거절하지 않는다")
+            except ValueError:
+                pass
         for bad in ({"skeleton": "template"}, {"nope": "x"}, {"voice": "nope"}):
             try:
                 resolve(th, sets=bad)
@@ -2954,7 +3225,7 @@ def main(argv=None):
     e.add_argument("--dest", help="에이전트별 하위 폴더로 이 폴더 아래에 쓴다. 시험용")
     e.add_argument("--dry-run", action="store_true")
     c = sub.add_parser("check", parents=[slot])
-    c.add_argument("file", help="검사할 본문 파일. - 이면 표준 입력에서 읽는다")
+    c.add_argument("file", help="검사할 본문 파일. md, txt 와 docx, pptx, hwpx, odt, odp, html, pdf 를 읽는다. - 이면 표준 입력에서 읽는다")
     c.add_argument("--class", dest="cls")
     c.add_argument("--kind")
     c.add_argument("--audience")
