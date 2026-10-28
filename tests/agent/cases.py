@@ -122,7 +122,9 @@ FLOWS = [
      "turns": ["docs-suit 세팅해 줘.",
                "직장인이야. 호칭은 지수 님, 소속은 플랫폼팀 백엔드 3년 차, 목표는 보고서를 빨리 끝내는 거야. "
                "자주 쓰는 문서는 업무 보고랑 메일이고, 나머지 질문은 건너뛸게."],
-     "expect": {"profile": {"profile.class": "office", "persona.call": "지수 님", "persona.docs": ["work-report", "email"]}}},
+     # 캐릭터는 폴더마다 자란다. 새로 세팅하면 폴더 이름(proj)의 슬롯을 만들어 이 폴더에 이어야 한다
+     "expect": {"profile": {"profile.class": "office", "persona.call": "지수 님", "persona.docs": ["work-report", "email"]},
+                "folder": {"profile": "proj"}}},
     {"id": "flow-restyle",
      "turns": ["팀장님께 올릴 주간 업무 보고 써 줘. 이번 주에는 로그인 오류를 고쳤고, 다음 주에는 알림 재시도를 붙여.",
                "말투가 너무 딱딱해. 해요체로 바꿔 줘. 앞으로 팀장님께 쓰는 글은 계속 해요체로 해 줘."],
