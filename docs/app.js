@@ -6,9 +6,9 @@
   "use strict";
   const KEY = "docs-suit.personal";
   const $ = (id) => document.getElementById(id);
-  // 자주 바꾸는 축을 앞에 두고, 나머지는 접어 둔다
-  const MAIN = ["register", "voice", "length", "skeleton", "terms", "emphasis"];
-  const MORE = ["markup", "diagram", "sources", "exposure", "ai-disclosure", "visual-deck", "visual-doc"];
+  // 정말 고를 축만 펼친다. 캐릭터 카드의 "지금 테마" 와 같은 세 축이고, 나머지는 "더 바꾸기" 에 접어 둔다
+  const MAIN = ["register", "voice", "length"];
+  const MORE = ["skeleton", "terms", "emphasis", "markup", "diagram", "sources", "exposure", "ai-disclosure", "visual-deck", "visual-doc"];
   const state = { cls: null, kind: undefined, aud: null, sets: {}, ctx: null };
   let T = null, C = null;
 
@@ -118,54 +118,37 @@
     box.textContent = "";
     const mine = savedKinds();
     const main = mainKinds();
-    const group = (title, keys, fold) => {
+    const row = (title, keys) => {
       if (!keys.length) return;
-      // 주력이 아닌 종류는 접어 둔다. 지금 고른 종류가 그 안에 있으면 펼친다
-      let into = box;
-      if (fold) {
-        into = document.createElement("details");
-        into.className = "kfold";
-        into.open = keys.indexOf(state.kind) >= 0 || box.dataset.open === "1";
-        into.addEventListener("toggle", () => { box.dataset.open = into.open ? "1" : ""; });
-        const s = document.createElement("summary");
-        s.className = "kgroup";
-        s.textContent = `${title} ${keys.length}가지`;
-        into.appendChild(s);
-        box.appendChild(into);
-      } else {
+      if (title) {
         const h = document.createElement("p");
         h.className = "kgroup";
         h.textContent = title;
         box.appendChild(h);
       }
       const wrap = document.createElement("div");
-      wrap.className = "kinds";
-      into.appendChild(wrap);
+      wrap.className = "chips small";
+      box.appendChild(wrap);
       for (const key of keys) {
-        const b = document.createElement("button");
-        b.type = "button";
-        b.className = "kind";
-        b.setAttribute("aria-pressed", String(state.kind === key));
-        const lab = key ? T.kinds[key].label : "일반 글";
-        b.innerHTML = `<span>${esc(lab)}</span>` + (key && mine[key] ? '<span class="tag">내 조합</span>' : "");
-        b.addEventListener("click", () => { state.kind = key; state.sets = {}; render(); });
-        wrap.appendChild(b);
+        const lab = (key ? T.kinds[key].label : "일반 글") + (key && mine[key] ? " · 내 조합" : "");
+        chip(wrap, lab, state.kind === key, () => { state.kind = key; state.sets = {}; $("kindPick").open = false; render(); });
       }
     };
     const others = Object.keys(T.kinds).filter((k) => main.indexOf(k) < 0);
-    group(state.cls ? `${T.classes[state.cls].label}의 주력 문서` : "", main.length ? main : others);
-    if (main.length) group("다른 문서", others, true);
-    group("종류 없는 글", [null]);
+    row(main.length ? `${T.classes[state.cls].label}의 주력 문서` : "", main);
+    row(main.length ? "다른 문서" : "", others);
+    row("종류 없는 글", [null]);
   }
 
   function buildHead() {
     const k = state.kind;
     $("kindTitle").textContent = k ? T.kinds[k].label : "일반 글";
     const mine = k && savedKinds()[k];
-    $("kindNote").textContent = !k
-      ? "종류 없는 글은 말투와 모양을 요청과 대화에서 맞춥니다. 고른 값은 이번 문서에만 씁니다."
-      : mine ? "이 종류에 저장한 조합으로 씁니다. 카드를 눌러 바꾸고 저장하면 다음 문서부터 그 값을 씁니다."
-        : "지금은 이 종류가 권하는 조합입니다. 마음에 안 드는 축의 카드를 누르세요.";
+    const now = state.ctx && state.ctx.fromAgent && state.ctx.kind === k;
+    const auds = state.aud ? [state.aud] : (k && T.kinds[k].audience) || [];
+    $("kindNote").textContent = [now ? "지금 쓰는 문서" : "",
+      auds.length ? `독자 ${auds.map((x) => T.audiences[x].label).join(", ")}` : "",
+      !k ? "고른 값은 이번 문서에만 씁니다" : mine ? "내가 저장한 조합" : "이 종류가 권하는 조합"].filter(Boolean).join(" · ");
     const a = $("auds");
     a.textContent = "";
     const def = k && T.kinds[k].audience ? T.kinds[k].audience.map((x) => T.audiences[x].label).join(", ") : "없음";
@@ -228,7 +211,7 @@
     }
     const rest = MORE.filter(shown);
     const picked = rest.filter((a) => state.sets[a]).length;
-    $("moreSum").textContent = `나머지 축 ${rest.length}개` + (picked ? ` · 고른 것 ${picked}개` : "") + ` (${rest.map((a) => T.axes[a].label).join(", ")})`;
+    $("moreSum").textContent = `더 바꾸기 · 축 ${rest.length}개와 독자` + (picked ? ` · 고른 것 ${picked}개` : "");
     document.querySelectorAll(".cards").forEach((row) => {
       if (keep[row.dataset.axis]) row.scrollLeft = keep[row.dataset.axis];
       row.classList.toggle("overflow", row.scrollWidth > row.clientWidth + 4);
@@ -242,7 +225,7 @@
     if (!keys.length) {
       const li = document.createElement("li");
       li.className = "muted";
-      li.textContent = "아직 고른 카드가 없습니다.";
+      li.textContent = "바꿀 축의 카드를 누르세요.";
       ul.appendChild(li);
     }
     for (const axis of keys) {
@@ -250,7 +233,7 @@
       li.textContent = `${T.axes[axis].label} · ${C.label(axis, state.sets[axis])}`;
       ul.appendChild(li);
     }
-    $("apply").disabled = !keys.length && !(state.ctx && state.ctx.fromAgent);
+    $("apply").disabled = !keys.length;
     $("save").disabled = !keys.length || !state.kind;
     $("save").title = state.kind ? "" : "종류 없는 글은 저장하지 않습니다";
     $("clearKind").hidden = !(state.kind && savedKinds()[state.kind]);
@@ -312,7 +295,7 @@
         const auds = state.aud ? [state.aud] : (state.ctx ? state.ctx.audiences : []);
         const sets = Object.assign({}, state.ctx && state.ctx.kind === state.kind ? state.ctx.sets : {}, state.sets);
         const r = await L.api("/api/pick", { kind: state.kind, audiences: auds, sets });
-        $("status").textContent = r.message;
+        $("status").textContent = "골랐습니다. 대화창에 \"골랐어\" 라고 하면 에이전트가 이 값으로 다시 씁니다.";
       } catch (e) { $("status").textContent = e.message; }
     });
     $("save").addEventListener("click", async () => {
@@ -342,11 +325,6 @@
       if (state.ctx.fromAgent) {
         state.kind = st.context.kind;
         state.aud = st.context.audiences.length === 1 ? st.context.audiences[0] : null;
-        const c = $("ctx");
-        c.hidden = false;
-        c.textContent = `지금 쓰는 문서: ${st.context.kind ? T.kinds[st.context.kind].label : "일반 글"}` +
-          (st.context.audiences.length ? ` · 독자 ${st.context.audiences.map((x) => T.audiences[x].label).join(", ")}` : "") +
-          ". 에이전트가 이 문서 기준으로 화면을 열었습니다. 고른 뒤 \"이번 문서에만 적용\" 을 누르고 대화창에 \"골랐어\" 라고 하면 다시 씁니다.";
       }
     }
     L.banner(st, async (name) => {
@@ -368,6 +346,8 @@
     } else {
       $("guide").open = true;
     }
+    // 에이전트가 쓰던 문서로 연 것이 아니면 무엇을 쓸지부터 고른다
+    $("kindPick").open = !(state.ctx && state.ctx.fromAgent);
     render();
   })
     .catch(() => { $("out").value = "themes.json 을 읽지 못했습니다. 로컬에서 열 때는 docs 폴더에서 python3 -m http.server 로 띄워 주세요."; });

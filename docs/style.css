@@ -115,48 +115,33 @@ button:disabled { opacity: .45; cursor: not-allowed; }
 body.is-local .local-only { display: revert; }
 body.is-local .web-only { display: none; }
 
-/* 테마 고르기: 문서 종류가 맨 위의 구분이고, 그 아래에 축 조합을 고른다 */
-.layout3 { display: grid; grid-template-columns: 200px minmax(0, 1fr) minmax(0, 360px); gap: 22px; align-items: start; }
-.kindlist { position: sticky; top: 12px; max-height: calc(100vh - 24px); overflow-y: auto; }
-.kindlist > h2 { font-size: 14px; margin: 0 0 6px; }
+/* 테마 고르기: 문서 종류가 맨 위의 구분이고, 그 아래에 정말 고를 축 셋만 펼친다. 나머지는 접어 둔다 */
+.kindbar { margin-bottom: 18px; }
+.kindtitle { font-size: 22px; margin: 0 0 2px; }
+.kindbar > .note { margin: 0 0 10px; }
+details.fold > summary { cursor: pointer; font-size: 13.5px; color: var(--accent); font-weight: 600; margin: 4px 0 8px; }
+details.fold[open] > summary { margin-bottom: 10px; }
 .kgroup { font-size: 12px; color: var(--muted); margin: 10px 0 4px; }
-.kgroup:empty { display: none; }
-details.kfold > summary { cursor: pointer; }
-button.kind { display: flex; justify-content: space-between; gap: 6px; width: 100%; text-align: left; font: inherit; font-size: 14px;
-  padding: 7px 10px; margin-bottom: 4px; background: var(--surface); color: var(--ink); border: 1px solid var(--line); cursor: pointer; }
-button.kind[aria-pressed="true"] { border-color: var(--chosen); box-shadow: inset 3px 0 0 var(--chosen); font-weight: 700; }
-.kind .tag { font-size: 11px; font-weight: 700; color: var(--accent); white-space: nowrap; }
-.kindtitle { font-size: 20px; margin: 0 0 4px; }
-.audrow { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-size: 13px; color: var(--muted); margin: 6px 0 18px; }
+.chips.small { gap: 6px; }
 .chips.small .chip { font-size: 12.5px; padding: 4px 9px; }
+.audrow { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-size: 13px; color: var(--muted); margin: 0 0 18px; }
 .cards.overflow { -webkit-mask-image: linear-gradient(to right, #000 88%, transparent); mask-image: linear-gradient(to right, #000 88%, transparent); }
-details.more { margin-top: 6px; border-top: 1px solid var(--line); padding-top: 10px; }
-details.more > summary { cursor: pointer; font-size: 14px; font-weight: 700; margin-bottom: 12px; }
-.pickbox { margin-bottom: 12px; }
+details.more { margin-top: 4px; border-top: 1px solid var(--line); padding-top: 10px; }
 ul.picked { margin: 0 0 4px; padding-left: 1.1em; font-size: 13.5px; }
 ul.picked .muted { color: var(--muted); list-style: none; margin-left: -1.1em; }
 button.btn.link { border: 0; background: none; color: var(--accent); padding: 4px 2px; text-decoration: underline; }
-details.guide > summary { cursor: pointer; font-size: 14px; font-weight: 700; margin-bottom: 8px; }
-body.is-local details.guide { border-top: 1px solid var(--line); padding-top: 10px; }
-.ctx { font-size: 13.5px; padding: 10px 12px; margin: -6px 0 16px; background: var(--surface); border: 1px solid var(--accent); border-left-width: 4px; }
-@media (max-width: 1180px) {
-  .layout3 { grid-template-columns: 180px minmax(0, 1fr); }
-  .layout3 > aside.out { grid-column: 1 / -1; position: static; }
+details.opts { margin-top: 6px; }
+details.opts > summary, details.guide > summary { color: var(--muted); font-weight: 500; }
+body.is-local details.guide { border-top: 1px solid var(--line); padding-top: 8px; margin-top: 10px; }
+.local code { cursor: help; }
+@media (max-width: 900px) {
   /* 로컬 화면에서는 고른 값과 적용 버튼을 아래에 붙은 띠로 띄운다. 맨 아래로 밀리면 고른 뒤 누를 곳을 못 찾는다 */
-  body.is-local main { padding-bottom: 150px; }
+  body.is-local main { padding-bottom: 130px; }
   body.is-local .pickbox { position: fixed; left: 0; right: 0; bottom: 0; z-index: 5; margin: 0; padding: 10px 16px;
     background: var(--surface); border-top: 2px solid var(--accent); box-shadow: 0 -4px 14px rgba(0, 0, 0, .08); }
-  body.is-local .pickbox h2 { display: none; }
   body.is-local ul.picked { display: flex; flex-wrap: wrap; gap: 4px 14px; padding: 0; list-style: none; max-height: 3.2em; overflow: auto; }
   body.is-local ul.picked .muted { margin-left: 0; }
   body.is-local .pickbox .actions { margin-top: 4px; }
-  body.is-local .pickbox .row { margin: 4px 0 0; }
-}
-@media (max-width: 760px) {
-  .layout3 { grid-template-columns: minmax(0, 1fr); }
-  .kindlist { position: static; max-height: none; }
-  .kindlist .kinds { display: flex; flex-wrap: wrap; gap: 6px; }
-  button.kind { width: auto; margin: 0; }
 }
 
 /* 캐릭터 만들기: 예전 글에서 문체 배우기 */

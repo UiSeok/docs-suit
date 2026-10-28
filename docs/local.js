@@ -28,8 +28,10 @@
     box.textContent = "";
     const why = { env: "환경 변수", arg: "직접 고름", folder: "폴더 파일", current: "profile use", default: "기본 슬롯" }[state.why] || "";
     const t = document.createElement("span");
-    t.innerHTML = `<b>이 컴퓨터에 바로 적용합니다</b> · 실행한 폴더 <code></code> · 슬롯 `;
-    t.querySelector("code").textContent = short(state.cwd);
+    t.innerHTML = `<b>이 컴퓨터에 바로 적용</b> · 폴더 <code></code> · 슬롯 `;
+    const code = t.querySelector("code");
+    code.textContent = String(state.cwd).split("/").filter(Boolean).pop() || state.cwd;
+    code.title = short(state.cwd);
     const sel = document.createElement("select");
     sel.setAttribute("aria-label", "슬롯");
     for (const s of state.slots) {

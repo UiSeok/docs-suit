@@ -11,45 +11,47 @@
   <header>
     <h1>docs-suit</h1>
     <p class="nav"><b>테마 고르기</b> · <a href="create.html">캐릭터 만들기</a></p>
-    <p>문서 종류마다 테마 조합이 따로 있습니다. 왼쪽에서 종류를 고르고, 같은 예문을 값마다 다르게 써 본 카드를 보며 마음에 드는 쪽을 누르세요.</p>
   </header>
   <div id="local"></div>
-  <p class="ctx" id="ctx" hidden></p>
-  <div class="layout3">
-    <nav class="kindlist" aria-label="문서 종류">
-      <section class="step web-only">
-        <h2>클래스</h2>
-        <div class="chips" id="classes"></div>
+  <div class="layout">
+    <div>
+      <section class="kindbar">
+        <h2 class="kindtitle" id="kindTitle"></h2>
+        <p class="note" id="kindNote"></p>
+        <details class="fold" id="kindPick">
+          <summary>다른 문서 종류</summary>
+          <div class="web-only">
+            <p class="kgroup">클래스</p>
+            <div class="chips small" id="classes"></div>
+          </div>
+          <div id="kinds"></div>
+        </details>
       </section>
-      <h2>문서 종류</h2>
-      <div id="kinds"></div>
-    </nav>
-    <div class="combo">
-      <h2 class="kindtitle" id="kindTitle"></h2>
-      <p class="note" id="kindNote"></p>
-      <div class="audrow"><span>독자로 미리 보기</span><div class="chips small" id="auds"></div></div>
       <div id="gallery"></div>
-      <details class="more" id="more">
-        <summary id="moreSum">나머지 축</summary>
+      <details class="fold more" id="more">
+        <summary id="moreSum">더 바꾸기</summary>
+        <div class="audrow"><span>독자로 미리 보기</span><div class="chips small" id="auds"></div></div>
         <div id="gallery2"></div>
       </details>
     </div>
     <aside class="out" aria-label="고른 값">
       <section class="local-only pickbox">
-        <h2>고른 값</h2>
         <ul class="picked" id="picked"></ul>
         <div class="actions">
           <button type="button" class="btn primary" id="apply">이번 문서에만 적용</button>
           <button type="button" class="btn" id="save">이 종류에 저장</button>
         </div>
-        <div class="row">
-          <label><input type="checkbox" id="here"> 실행한 폴더에서만</label>
-          <button type="button" class="btn link" id="reset">고른 것 지우기</button>
-          <button type="button" class="btn link" id="clearKind" hidden>이 종류를 기본으로 되돌리기</button>
-        </div>
         <div class="status" id="status" aria-live="polite"></div>
+        <details class="fold opts">
+          <summary>옵션</summary>
+          <div class="row"><label><input type="checkbox" id="here"> 저장은 실행한 폴더에서만</label></div>
+          <div class="row">
+            <button type="button" class="btn link" id="reset">고른 것 지우기</button>
+            <button type="button" class="btn link" id="clearKind" hidden>이 종류를 기본으로 되돌리기</button>
+          </div>
+        </details>
       </section>
-      <details class="guide" id="guide">
+      <details class="fold guide" id="guide">
         <summary>조립된 지침 보기·복사</summary>
         <div class="row">
           <label><input type="radio" name="fmt" value="prompt" checked> 붙여 넣기용</label>
