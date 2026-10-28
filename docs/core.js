@@ -183,17 +183,38 @@
       return out;
     }
 
-    // 슬롯의 look 에 기본값을 채운다. tier 를 주면 그 차수까지 클래스가 연 꾸미기만 입힌다.
+    // 부위마다 가장 최근 차수에 연 꾸미기. 한 차수에 여럿을 열면 앞의 것이다.
+    function lookLatest(cls, tier) {
+      const out = {};
+      if (tier === undefined || tier === null) return out;
+      const seen = new Set();
+      for (const [t, part, val] of classRewards(cls)) {
+        if (t <= tier && !seen.has(`${t}.${part}`)) {
+          out[part] = val;
+          seen.add(`${t}.${part}`);
+        }
+      }
+      return out;
+    }
+
+    // 슬롯의 look 에 기본값을 채운다. tier 를 주면 그 차수까지 클래스가 연 꾸미기만 입히고, 고르지 않은 부위는 가장 최근에 연 것을 입힌다.
     function lookOf(slot, tier) {
       const have = (slot && slot.look) || {};
       const bases = T.look.base || {};
       const base = have.base in bases ? have.base : Object.keys(bases)[0];
       const look = { base, top: "shirt", hair: (bases[base] || {}).hair, prop: null, color: null };
       const tables = { top: T.look.top, hair: T.look.hair, prop: T.look.prop, color: T.look.colors };
-      const opened = lookOpen(((slot && slot.profile) || {}).class, tier);
+      const cls = ((slot && slot.profile) || {}).class;
+      const opened = lookOpen(cls, tier);
+      const latest = lookLatest(cls, tier);
       for (const part of ["top", "hair", "prop", "color"]) {
         const val = have[part];
-        if (val && tables[part] && val in tables[part] && opened[part].has(val)) look[part] = val;
+        if (val === "none" && (part === "prop" || part === "color")) continue;
+        if (val && tables[part] && val in tables[part] && opened[part].has(val)) {
+          look[part] = val;
+          continue;
+        }
+        if (part in latest) look[part] = latest[part];
       }
       return look;
     }

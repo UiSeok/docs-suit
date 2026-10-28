@@ -52,7 +52,10 @@ looks = [({}, None), ({"look": {"base": "b"}}, 0), ({"look": {"color": "wine", "
          ({"profile": {"class": "developer"}, "look": {"prop": "laptop", "top": "hoodie"}}, 4),
          ({"profile": {"class": "planner"}, "look": {"prop": "clipboard", "top": "blazer", "color": "mustard"}}, 4),
          ({"profile": {"class": "creator"}, "look": {"prop": "camera", "top": "stripe", "color": "pink"}}, 4),
-         ({"profile": {"class": "creator"}, "look": {"prop": "tie"}}, 4), ({"look": {"top": "nope"}}, 4)]
+         ({"profile": {"class": "creator"}, "look": {"prop": "tie"}}, 4), ({"look": {"top": "nope"}}, 4),
+         ({"profile": {"class": "student"}}, 4), ({"profile": office}, 1),
+         ({"profile": {"class": "researcher"}, "look": {"prop": "glasses", "color": "none"}}, 4),
+         ({"profile": {"class": "planner"}, "look": {"prop": "none"}}, 3)]
 look_cases = [{"slot": slot, "tier": tier, "look": suit.look_of(th, slot, tier),
                "expected": suit.look_grid(th, suit.look_of(th, slot, tier))} for slot, tier in looks]
 json.dump({"compose": cases, "slots": slot_cases, "looks": look_cases}, sys.stdout, ensure_ascii=False)

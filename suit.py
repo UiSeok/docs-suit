@@ -1382,6 +1382,19 @@ def look_open(th, cls, tier):
     return out
 
 
+def look_latest(th, cls, tier):
+    """부위마다 가장 최근 차수에 연 꾸미기. 고르지 않은 부위는 이것을 입는다. 한 차수에 여럿을 열면 앞의 것이다."""
+    out = {}
+    if tier is None:
+        return out
+    for t, part, val in class_rewards(th, cls):
+        if t <= tier and (t, part) not in out.get("_seen", set()):
+            out[part] = val
+            out.setdefault("_seen", set()).add((t, part))
+    out.pop("_seen", None)
+    return out
+
+
 def look_of(th, slot_data, tier=None, warn=lambda m: None):
     """슬롯의 look 절에 기본값을 채운다. 모르는 값은 기본값으로 돌린다. tier 를 주면 그 차수까지 클래스가 연
     꾸미기만 입힌다. 슬롯 파일을 손으로 고쳐 잠긴 옷을 입히거나 클래스를 바꿔 다른 클래스의 보상을 입는 길을 막는다."""
@@ -1391,14 +1404,19 @@ def look_of(th, slot_data, tier=None, warn=lambda m: None):
     base = have.get("base") if have.get("base") in bases else next(iter(bases), "a")
     look = {"base": base, "top": "shirt", "hair": bases.get(base, {}).get("hair"), "prop": None, "color": None}
     opened = look_open(th, slot_class(slot_data), tier)
+    latest = look_latest(th, slot_class(slot_data), tier)
     for part, table in (("top", th.look.get("top")), ("hair", th.look.get("hair")), ("prop", th.look.get("prop")),
                         ("color", th.look.get("colors"))):
         val = have.get(part)
-        if val and val in (table or {}):
-            if val in opened[part]:
-                look[part] = val
-        elif val:
+        if val == "none" and part in ("prop", "color"):
+            continue  # 벗어 둔 것은 새로 연 것이 있어도 입히지 않는다
+        if val and val in (table or {}) and val in opened[part]:
+            look[part] = val
+            continue
+        if val and val not in (table or {}):
             warn(f"프로필의 look.{part}={val} 는 모르는 값이라 기본값을 쓴다")
+        if part in latest:
+            look[part] = latest[part]  # 고르지 않았거나 잠긴 값이면 가장 최근에 연 것을 입는다
     return look
 
 
@@ -2051,7 +2069,7 @@ def cmd_look(a, th):
         raise Missing(f"값을 준다: suit.py look {a.part} <값>. 고를 수 있는 값은 {', '.join(sorted(opened[a.part])) or '아직 없음'}")
     want = dict(data.get("look") or {}) if isinstance(data.get("look"), dict) else {}
     if a.value == "none" and a.part in ("prop", "color"):
-        want.pop(a.part, None)
+        want[a.part] = "none"
     elif a.value not in tables[a.part]:
         raise Missing(f"모르는 값: {a.part}={a.value}. 고를 수 있는 값은 {', '.join(tables[a.part])}")
     elif a.value not in opened[a.part]:
@@ -2808,7 +2826,12 @@ def selftest(th):
               "전직 전에 머리 말고 다른 꾸미기가 열렸다")
         check(look_of(th, office, 3) == {"base": "a", "top": "shirt", "hair": "long", "prop": "tie", "color": "navy"},
               "직장인 3차까지 연 꾸미기가 다르다")
-        check(look_of(th, {**office, "profile": {"class": "creator"}}, 4)["prop"] is None, "다른 클래스의 보상을 입었다")
+        bare = {"profile": {"class": "researcher"}}
+        check(look_of(th, bare, 4) == {"base": "a", "top": "coat", "hair": "short", "prop": "flask", "color": "ivory"},
+              "고르지 않은 부위에 가장 최근에 연 꾸미기를 입히지 않는다")
+        check(look_of(th, {**bare, "look": {"prop": "glasses"}}, 4)["prop"] == "glasses", "아래 차수에서 연 소품으로 바꾸지 못한다")
+        check(look_of(th, {**bare, "look": {"prop": "none", "color": "none"}}, 4)["prop"] is None, "벗어 둔 소품을 다시 입혔다")
+        check(look_of(th, {**office, "profile": {"class": "creator"}}, 4)["prop"] == "camera", "다른 클래스의 보상을 입었다")
         check(look_of(th, {"look": {"base": "b"}})["base"] == "a", "없어진 캐릭터를 기본 캐릭터로 돌리지 않는다")
 
     # 본문 검사와 경험치 계약. 경험치 숫자는 growth.yaml 과 상관없이 고정한 규칙으로 잰다.
