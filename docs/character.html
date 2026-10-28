@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>docs-suit · 캐릭터</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main>
+  <header>
+    <h1>docs-suit</h1>
+    <p class="nav"><b>캐릭터</b> · <a href="index.html#setup">캐릭터 설정</a> · <a href="index.html#theme">테마 설정</a></p>
+  </header>
+  <div id="local"></div>
+  <p class="empty" id="empty" hidden></p>
+  <div class="layout charlayout" id="char" hidden>
+    <aside class="out" aria-label="내 캐릭터">
+      <canvas id="portrait" class="portrait big" width="160" height="240" role="img" aria-label="캐릭터 그림"></canvas>
+      <div class="who" id="who"></div>
+      <pre class="statusline" id="statusline" aria-label="상태 줄에 뜨는 모양"></pre>
+      <ul class="ladder-list" id="next"></ul>
+      <div class="row"><label><input type="checkbox" id="growthOn"> 캐릭터 키우기</label></div>
+      <div class="status" id="status" aria-live="polite"></div>
+    </aside>
+    <div>
+      <section class="step">
+        <h2>꾸미기 <span class="now">머리 모양은 언제든 바꾸고, 옷 색과 소품, 옷은 전직하면서 열립니다</span></h2>
+        <div id="looks"></div>
+      </section>
+      <section class="step">
+        <h2>성장 기록 <span class="now" id="logNote"></span></h2>
+        <div class="chips small" id="dex"></div>
+        <table class="log" id="log"></table>
+      </section>
+      <section class="step">
+        <h2>승급 키 <span class="now">3차와 4차 전직은 저장소에 기여하고 받은 키로 열립니다</span></h2>
+        <ul class="ladder-list" id="keys"></ul>
+        <div class="row">
+          <label class="grow">키 <input type="text" id="key" autocomplete="off" spellcheck="false" placeholder="받은 키 전체를 붙여 넣습니다"></label>
+          <button type="button" class="btn" id="addKey">넣기</button>
+        </div>
+      </section>
+    </div>
+  </div>
+</main>
+<script src="local.js"></script>
+<script src="core.js"></script>
+<script src="character.js"></script>
+</body>
+</html>

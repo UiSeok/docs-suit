@@ -1,4 +1,4 @@
-// 테마 고르기 화면. 문서 종류가 맨 위의 구분이고, 종류마다 축 값의 조합을 고른다. 조립은 core.js 가 하고, 데이터는 themes.json 하나다.
+// 대시보드의 테마 설정 탭. 문서 종류가 맨 위의 구분이고, 종류마다 축 값의 조합을 고른다. 조립은 core.js 가 하고, 데이터는 themes.json 하나다.
 // 축마다 같은 예문을 값별로 써 본 보기 카드를 보이고, 카드를 누르면 그 값을 고른다. 다시 누르면 고르기 전으로 돌아간다.
 // suit.py serve 로 띄우면 "이번 문서에만" 은 에이전트에게 넘기고 "이 종류에 저장" 은 슬롯의 종류별 값에 쓴다.
 // GitHub Pages 로 열면 종류별 값을 이 브라우저의 localStorage 에만 남긴다.
@@ -303,6 +303,7 @@
         const r = await L.api("/api/defaults", { slot: local.slot, here: $("here").checked, kind: state.kind, defaults: { ...state.sets } });
         state.sets = {};
         applyLocal(r.state);
+        L.changed();
         $("status").textContent = `${r.message}. 다음 ${T.kinds[state.kind].label}부터 이 조합으로 씁니다.`;
       } catch (e) { $("status").textContent = e.message; }
     });
@@ -310,6 +311,7 @@
       try {
         const r = await L.api("/api/defaults", { slot: local.slot, here: $("here").checked, kind: state.kind, clear: true });
         applyLocal(r.state);
+        L.changed();
         $("status").textContent = `${T.kinds[state.kind].label}를 종류가 권하는 조합으로 되돌렸습니다.`;
       } catch (e) { $("status").textContent = e.message; }
     });
@@ -342,7 +344,7 @@
     wire();
     if (L) {
       document.body.classList.add("is-local");
-      try { applyLocal(await L.api("/api/state")); } catch (e) { $("status").textContent = e.message; }
+      try { applyLocal(await L.api(L.stateUrl())); } catch (e) { $("status").textContent = e.message; }
     } else {
       $("guide").open = true;
     }

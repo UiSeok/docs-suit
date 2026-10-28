@@ -1,8 +1,9 @@
 """동작 테스트 케이스. tests/agent/run.py 가 읽는다.
 
 expect 가 compose 이면 에이전트가 suit.py compose 를 불러야 한다. kind 는 기대하는 문서 종류이고, 여럿을 허용하면
-목록으로, 종류 없이 조립해야 하면 빈 문자열로 쓴다. expect 가 serve 이면 suit.py serve 를 --detach 로 불러 page 화면을
-띄워야 한다. want 는 조립 결과에서 이 값이어야 하는 축이다. audience 는 실제로
+목록으로, 종류 없이 조립해야 하면 빈 문자열로 쓴다. expect 가 serve 이면 suit.py serve 를 --detach 로 불러 대시보드의
+page 탭을 띄워야 한다. page 가 auto 면 --page 를 빼고 엔진에 맡겨도 맞다. expect 가 call 이면 대시보드를 띄우지 않고
+suit.py <call> <args> 를 불러야 하고, offer 가 True 면 답에서 대시보드를 권해야 한다. want 는 조립 결과에서 이 값이어야 하는 축이다. audience 는 실제로
 쓰인 독자에 들어 있어야 하는 키다. revise 가 True 면 --revise 를 붙여야 하고, 아니면 붙이지 않아야 한다. expect 가 skip 이면 suit.py 를 부르지 않아야 한다. profile 이 False 이면 프로필 없이
 시작한다. folder 는 작업 폴더에 둘 .docs-suit.yaml 이다. 어느 케이스든 사용자의 답 없이 bootstrap 으로 프로필을 저장하면
 틀린다.
@@ -106,13 +107,22 @@ CASES = [
     {"id": "no-profile", "kind": "work-report", "profile": False,
      "ask": "팀장님께 올릴 주간 업무 보고 써 줘. 이번 주에는 로그인 오류를 고쳤어."},
 
-    # 화면. 사용자가 화면에서 고르겠다고 하면 에이전트가 serve --detach 로 띄워 준다
-    {"id": "screen-kind", "expect": "serve", "page": "index", "serve_kind": "work-report",
+    # 대시보드. 사용자가 화면에서 하겠다고 하면 에이전트가 serve --detach 로 맞는 탭을 띄워 준다
+    {"id": "screen-kind", "expect": "serve", "page": "theme", "serve_kind": "work-report",
      "ask": "업무 보고 말투를 카드 보면서 바꾸고 싶어. 화면 열어 줘."},
-    {"id": "screen-theme", "expect": "serve", "page": "index",
+    {"id": "screen-theme", "expect": "serve", "page": "theme",
      "ask": "docs-suit 테마를 카드 보면서 직접 고르고 싶어. 화면 열어 줘."},
-    {"id": "screen-setup", "expect": "serve", "page": "create", "profile": False,
+    {"id": "screen-setup", "expect": "serve", "page": ["setup", "auto"], "profile": False,
      "ask": "docs-suit 세팅해 줘. 질문에 하나씩 답하는 건 번거로우니까 화면에서 고를게."},
+    {"id": "screen-character", "expect": "serve", "page": ["character", "auto"],
+     "ask": "docs-suit 대시보드 열어 줘. 화면에서 캐릭터 옷 좀 갈아입힐래."},
+    # 대시보드에서 하는 일은 대화로도 된다. 값을 정한 요청은 묻지 않고 바로, 정하지 않은 요청은 고를 것을 보이며 대시보드를 권한다
+    {"id": "look-direct", "expect": "call", "call": "look", "args": ["hair", "bob"],
+     "ask": "docs-suit 캐릭터 머리를 단발로 바꿔 줘."},
+    {"id": "look-offer", "expect": "call", "call": "look", "offer": True,
+     "ask": "docs-suit 캐릭터 꾸미고 싶어."},
+    {"id": "growth-log", "expect": "call", "call": "growth", "args": ["log"],
+     "ask": "docs-suit 성장 기록 보여 줘. 어떤 문서로 경험치를 받았는지 궁금해."},
 ]
 
 # 여러 턴 흐름. 턴마다 같은 세션을 이어 가고, 끝난 뒤 프로필과 폴더 파일에 남은 값을 본다.

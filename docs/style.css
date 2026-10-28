@@ -1,4 +1,4 @@
-/* docs-suit 웹 화면 공통 모양. index.html(테마 고르기)과 create.html(캐릭터 만들기)이 함께 쓴다. */
+/* docs-suit 웹 화면 공통 모양. 대시보드(index.html)와 그 탭인 캐릭터(character.html), 캐릭터 설정(create.html), 테마 설정(theme.html)이 함께 쓴다. */
 :root {
   --bg: #f6f5f2; --surface: #ffffff; --line: #e4e1db; --ink: #1c1917; --muted: #6b6560;
   --accent: #0f766e; --accent-tint: #e6f4f1; --warn: #9f1239; --chosen: #0f766e;
@@ -12,6 +12,7 @@
   }
 }
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.6 Pretendard, "Apple SD Gothic Neo", "Noto Sans KR", system-ui, sans-serif; word-break: keep-all; overflow-wrap: anywhere; }
 main { max-width: 1320px; margin: 0 auto; padding: 24px 16px 48px; }
 header h1 { font-size: 28px; margin: 0; letter-spacing: -0.01em; }
@@ -149,3 +150,45 @@ body.is-local details.guide { border-top: 1px solid var(--line); padding-top: 8p
 .form textarea.sample { min-height: 110px; }
 .learned { border: 1px solid var(--line); background: var(--surface); padding: 10px 12px; }
 .learned p { margin: 0 0 6px; font-size: 13px; }
+
+/* 대시보드: 머리말과 탭, 띠 아래를 탭 화면이 채운다 */
+body.dash { height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+.dashhead { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 22px; padding: 16px 16px 0; max-width: 1320px; width: 100%; margin: 0 auto; }
+.dashhead h1 { font-size: 24px; margin: 0; }
+.tabs { display: flex; gap: 2px; }
+.tabs [role=tab] { font: inherit; font-size: 14px; padding: 8px 14px; border: 0; border-bottom: 2px solid transparent; background: none; color: var(--muted); cursor: pointer; }
+.tabs [role=tab][aria-selected="true"] { color: var(--ink); border-bottom-color: var(--accent); font-weight: 700; }
+body.dash #local { max-width: 1320px; width: calc(100% - 32px); margin: 10px auto 0; }
+body.dash #local:empty { display: none; }
+.frames { flex: 1; min-height: 0; border-top: 1px solid var(--line); margin-top: 10px; }
+.frames iframe { display: block; width: 100%; height: 100%; border: 0; background: var(--bg); }
+.frames iframe[hidden] { display: none; }
+/* 대시보드 탭 안에서는 머리말과 띠를 대시보드가 그린다 */
+html.embedded main > header, html.embedded #local { display: none; }
+html.embedded main { padding-top: 16px; }
+
+/* 캐릭터 탭 */
+.charlayout { grid-template-columns: minmax(0, 320px) minmax(0, 1fr); }
+.charlayout aside.out { order: -1; }
+.portrait.big { margin-bottom: 12px; }
+.who .t { font-weight: 800; font-size: 17px; }
+.who .s { font-size: 13px; color: var(--muted); margin-top: 4px; font-variant-numeric: tabular-nums; }
+pre.statusline { font: 12.5px/1.5 "SF Mono", Menlo, Consolas, monospace; background: #1c1b19; color: #ecebe8; padding: 8px 10px; margin: 12px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+h3.parthead { font-size: 13px; margin: 14px 0 6px; color: var(--muted); font-weight: 600; }
+.opts.looks { grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; }
+.opts.looks .opt { padding: 6px; }
+.opts.looks .opt b { font-size: 12.5px; }
+.opts.looks .opt .d { font-size: 11px; }
+canvas.locked { opacity: .35; filter: grayscale(1); }
+.dexchip { cursor: default; font-size: 12px; padding: 3px 8px; color: var(--muted); }
+.dexchip.got { color: var(--ink); border-color: var(--accent); font-weight: 700; }
+table.log { border-collapse: collapse; width: 100%; font-size: 13px; margin-top: 12px; }
+table.log th, table.log td { text-align: left; border-bottom: 1px solid var(--line); padding: 6px 8px; }
+table.log th { color: var(--muted); font-weight: 600; font-size: 12px; }
+table.log .muted, .ladder-list .muted { color: var(--muted); }
+label.grow { flex: 1; display: flex; gap: 8px; align-items: center; }
+label.grow input { flex: 1; width: auto; font: inherit; padding: 5px 8px; background: var(--bg); color: var(--ink); border: 1px solid var(--line); }
+.empty { background: var(--surface); border: 1px solid var(--line); padding: 16px; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+@media (max-width: 900px) {
+  .charlayout { grid-template-columns: minmax(0, 1fr); }
+}

@@ -19,7 +19,7 @@ docs-suit 를 고치는 사람과 AI 에이전트가 읽는 작업 규칙이다.
 | `themes/ko/presets/<이름>.yaml` | 기여받은 테마 조합. 축 기본값과 독자별 값, 소개, 만든 사람 |
 | `themes/ko/sprites/<부위>/<값>.txt` | 도트 그림 부품. 기본 몸(`base`) 위에 옷(`top`), 머리(`hair`), 소품(`prop`) 순으로 겹친다. 모두 같은 크기다 |
 | `tools/issue-key.py` | 관리자가 승급 키를 만드는 도구. 개인 키는 저장소 밖 `~/.config/docs-suit-admin/` 에 둔다 |
-| `docs/` | 웹 화면. 테마 고르기(`index.html`, `app.js`)와 캐릭터 만들기(`create.html`, `create.js`)가 `style.css` 를 함께 쓴다. `core.js` 가 조립과 캐릭터 그림, 슬롯 파일 쓰기를 하고 `themes.json` 은 `suit.py bundle` 이 만든다. `local.js` 는 `suit.py serve` 로 띄웠을 때만 켜져 바로 적용하게 한다 |
+| `docs/` | 웹 화면. 대시보드(`index.html`, `dashboard.js`)가 캐릭터(`character.html`, `character.js`)와 캐릭터 설정(`create.html`, `create.js`), 테마 설정(`theme.html`, `app.js`) 세 탭을 품고, 모두 `style.css` 를 함께 쓴다. `core.js` 가 조립과 캐릭터 그림, 슬롯 파일 쓰기를 하고 `themes.json` 은 `suit.py bundle` 이 만든다. `local.js` 는 `suit.py serve` 로 띄웠을 때만 켜져 바로 적용하게 한다 |
 | `tests/parity.js` | 웹과 엔진의 조립 결과를 견준다 |
 | `tests/agent/` | 실제 에이전트에 요청을 넣는 동작 테스트. 케이스는 `cases.py`, 에이전트별 결과는 `results/`, 문체 배우기 흐름의 지어낸 샘플은 `samples/` |
 

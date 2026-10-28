@@ -3,14 +3,14 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>docs-suit · 캐릭터 만들기</title>
+<title>docs-suit · 캐릭터 설정</title>
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
 <main>
   <header>
     <h1>docs-suit</h1>
-    <p class="nav"><a href="index.html">테마 고르기</a> · <b>캐릭터 만들기</b></p>
+    <p class="nav"><a href="index.html#character">캐릭터</a> · <b>캐릭터 설정</b> · <a href="index.html#theme">테마 설정</a></p>
     <p>글 쓰는 나를 캐릭터로 만듭니다. 고른 대로 슬롯 파일을 내려받아 두면 AI 가 이 말투와 맥락으로 쓰고, 문서를 쓸수록 캐릭터가 자랍니다.</p>
   </header>
   <div id="local"></div>
@@ -55,6 +55,10 @@
       <div class="row local-only">
         <label><input type="checkbox" id="installSkills"> 고른 도구에 스킬도 깔기</label>
         <label><input type="checkbox" id="useHere"> 실행한 폴더에서 이 슬롯 쓰기</label>
+      </div>
+      <div class="row local-only" id="bindRow" hidden>
+        <span class="note" id="bindNote"></span>
+        <button type="button" class="btn" id="bind">이 폴더에서 이 캐릭터 쓰기</button>
       </div>
       <div class="actions">
         <button type="button" class="btn primary" id="download">내려받기</button>

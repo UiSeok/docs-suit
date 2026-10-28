@@ -1,4 +1,4 @@
-// 캐릭터 만들기 화면. suit.py bootstrap 이 묻는 것을 웹으로 옮겼다.
+// 대시보드의 캐릭터 설정 탭. suit.py bootstrap 이 묻는 것을 웹으로 옮겼다.
 // 슬롯 파일의 꼴과 캐릭터 그림은 core.js 가 엔진과 같은 규칙으로 만들고, tests/parity.js 가 견준다.
 (function () {
   "use strict";
@@ -386,6 +386,19 @@
     // 캐릭터는 폴더마다 따로 키운다. 폴더에 이은 슬롯이 없으면 폴더 이름으로 새 슬롯을 제안하고 이 폴더에 잇는다
     $("slot").value = st.why === "folder" || st.why === "arg" ? st.slot : st.suggest || "";
     $("useHere").checked = true;
+    // 다른 폴더에서 만든 캐릭터를 띠에서 골랐으면 저장하지 않고 이 폴더에 이을 수 있다. 대화의 profile use --here 와 같다
+    const folder = String(st.cwd).split("/").filter(Boolean).pop() || st.cwd;
+    const canBind = st.exists && st.slot && st.slot !== "default" && st.bound !== st.slot;
+    $("bindRow").hidden = !canBind;
+    $("bindNote").textContent = canBind ? `폴더 ${folder} 은 ${st.bound ? `지금 슬롯 ${st.bound} 을 씁니다` : "아직 캐릭터를 잇지 않았습니다"}.` : "";
+    $("bind").onclick = async () => {
+      try {
+        const r = await L.api("/api/use", { slot: st.slot });
+        $("status").textContent = r.message;
+        L.changed();
+        fill(r.state);
+      } catch (e) { $("status").textContent = e.message; }
+    };
     L.banner(st, async (name) => {
       try { fill(await L.api(`/api/state?slot=${encodeURIComponent(name)}`)); } catch (e) { $("status").textContent = e.message; }
     });
@@ -397,6 +410,7 @@
       const r = await L.api("/api/slot", { slot: $("slot").value.trim() || "default", data: slotData(),
         install: $("installSkills").checked, useHere: $("useHere").checked });
       $("status").textContent = r.message;
+      L.changed();
       L.banner(r.state, async (name) => {
         try { fill(await L.api(`/api/state?slot=${encodeURIComponent(name)}`)); } catch (e) { $("status").textContent = e.message; }
       });
@@ -434,7 +448,7 @@
     if (L) {
       document.body.classList.add("is-local");
       $("download").textContent = "이 컴퓨터에 저장";
-      try { fill(await L.api("/api/state")); return; } catch (e) { $("status").textContent = e.message; }
+      try { fill(await L.api(L.stateUrl())); return; } catch (e) { $("status").textContent = e.message; }
     }
     render();
   }).catch(() => {

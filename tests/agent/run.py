@@ -183,8 +183,8 @@ def case_profile(case):
     return suit.merge_folder(PROFILE if case.get("profile", True) else {}, case.get("folder", {}))
 
 
-def grade(case, calls):
-    """(맞았나, 에이전트가 부른 것, 어긋난 까닭, 조립된 값, 글자수) 를 돌려준다."""
+def grade(case, calls, reply=""):
+    """(맞았나, 에이전트가 부른 것, 어긋난 까닭, 조립된 값, 글자수) 를 돌려준다. reply 는 첫 턴의 답이다."""
     expect = case.get("expect", "compose")
     composes = [c for c in calls if c[:1] == ["compose"] and not {"--help", "-h"} & set(c)]
     shown = "; ".join(describe(c) for c in composes) or ", ".join(sorted({c[0] for c in calls if c})) or "부르지 않음"
@@ -199,14 +199,24 @@ def grade(case, calls):
         if not serves:
             return False, shown, "serve 를 부르지 않았다", None, None
         p = argparse.ArgumentParser(add_help=False)
-        p.add_argument("--page", default="index")
+        p.add_argument("--page")
         p.add_argument("--detach", action="store_true")
         p.add_argument("--kind")
         a, _ = p.parse_known_args(serves[-1][1:])
-        why = ([] if a.detach else ["--detach 없이 띄웠다"]) + ([] if a.page == case["page"] else [f"화면이 {a.page} 이다"])
+        # 예전 화면 이름은 대시보드 탭 이름으로 읽는다. --page 를 빼면 엔진이 고르므로 auto 로 센다
+        page = suit.DASH_ALIAS.get(a.page, a.page) or "auto"
+        pages = case["page"] if isinstance(case["page"], list) else [case["page"]]
+        why = ([] if a.detach else ["--detach 없이 띄웠다"]) + ([] if page in pages else [f"탭이 {page} 이다"])
         if case.get("serve_kind") and a.kind != case["serve_kind"]:
             why.append(f"화면을 종류 {a.kind or '없이'} 로 띄웠다")
         return not why, "; ".join(describe(c) for c in serves), ", ".join(why), None, None
+    if expect == "call":
+        # 대화로 바로 처리할 요청. 대시보드를 띄우지 않고 이 명령을 불러야 하고, offer 면 답에서 대시보드를 권해야 한다
+        hits = [c for c in calls if c[:1] == [case["call"]] and all(x in c for x in case.get("args", []))]
+        why = ([] if hits else [f"{' '.join([case['call']] + case.get('args', []))} 를 부르지 않았다"])
+        why += ["묻지 않고 대시보드를 띄웠다"] if any(c[:1] == ["serve"] for c in calls) else []
+        why += ["대시보드를 권하지 않았다"] if case.get("offer") and "대시보드" not in reply else []
+        return not why, ", ".join(sorted({" ".join(c[:2]) for c in calls if c})) or "부르지 않음", ", ".join(why), None, None
     if not composes:
         return False, shown, "compose 를 부르지 않았다", None, None
     a = compose_args(composes[-1])
@@ -382,9 +392,10 @@ def finish_meta(agent, tmp, transcripts, ok):
 def load_case(agent, case, base):
     """지난 실행의 기록으로 다시 채점한다. 기대값만 고쳤을 때 에이전트를 다시 부르지 않는다."""
     tmp = base / case["id"]
-    ok, shown, why, vals, chars = grade(case, read_calls(tmp))
     transcripts = [(tmp / name).read_text(encoding="utf-8") for name in ("transcript.jsonl", "transcript-2.jsonl")
                    if (tmp / name).exists()]
+    reply = AGENTS[agent]["meta"](transcripts[0])["reply"] if transcripts else ""
+    ok, shown, why, vals, chars = grade(case, read_calls(tmp), reply)
     meta = finish_meta(agent, tmp, transcripts, ok)
     meta["followup"] = len(transcripts) > 1
     # check 에 넘긴 본문이 있으면 그것을 잰다. 없으면 답에서 뽑되, 재촉했으면 두 답 가운데 본문이 더 긴 쪽을 쓴다.
@@ -502,7 +513,10 @@ def expected(case):
     if expect == "skip":
         return "부르지 않음"
     if expect == "serve":
-        return f"serve --detach, 화면 {case['page']}" + (f", 종류 {case['serve_kind']}" if case.get("serve_kind") else "")
+        pages = case["page"] if isinstance(case["page"], list) else [case["page"]]
+        return f"serve --detach, 탭 {' 또는 '.join(pages)}" + (f", 종류 {case['serve_kind']}" if case.get("serve_kind") else "")
+    if expect == "call":
+        return " ".join([case["call"]] + case.get("args", [])) + ", 대시보드 띄우지 않음" + (", 대시보드 권함" if case.get("offer") else "")
     kinds =case["kind"] if isinstance(case["kind"], list) else [case["kind"]]
     parts = [" 또는 ".join(k or "종류 없음" for k in kinds)]
     if case.get("audience"):

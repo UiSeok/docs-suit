@@ -49,11 +49,12 @@ profiles/<이름>.yaml 이다. 폴더의 .docs-suit.yaml 은 쓸 슬롯과 그 �
   python3 suit.py preset list|show|use|export [<이름>] [--here] [--by 아이디] [--label …] [--desc …]
                                                     테마 조합. 남의 조합을 입히거나 내 조합을 기여용 파일로 낸다
   python3 suit.py growth on|off                     캐릭터 키우기를 켜고 끈다. 기록은 지우지 않는다
+  python3 suit.py growth log [--limit N] [--json]   문서마다 받은 경험치를 최근 것부터 보인다
   python3 suit.py status [--size line|face|full]    상태 줄에 캐릭터를 그린다. 표준 입력의 JSON 에서 작업 폴더를 읽는다
   python3 suit.py widget [--cwd 폴더] [--split] [--once]  터미널 옆 칸의 캐릭터 창. 기록이 바뀌면 다시 그린다
-  python3 suit.py serve [--page index|create] [--kind K] [--audience A] [--set 축=값]... [--detach]
-                                               화면을 로컬에 띄운다. 테마 고르기는 지금 문서의 종류로 열린다
-  python3 suit.py picked [--json] [--clear]    테마 고르기에서 "이번 문서에만" 으로 고른 값을 compose 인자로 낸다
+  python3 suit.py serve [--page character|setup|theme] [--kind K] [--audience A] [--set 축=값]... [--detach]
+                                               대시보드를 로컬에 띄운다. 테마 설정 탭은 지금 문서의 종류로 열린다
+  python3 suit.py picked [--json] [--clear]    테마 설정 탭에서 "이번 문서에만" 으로 고른 값을 compose 인자로 낸다
   python3 suit.py bundle                            웹 고르개용 docs/themes.json 을 만든다
   python3 suit.py selftest
 
@@ -1286,7 +1287,8 @@ def growth_state(th, entries, keys=()):
         exp += sum(pts[p] for p in parts)
     level, into, need = level_of(th, exp)
     return {"exp": exp, "level": level, "into": into, "need": need, "tier": tier_of(th, level, keys),
-            "docs": len(docs), "kinds": kinds, "gains": gains}
+            "docs": len(docs), "kinds": kinds, "gains": gains,
+            "log": [{"day": d["day"], "kind": d["kind"], "parts": gains[key]} for key, d in docs.items()]}
 
 
 def promote_rules(th):
@@ -1332,6 +1334,64 @@ def opened_at(th, cls, tier):
 def look_label(th, part, val):
     table = th.look["colors"] if part == "color" else th.look[part]
     return table[val]["label"] if part == "color" else table[val]
+
+
+def growth_log(th, state, limit=None):
+    """문서마다 받은 경험치. 최근 것이 앞이다. 본문과 경로는 원래 남기지 않으니 날짜와 종류, 점수만 있다."""
+    exp = th.growth["exp"]
+    rows = [{"day": e["day"], "kind": e["kind"], "label": th.kinds[e["kind"]]["label"] if e["kind"] in th.kinds else "종류 없는 글",
+             "points": sum(int(exp[p]["points"]) for p in e["parts"]), "parts": [exp[p]["label"] for p in e["parts"]]}
+            for e in reversed(state["log"])]
+    rows.sort(key=lambda r: r["day"], reverse=True)
+    return rows[:limit] if limit else rows
+
+
+def set_look(th, data, part, value, tier):
+    """슬롯의 꾸미기를 바꾼다. (바꿨나, 알릴 말). 머리 모양은 언제든, 나머지는 클래스가 tier 차까지 연 것만 바꾼다."""
+    tables = look_tables(th)
+    labels = th.look["parts"]
+    if part not in tables:
+        raise Missing(f"모르는 부위: {part}. 부위는 {', '.join(tables)}")
+    opened = look_open(th, slot_class(data), tier)
+    if not value:
+        raise Missing(f"값을 준다: suit.py look {part} <값>. 고를 수 있는 값은 {', '.join(sorted(opened[part])) or '아직 없음'}")
+    want = dict(data.get("look") or {}) if isinstance(data.get("look"), dict) else {}
+    if value == "none" and part in ("prop", "color"):
+        want[part] = "none"
+    elif value not in tables[part]:
+        raise Missing(f"모르는 값: {part}={value}. 고를 수 있는 값은 {', '.join(tables[part])}")
+    elif value not in opened[part]:
+        when = next((t for t, p, v in class_rewards(th, slot_class(data)) if t > tier and p == part and v == value), None)
+        return False, f"{labels[part]} {tables[part][value]}: " + (f"{when}차 전직에서 열린다. 지금은 {tier}차다" if when else "이 클래스의 보상이 아니다")
+    else:
+        want[part] = value
+    data["look"] = want
+    return True, f"바꿨다: {labels[part]} → {tables[part].get(value, '없음')}"
+
+
+def look_tables(th):
+    return {"top": th.look["top"], "hair": th.look["hair"], "prop": th.look["prop"],
+            "color": {k: v["label"] for k, v in th.look["colors"].items()}}
+
+
+def add_promote_key(text):
+    """승급 키를 받아 남긴다. 맞지 않으면 None 이다."""
+    payload = read_promote_key(text)
+    if not payload:
+        return None
+    path = keys_path()
+    have = path.read_text(encoding="utf-8").split() if path.exists() else []
+    if text.strip() not in have:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with open(path, "a", encoding="utf-8") as f:
+            f.write(text.strip() + "\n")
+    return payload
+
+
+def set_growth(data, on):
+    meta = data.get("profile") if isinstance(data.get("profile"), dict) else {}
+    meta["growth"] = "on" if on else "off"
+    data["profile"] = meta
 
 
 def growth_line(th, before, after, key, kind, cls=None):
@@ -1711,7 +1771,7 @@ def bundle_data(th):
         "rules": rules,
         "samples": samples,
         "css": css,
-        # 웹 캐릭터 만들기가 쓴다. 그림 부품, 꾸미기, 테마 조합, 전직 문턱, 슬롯 파일 머리
+        # 대시보드의 캐릭터와 캐릭터 설정 탭이 쓴다. 그림 부품, 꾸미기, 테마 조합, 전직 문턱, 슬롯 파일 머리
         "sprites": {f"{f.parent.name}/{f.stem}": dict(zip(("palette", "rows"), read_sprite(f)))
                     for f in sorted((th.root / "sprites").glob("*/*.txt"))},
         "look": th.look,
@@ -1753,7 +1813,7 @@ description: 문서를 쓰거나 다듬거나 검토할 때 docs-suit 테마를 
    - 같은 출력의 `slot` 을 새 캐릭터의 슬롯 이름으로 제안한다. 이 폴더 이름에서 만든 이름이고, 사용자가 바꾸면 글자, 숫자, -, _ 로 쓴다.
    - 조합과 머리 모양, 슬롯 이름은 페르소나 질문과 같은 메시지에서 함께 묻는다. 사용자가 나머지 질문을 건너뛰겠다고 하면 다시 묻지 않고 답한 것만으로 저장한다. 조합은 쓰지 않고 머리 모양은 기본값이고 슬롯 이름은 제안한 이름이다.
    - `{run} bootstrap --profile <슬롯> --here --class <클래스> --call … --affiliation … --goal … --docs <종류,종류> --facts … --dislikes … [--preset <조합>] [--hair <머리>] --yes` 로 저장한다. `--here` 가 이 폴더를 새 슬롯에 잇는다.
-   - 사용자가 화면에서 고르겠다고 하면 묻는 대신 `{run} serve --page create --detach` 로 로컬 화면을 띄우고 나온 주소를 알려 준다. 화면은 이 폴더 이름의 슬롯과 "실행한 폴더에서 이 슬롯 쓰기" 를 미리 채워 두고, 저장하면 바로 적용된다.
+   - 첫 질문 메시지의 끝에 화면에서 고르고 싶으면 대시보드를 열어 주겠다고 한 줄 붙인다. 사용자가 화면에서 하겠다고 하면 묻는 대신 `{run} serve --page setup --detach` 로 대시보드의 캐릭터 설정 탭을 띄우고 나온 주소를 알려 준다. 이 탭은 이 폴더 이름의 슬롯과 "실행한 폴더에서 이 슬롯 쓰기" 를 미리 채워 두고, 저장하면 바로 적용된다.
    - 저장한 뒤 답의 끝에 "<호칭>만의 글쓰기 스타일을 원하시면 예전에 작성하셨던 글 몇 개를 알려 주세요" 처럼 권한다. 호칭이 없으면 빼고 쓰고, 건너뛰어도 된다고 함께 말한다. 글을 받으면 10번대로 배운다.
 2. 요청에서 문서 종류를 정한다. 종류는 {kinds} 이다. 맞는 것이 없으면 종류 없이 조립한다. 종류 없는 글은 문체 축을 프로필과 클래스에서 물려받지 않고, 지침의 "대화로 정하기" 절대로 요청과 대화에서 읽어 맞춘다. 독자가 분명하면 `--audience <키>` 로 넘긴다. 독자 키는 {auds} 이다. 독자가 여럿이면 키를 쉼표로 잇는다.
 3. 사용자가 문체, 어법, 분량, 글자수, 공개 범위를 말했으면 `--set 축=값` 과 `--chars` 로 넘긴다. 축과 값은 아래 영어 키로 쓴다. {axes}. 공개 범위는 안전 축이라 `--set exposure` 는 `team`, `submit`, `public` 순서로 더 조심하는 쪽으로만 먹는다. 사내나 팀 안에서만 볼 글이면 `--set` 대신 `--audience` 를 `teammate` 나 `peer-dev` 로 넘긴다. 붙여 넣을 곳이 메일 본문이나 메신저, 지원서 입력 칸처럼 마크다운이 먹지 않는 곳이면 `--set markup=plain` 을 넘긴다.
@@ -1771,12 +1831,17 @@ description: 문서를 쓰거나 다듬거나 검토할 때 docs-suit 테마를 
    - "팀장님께 쓰는 글" 처럼 읽는 사람을 말했으면 `--audience <독자>` 를, "업무 보고는" 처럼 문서 종류를 말했으면 `--kind <종류>` 를 붙인다. 문서 종류가 권하는 값은 기본값을 이기지만 `--audience` 와 `--kind` 로 남긴 값에는 진다.
    - 이 폴더에서만 그렇게 쓰고 싶어 하면 `--here` 를 붙여 폴더 파일 `.docs-suit.yaml` 에 남긴다.
    - 종류 없는 글은 프로필 값을 쓰지 않으니, 그런 글에서 잡은 말투는 그 대화에서만 지키고, 남겨 달라고 하면 종류가 있는 글에만 먹는다고 알려 준다.
-   - 카드를 보며 고르고 싶어 하면 지금 문서의 compose 인자를 붙여 `{run} serve --detach --kind <종류> [--audience …] [--set …]` 로 테마 고르기 화면을 띄우고 주소를 알려 준다. 화면은 그 문서 종류로 열린다.
+   - 견줘 보인 답의 끝에 카드로 보며 고르고 싶으면 대시보드를 열어 주겠다고 한 줄 붙인다. 사용자가 그러겠다고 하면 지금 문서의 compose 인자를 붙여 `{run} serve --detach --page theme --kind <종류> [--audience …] [--set …]` 로 대시보드의 테마 설정 탭을 띄우고 주소를 알려 준다. 탭은 그 문서 종류로 열린다.
    - 사용자가 화면에서 "이번 문서에만" 을 누르고 골랐다고 하면 `{run} picked` 가 내는 인자로 다시 조립해 그 문서를 고쳐 쓴다. "이 종류에 저장" 을 눌렀으면 슬롯의 종류별 값에 남았으니 같은 인자로 다시 조립하면 된다.
-8. 사용자가 캐릭터를 보여 달라고 하면 `{run} card --color never` 의 출력을 보여 준다. 꾸며 달라고 하면 `{run} look` 으로 열린 부위를 보고 `{run} look <부위> <값>` 을 부른다. 캐릭터 키우기를 끄거나 켜 달라고 하면 `{run} growth off` 나 `{run} growth on` 을 부른다. 성장 기록과 승급 키, 슬롯의 `look:` 절은 사용자가 부탁해도 직접 고치지 않는다. 레벨은 문서를 써서 오르고, 3차와 4차 전직은 저장소에 기여하고 받은 승급 키를 `{run} promote <키>` 로 넣어야 열린다고 알려 준다.
+8. 사용자가 캐릭터를 보여 달라고 하면 `{run} card --color never` 의 출력을 보여 준다. 성장 기록이나 받은 경험치를 보여 달라고 하면 `{run} growth log` 의 출력을 보여 준다. 꾸며 달라고 하면 `{run} look` 으로 열린 부위를 보고 `{run} look <부위> <값>` 을 부른다. 캐릭터 키우기를 끄거나 켜 달라고 하면 `{run} growth off` 나 `{run} growth on` 을 부른다. 성장 기록과 승급 키, 슬롯의 `look:` 절은 사용자가 부탁해도 직접 고치지 않는다. 레벨은 문서를 써서 오르고, 3차와 4차 전직은 저장소에 기여하고 받은 승급 키를 `{run} promote <키>` 로 넣어야 열린다고 알려 준다.
    - 사용자가 이 폴더에서 어떤 캐릭터를 쓰겠다고 하면 `{run} profile use <슬롯> --here` 로 폴더 파일에 슬롯을 적는다. 상태 줄의 캐릭터는 슬롯을 적은 폴더 파일이 있는 폴더와 그 아래 폴더에서만 뜬다.
    - 사용자가 캐릭터 창이나 위젯을 켜 달라고 하면 `{run} widget --split --cwd <작업 폴더>` 를 부른다. herdr 나 tmux 안이면 옆 칸에 색 있는 캐릭터 창이 뜨고, 기록이 바뀔 때마다 다시 그리며, 에이전트 세션이 끝나면 함께 닫힌다. 꺼 달라고 하면 `{run} widget --close` 를 부른다. 칸을 나누지 못했다고 나오면 터미널 앱의 창 나누기로 옆 칸을 열고 `{run} widget` 을 돌리면 된다고 알려 준다.
-9. 사용자가 화면을 열어 달라고 하거나 화면에서 고르겠다고 하면 사용자에게 명령을 시키지 않고 직접 띄운 뒤 나온 주소를 알려 준다. 화면은 두 가지다. 말투나 분량 같은 테마 값을 카드로 견줘 고르려면 `{run} serve --detach` 로 테마 고르기 화면을 띄운다. 쓰고 있는 문서가 있으면 7번처럼 그 문서의 `--kind` 와 `--audience`, `--set` 을 붙인다. 처음 세팅하거나 클래스와 캐릭터를 고르려면 `{run} serve --page create --detach` 로 캐릭터 만들기 화면을 띄운다. 어느 쪽인지 모르면 프로필이 없을 때는 캐릭터 만들기 화면을, 있을 때는 테마 고르기 화면을 띄운다.
+9. 대시보드는 캐릭터, 캐릭터 설정, 테마 설정 세 탭을 모은 로컬 화면이다. 대시보드에서 하는 일은 모두 1번과 7번, 8번의 대화로도 된다. 그래서 먼저 띄우지 않고, 사용자가 원할 때만 띄운다.
+   - 바꿀 값까지 정한 요청은 묻지 않고 대화로 바로 처리한다. "머리를 단발로 바꿔 줘" 가 그렇다. 처리한 뒤 답의 끝에 대시보드에서도 바꿀 수 있다고 한 줄만 붙인다.
+   - 바꾸고 싶다고만 하고 값을 정하지 않았으면 고를 수 있는 것을 대화로 보이고, 같은 메시지의 끝에 대시보드에서 보며 고르겠는지 묻는다. "꾸미고 싶어", "말투를 바꾸고 싶어" 가 그렇다. 사용자가 그러겠다고 하면 그때 띄운다.
+   - 사용자가 대시보드나 화면을 열어 달라고 하거나 화면에서 하겠다고 하면 묻지 않고 바로 띄운다. 명령을 사용자에게 시키지 않고 직접 띄운 뒤 나온 주소를 알려 준다.
+   - 띄울 때는 할 일에 맞는 탭을 `--page` 로 고른다. 꾸미기와 성장 기록, 승급 키는 `{run} serve --detach --page character` 이다. 클래스와 페르소나, 내 문체, 폴더에 캐릭터 잇기는 `--page setup` 이다. 말투와 분량 같은 테마 값은 `--page theme` 이고, 쓰고 있는 문서가 있으면 7번처럼 그 문서의 `--kind` 와 `--audience`, `--set` 을 붙인다.
+   - 할 일이 분명하지 않으면 `--page` 를 빼고 `{run} serve --detach` 로 띄운다. 엔진이 이 폴더에 캐릭터가 있으면 캐릭터 탭을, 없으면 캐릭터 설정 탭을 연다.
 10. 사용자가 예전에 쓴 글로 문체를 맞춰 달라고 하거나 bootstrap 중에 글을 주면 아래 순서로 배운다. 원문은 어디에도 저장하지 않는다.
    - 파일이면 경로를 그대로 넘기고, 붙여 넣은 글이면 `-` 를 쓰고 heredoc 으로 넘긴다. check 처럼 다른 명령과 잇지 않는다.
      ```sh
@@ -2319,7 +2384,7 @@ def cmd_card(a, th):
         print(json.dumps({"slot": slot, "name": (data.get("persona") or {}).get("call") or slot, "class": cls,
                           "title": title_of(th, cls, state["tier"]), "look": look_of(th, data, state["tier"]), "on": growth_on(data),
                           "keys": [{k: p[k] for k in ("tier", "who", "ref", "at") if k in p} for p in held],
-                          **{k: v for k, v in state.items() if k != "gains"}}, ensure_ascii=False, indent=1))
+                          **{k: v for k, v in state.items() if k not in ("gains", "log")}}, ensure_ascii=False, indent=1))
         return 0
     vals = resolve(th, profile=load_profile(warn_stderr, a.profile), warn=warn_stderr)[0]
     print("\n".join(card_lines(th, data, slot, state, color_depth(a.color), vals, held)))
@@ -2339,8 +2404,7 @@ def cmd_look(a, th):
     look = look_of(th, data, tier, warn_stderr)
     opened = look_open(th, cls, tier)
     labels = th.look["parts"]
-    tables = {"top": th.look["top"], "hair": th.look["hair"], "prop": th.look["prop"],
-              "color": {k: v["label"] for k, v in th.look["colors"].items()}}
+    tables = look_tables(th)
     later = [(t, part, val) for t, part, val in class_rewards(th, cls) if t > tier]
     if a.json:
         print(json.dumps({"look": look, "tier": tier, "open": {k: sorted(v) for k, v in opened.items()},
@@ -2356,25 +2420,12 @@ def cmd_look(a, th):
         if later:
             print("앞으로 열리는 것: " + ", ".join(f"{t}차 {labels[part]} {look_label(th, part, val)}" for t, part, val in later))
         return 0
-    if a.part not in tables:
-        raise Missing(f"모르는 부위: {a.part}. 부위는 {', '.join(tables)}")
-    if not a.value:
-        raise Missing(f"값을 준다: suit.py look {a.part} <값>. 고를 수 있는 값은 {', '.join(sorted(opened[a.part])) or '아직 없음'}")
-    want = dict(data.get("look") or {}) if isinstance(data.get("look"), dict) else {}
-    if a.value == "none" and a.part in ("prop", "color"):
-        want[a.part] = "none"
-    elif a.value not in tables[a.part]:
-        raise Missing(f"모르는 값: {a.part}={a.value}. 고를 수 있는 값은 {', '.join(tables[a.part])}")
-    elif a.value not in opened[a.part]:
-        when = next((t for t, part, val in later if part == a.part and val == a.value), None)
-        print(f"{labels[a.part]} {tables[a.part][a.value]}: "
-              + (f"{when}차 전직에서 열린다. 지금은 {tier}차다" if when else "이 클래스의 보상이 아니다"))
+    ok, msg = set_look(th, data, a.part, a.value, tier)
+    if not ok:
+        print(msg)
         return 1
-    else:
-        want[a.part] = a.value
-    data["look"] = want
     write_profile(data, a.profile)
-    print(f"바꿨다: {labels[a.part]} → {tables[a.part].get(a.value, '없음')}. suit.py card 로 본다")
+    print(f"{msg}. suit.py card 로 본다")
     return 0
 
 def cmd_preset(a, th):
@@ -2444,16 +2495,10 @@ def cmd_promote(a, th):
         for k in held:
             print(f"- {k['tier']}차 승급 키 · @{k['who']} · {k.get('ref', '')} · {k.get('at', '')}")
         return 0
-    payload = read_promote_key(a.key)
+    payload = add_promote_key(a.key)
     if not payload:
         print("오류: 승급 키가 맞지 않는다. 받은 키 전체를 줄바꿈 없이 그대로 넣는다", file=sys.stderr)
         return 1
-    path = keys_path()
-    have = path.read_text(encoding="utf-8").split() if path.exists() else []
-    if a.key.strip() not in have:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        with open(path, "a", encoding="utf-8") as f:
-            f.write(a.key.strip() + "\n")
     print(f"승급 키를 받았다: {payload['tier']}차 · @{payload['who']} · {payload.get('ref', '')}")
     data = read_slot(profile_path(a.profile), warn_stderr)
     if data:
@@ -2474,9 +2519,20 @@ def cmd_growth(a, th):
     if not data:
         print(f"프로필이 없다: {path}\n`python3 suit.py bootstrap` 으로 캐릭터를 만든다")
         return 3
-    meta = data.get("profile") if isinstance(data.get("profile"), dict) else {}
-    meta["growth"] = a.action
-    data["profile"] = meta
+    if a.action == "log":
+        state = growth_state(th, class_growth(growth_path(a.profile), data, warn_stderr), key_tiers(promote_keys(warn_stderr)))
+        rows = growth_log(th, state, a.limit)
+        if a.json:
+            print(json.dumps({"level": state["level"], "exp": state["exp"], "docs": state["docs"],
+                              "dex": [len(state["kinds"]), len(th.kinds)], "log": rows}, ensure_ascii=False, indent=1))
+            return 0
+        print(f"문서 {state['docs']}건 · 경험치 {state['exp']} · Lv.{state['level']} · 도감 {len(state['kinds'])}/{len(th.kinds)} 종류")
+        if not rows:
+            print("아직 기록이 없다. 문서를 쓰고 suit.py check 로 검사하면 쌓인다")
+        for r in rows:
+            print(f"- {r['day']} {r['label']} +{r['points']}" + (f" ({', '.join(r['parts'])})" if r["parts"] else " (그날 같은 종류를 넘게 써 경험치 없음)"))
+        return 0
+    set_growth(data, a.action == "on")
     write_profile(data, a.profile)
     print(f"캐릭터 키우기를 {'켰다' if a.action == 'on' else '껐다'}: {path}. 지난 기록은 그대로 둔다")
     return 0
@@ -2713,7 +2769,12 @@ def cmd_widget(a, th):
 # 초기 세팅이나 테마를 바꿀 때 가볍게 띄우는 서버다. docs/ 의 화면을 그대로 내주고, 화면에서 고른 값을 실행한 폴더
 # 기준의 슬롯이나 폴더 파일에 바로 쓴다. 이 컴퓨터(127.0.0.1)에서만 받고, 띄울 때마다 바뀌는 열쇠를 화면에 심어
 # 열쇠가 없는 요청은 거절한다. 브라우저에 열린 다른 사이트가 localhost 로 보내는 요청과 DNS 리바인딩을 막는다.
-SERVE_FILES = {"index.html": "text/html", "create.html": "text/html", "app.js": "text/javascript",
+# 대시보드(index.html)가 캐릭터, 캐릭터 설정, 테마 설정 세 화면을 탭으로 품는다. 예전 화면 이름은 탭 이름으로 바꿔 받는다
+DASH_TABS = ("character", "setup", "theme")
+DASH_ALIAS = {"index": "theme", "create": "setup"}
+SERVE_FILES = {"index.html": "text/html", "character.html": "text/html", "theme.html": "text/html",
+               "dashboard.js": "text/javascript", "character.js": "text/javascript",
+               "create.html": "text/html", "app.js": "text/javascript",
                "create.js": "text/javascript", "core.js": "text/javascript", "local.js": "text/javascript",
                "style.css": "text/css"}
 SERVE_IDLE = 30 * 60  # 이만큼 쓰지 않으면 스스로 꺼진다
@@ -2731,13 +2792,42 @@ def serve_state(th, cwd, slot=None):
                       "call": (d.get("persona") or {}).get("call")})
     out = {"cwd": cwd, "slot": name, "path": str(path), "why": why, "exists": path.exists(), "suggest": suggest_slot(cwd),
            "folders": [str(f) for f in folder], "slots": slots, "profile": data,
-           "merged": load_profile(name=slot, start=cwd), "folderHere": read_folder(Path(cwd) / FOLDER_FILE)}
+           "merged": load_profile(name=slot, start=cwd), "folderHere": read_folder(Path(cwd) / FOLDER_FILE),
+           "bound": (folder_settings(cwd)[0].get("profile") or None)}
     if data and th.growth:
-        state = growth_state(th, class_growth(growth_path(slot, start=cwd), data), key_tiers(promote_keys()))
+        held = promote_keys()
+        state = growth_state(th, class_growth(growth_path(slot, start=cwd), data), key_tiers(held))
         cls = (data.get("profile") or {}).get("class")
         out["growth"] = {"level": state["level"], "tier": state["tier"], "title": title_of(th, cls, state["tier"]),
                          "docs": state["docs"]}
+        out["character"] = character_view(th, data, name, state, held)
     return out
+
+
+def character_view(th, data, slot, state, held):
+    """대시보드 캐릭터 탭이 그릴 것. card, look, growth log, promote 가 대화로 보이는 것과 같은 값이다."""
+    cls = slot_class(data)
+    tier = state["tier"]
+    nxt = next(({"tier": t, "level": lv, "keyed": keyed, "title": title_of(th, cls, t), "opens": opened_at(th, cls, t)}
+                for t, lv, keyed in promote_rules(th) if t == tier + 1), None)
+    return {"name": (data.get("persona") or {}).get("call") or slot, "class": cls,
+            "classLabel": th.classes[cls]["label"] if cls in th.classes else None,
+            "title": title_of(th, cls, tier), "status": status_lines(th, data, slot, state, 0, "line", held)[0],
+            **{k: state[k] for k in ("tier", "level", "exp", "into", "need", "docs", "kinds")},
+            "dex": len(th.kinds), "next": nxt, "growthOn": growth_on(data),
+            "look": look_of(th, data, tier), "open": {k: sorted(v) for k, v in look_open(th, cls, tier).items()},
+            "later": [{"tier": t, "part": part, "value": val} for t, part, val in class_rewards(th, cls) if t > tier],
+            "keys": [{k: x[k] for k in ("tier", "who", "ref", "at") if k in x} for x in held],
+            "log": growth_log(th, state, 20)}
+
+
+def serve_page(th, cwd, page=None):
+    """대시보드에서 처음 열 탭. 주지 않으면 이 폴더에 이은 캐릭터가 있을 때 캐릭터, 없으면 캐릭터 설정이다."""
+    page = DASH_ALIAS.get(page, page)
+    if page:
+        return page
+    path, _, _, why = profile_source(None, start=cwd)
+    return "character" if why in ("env", "arg", "folder") and read_slot(path) else "setup"
 
 
 def clean_slot(th, data, old=None):
@@ -2797,7 +2887,7 @@ def clean_slot(th, data, old=None):
 
 
 def serve_context(th, kind=None, audience=None, sets=None):
-    """에이전트가 넘긴 지금 문서의 맥락. 테마 고르기 화면이 이 종류와 독자로 열린다. 모르는 값은 거절한다."""
+    """에이전트가 넘긴 지금 문서의 맥락. 테마 설정 탭이 이 종류와 독자로 열린다. 모르는 값은 거절한다."""
     if kind and kind not in th.kinds:
         raise Missing(f"모르는 문서 종류: {kind}")
     auds = _auds(audience) or []
@@ -2891,7 +2981,7 @@ def make_server(th, cwd, port=0, context=None):
         def route(self, path, body):
             slot = body.get("slot") or None
             if path == "/api/defaults":
-                # 테마 고르기에서 고른 값을 슬롯이나 실행한 폴더의 폴더 파일 기본값에 얹는다
+                # 테마 설정 탭에서 고른 값을 슬롯이나 실행한 폴더의 폴더 파일 기본값에 얹는다
                 # kind 를 주면 그 문서 종류의 값으로 남겨, 종류가 권하는 값을 이기게 한다
                 sets = body.get("defaults") or {}
                 for axis, value in sets.items():
@@ -2917,13 +3007,13 @@ def make_server(th, cwd, port=0, context=None):
                     target = profile_source(slot, start=cwd)[0]
                     data = read_slot(target)
                     if not data:
-                        raise Missing("이 슬롯이 아직 없다. 캐릭터 만들기에서 먼저 만든다")
+                        raise Missing("이 슬롯이 아직 없다. 캐릭터 설정에서 먼저 만든다")
                     put(data)
                     target.write_text(dump_yaml(data), encoding="utf-8")
                     where = target
                 return {"ok": True, "message": f"저장했다: {where}", "state": serve_state(th, cwd, slot)}
             if path == "/api/slot":
-                # 캐릭터 만들기에서 만든 슬롯을 쓴다. 있던 파일은 .bak 으로 남긴다
+                # 캐릭터 설정 탭에서 만든 슬롯을 쓴다. 있던 파일은 .bak 으로 남긴다
                 name = slot or "default"
                 target = slot_path(name)
                 old = read_slot(target)
@@ -2940,14 +3030,14 @@ def make_server(th, cwd, port=0, context=None):
                     notes.append("스킬을 깔았다: " + ", ".join(str(w) for w in written) if written else "깔 스킬이 없다")
                 return {"ok": True, "message": " · ".join(notes), "state": serve_state(th, cwd, name)}
             if path == "/api/pick":
-                # 테마 고르기의 "이번 문서에만". 슬롯에는 쓰지 않고, 에이전트가 suit.py picked 로 읽어 다시 조립한다
+                # 테마 설정 탭의 "이번 문서에만". 슬롯에는 쓰지 않고, 에이전트가 suit.py picked 로 읽어 다시 조립한다
                 ctx = serve_context(th, body.get("kind"), ",".join(body.get("audiences") or []), body.get("sets") or {})
                 pick = {"at": datetime.now().isoformat(timespec="seconds"), "cwd": cwd, **ctx}
                 picked_path().parent.mkdir(parents=True, exist_ok=True)
                 picked_path().write_text(json.dumps(pick, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
                 return {"ok": True, "message": "골랐다. 대화창에 \"골랐어\" 라고 하면 에이전트가 이 값으로 다시 쓴다", "args": picked_args(pick)}
             if path == "/api/learn":
-                # 캐릭터 만들기에서 붙여 넣은 예전 글을 잰다. 원문은 재기만 하고 어디에도 남기지 않는다
+                # 캐릭터 설정 탭에서 붙여 넣은 예전 글을 잰다. 원문은 재기만 하고 어디에도 남기지 않는다
                 texts = [x for x in (body.get("texts") or []) if isinstance(x, str) and x.strip()]
                 if not texts:
                     raise Missing("잴 글이 없다. 예전에 쓴 글을 붙여 넣는다")
@@ -2960,6 +3050,33 @@ def make_server(th, cwd, port=0, context=None):
                     samples.append(x)
                 plan, voice_ok, chars = learn_plan(samples)
                 return {"ok": True, "samples": samples, "plan": plan, "voice_ok": voice_ok, "chars": chars}
+            if path in ("/api/look", "/api/growth", "/api/use"):
+                # 캐릭터 탭의 꾸미기와 키우기 켜고 끄기, 캐릭터 설정의 이 폴더에 잇기. 대화의 look, growth, profile use --here 와 같다
+                target, name = profile_source(slot, start=cwd)[:2]
+                data = read_slot(target)
+                if not data:
+                    raise Missing("이 슬롯이 아직 없다. 캐릭터 설정에서 먼저 만든다")
+                if path == "/api/use":
+                    if not name or name == "default":
+                        raise Missing("기본 슬롯은 폴더에 잇지 않는다. 이름 붙은 슬롯을 고른다")
+                    msg = f"이 폴더가 슬롯 {name} 을 쓴다: {bind_folder(name, cwd)}"
+                else:
+                    if path == "/api/look":
+                        tier = growth_state(th, class_growth(growth_path(slot, start=cwd), data), key_tiers(promote_keys()))["tier"]
+                        ok, msg = set_look(th, data, body.get("part"), body.get("value"), tier)
+                        if not ok:
+                            raise Missing(msg)
+                    else:
+                        set_growth(data, bool(body.get("on")))
+                        msg = f"캐릭터 키우기를 {'켰다' if body.get('on') else '껐다'}"
+                    target.write_text(dump_yaml(data), encoding="utf-8")
+                return {"ok": True, "message": msg, "state": serve_state(th, cwd, slot)}
+            if path == "/api/promote":
+                payload = add_promote_key(str(body.get("key") or ""))
+                if not payload:
+                    raise Missing("승급 키가 맞지 않는다. 받은 키 전체를 줄바꿈 없이 그대로 넣는다")
+                return {"ok": True, "message": f"승급 키를 받았다: {payload['tier']}차 · @{payload['who']}",
+                        "state": serve_state(th, cwd, slot)}
             if path == "/api/stop":
                 threading.Thread(target=self.server.shutdown, daemon=True).start()
                 return {"ok": True, "message": "화면 서버를 껐다. 이 탭은 닫아도 된다"}
@@ -2998,7 +3115,7 @@ def free_port(prefer=8790, fixed=False):
 
 
 def cmd_picked(a, th):
-    """테마 고르기에서 "이번 문서에만" 으로 고른 값을 compose 인자로 낸다."""
+    """테마 설정 탭에서 "이번 문서에만" 으로 고른 값을 compose 인자로 낸다."""
     path = picked_path()
     if not path.exists():
         print("고른 값이 없다. 화면에서 \"이번 문서에만\" 을 누르고 다시 부른다")
@@ -3020,10 +3137,11 @@ def cmd_serve(a, th):
     cwd = os.path.abspath(os.path.expanduser(a.cwd or os.getcwd()))
     context = serve_context(th, a.kind, a.audience, a.set)
     port = free_port(a.port or 8790, fixed=bool(a.port))
-    url = f"http://127.0.0.1:{port}/{a.page}.html"
+    page = serve_page(th, cwd, a.page)
+    url = f"http://127.0.0.1:{port}/index.html#{page}"
     if a.detach:
         # 포트가 비어 있는 것을 위에서 봤으니, 이 포트에 연결되면 띄운 서버다. 서버가 먼저 끝나면 뜨지 못한 것이다.
-        args = [sys.executable, str(HERE / "suit.py"), "serve", "--port", str(port), "--cwd", cwd, "--page", a.page, "--no-open"]
+        args = [sys.executable, str(HERE / "suit.py"), "serve", "--port", str(port), "--cwd", cwd, "--page", page, "--no-open"]
         args += (["--kind", a.kind] if a.kind else []) + (["--audience", a.audience] if a.audience else [])
         args += [x for s in a.set or [] for x in ("--set", s)]
         child = subprocess.Popen(args, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
@@ -3042,7 +3160,8 @@ def cmd_serve(a, th):
         httpd, _ = make_server(th, cwd, port, context)
     _, slot, _, why = profile_source(None, start=cwd)
     reason = {"env": "환경 변수", "arg": "--profile", "folder": "폴더 파일", "current": "profile use", "default": "기본 슬롯"}[why]
-    print(f"docs-suit 화면: {url}\n실행한 폴더 {cwd} · 슬롯 {slot or '-'} ({reason}). 화면에서 다른 슬롯도 고를 수 있다.\n"
+    tab = {"character": "캐릭터", "setup": "캐릭터 설정", "theme": "테마 설정"}[page]
+    print(f"docs-suit 대시보드 ({tab} 탭): {url}\n실행한 폴더 {cwd} · 슬롯 {slot or '-'} ({reason}). 화면에서 다른 슬롯도 고를 수 있다.\n"
           f"{SERVE_IDLE // 60}분 동안 쓰지 않으면 꺼진다. 화면의 끄기 버튼" + ("으로 끈다." if a.detach else "이나 Ctrl+C 로 끈다."))
     if not a.no_open:
         webbrowser.open(url)
@@ -3287,6 +3406,10 @@ def selftest(th):
           f"경험치 계산이 다르다. 같은 문서는 가장 좋은 기록, 같은 날 같은 종류는 두 건까지다: {st}")
     check(st["gains"]["a"] == ["done", "clean", "resolved", "new-kind"] and st["gains"]["b"] == ["done", "clean"],
           f"[확인 필요] 를 채운 문서만 resolved 를 받아야 한다: {st['gains']}")
+    rows = growth_log(th, growth_state(th, log))
+    check([r["points"] for r in rows] == [20, 0, 20, 45] and rows[0]["day"] == "2026-01-02"
+          and rows[0]["label"] == th.kinds["email"]["label"] and rows[1]["parts"] == [],
+          f"성장 기록이 최근 문서부터 받은 경험치를 보이지 않는다: {rows}")
     st = growth_state(rules, log + [{"doc": "a", "at": day2, "kind": "email", "checks": {"emphasis": False}, "unresolved": 3}])
     check(st["exp"] == 85, "다시 검사해 나빠진 기록이 경험치를 깎았다")
     check(level_of(rules, 50 + 75) == (3, 0, 75) and level_of(rules, 50 + 75 * 2 + 30) == (4, 30, 0),
@@ -3759,6 +3882,27 @@ def selftest(th):
                   f"문체 재기가 다르거나 원문을 돌려준다: {code}")
             check(not any(f.is_file() and "정류장" in f.read_text(encoding="utf-8", errors="ignore")
                           for f in Path(td).rglob("*")), "문체 재기가 원문을 파일로 남겼다")
+            # 대시보드: 탭 화면을 내주고, 캐릭터 탭의 고치기는 대화의 look, growth, profile use --here 와 같은 결과를 남긴다
+            check(all(req(f"/{f}", tok=None)[0] == 200 for f in ("index.html", "character.html", "theme.html", "dashboard.js", "character.js")),
+                  "대시보드의 탭 화면을 내주지 않는다")
+            state = json.loads(req("/api/state")[1])
+            check(state["bound"] == "web" and state["character"]["class"] == "student" and state["character"]["status"].startswith(
+                th.classes["student"]["icon"]), "상태에 캐릭터 탭이 그릴 값이 없다")
+            code, _ = req("/api/look", {"part": "hair", "value": "long"})
+            check(code == 200 and read_slot(slot_path("web"))["look"]["hair"] == "long", "대시보드에서 머리 모양을 바꾸지 못한다")
+            check(req("/api/look", {"part": "top", "value": "uniform"})[0] == 400, "대시보드에서 아직 열리지 않은 옷을 입혔다")
+            code, _ = req("/api/growth", {"on": False})
+            check(code == 200 and not growth_on(read_slot(slot_path("web"))), "대시보드에서 캐릭터 키우기를 끄지 못한다")
+            req("/api/growth", {"on": True})
+            write_profile({"profile": {"class": "office"}}, "other")
+            check(req("/api/use", {"slot": "default"})[0] == 400, "기본 슬롯을 폴더에 이었다")
+            code, _ = req("/api/use", {"slot": "other"})
+            check(code == 200 and read_folder(Path(td) / FOLDER_FILE).get("profile") == "other", "대시보드에서 이 폴더에 캐릭터를 잇지 못한다")
+            check(req("/api/promote", {"key": "nope"})[0] == 400, "맞지 않는 승급 키를 받았다")
+            with tempfile.TemporaryDirectory() as bare:
+                check(serve_page(th, td) == "character" and serve_page(th, bare) == "setup"
+                      and serve_page(th, td, "create") == "setup" and serve_page(th, td, "index") == "theme",
+                      "대시보드가 처음 열 탭을 고르지 못한다")
         finally:
             if httpd:
                 httpd.shutdown()
@@ -3888,7 +4032,9 @@ def main(argv=None):
     pm = sub.add_parser("promote", parents=[slot])
     pm.add_argument("key", nargs="?", help="기여하고 받은 승급 키. 주지 않으면 받은 키를 보인다")
     g = sub.add_parser("growth", parents=[slot])
-    g.add_argument("action", choices=("on", "off"))
+    g.add_argument("action", choices=("on", "off", "log"), help="log 는 문서마다 받은 경험치를 최근 것부터 보인다")
+    g.add_argument("--limit", type=int, default=10, help="log 에서 보일 문서 수. 0 이면 모두")
+    g.add_argument("--json", action="store_true")
     wd = sub.add_parser("widget")
     wd.add_argument("--cwd", help="이 폴더의 슬롯을 그린다. 주지 않으면 지금 폴더")
     wd.add_argument("--split", action="store_true", help="herdr 나 tmux 의 지금 칸 오른쪽에 칸을 나눠 띄운다")
@@ -3900,10 +4046,11 @@ def main(argv=None):
     sv = sub.add_parser("serve")
     sv.add_argument("--port", type=int, help="주지 않으면 8790, 쓰고 있으면 빈 포트")
     sv.add_argument("--cwd", help="이 폴더 기준으로 슬롯을 고른다. 주지 않으면 지금 폴더")
-    sv.add_argument("--page", choices=("index", "create"), default="index", help="처음 열 화면")
+    sv.add_argument("--page", choices=DASH_TABS + tuple(DASH_ALIAS), help="대시보드에서 처음 열 탭. character 는 캐릭터, "
+                    "setup 은 캐릭터 설정, theme 는 테마 설정. 주지 않으면 이 폴더에 캐릭터가 있을 때 character, 없으면 setup")
     sv.add_argument("--detach", action="store_true", help="뒤에서 띄우고 바로 돌아온다. 에이전트가 쓸 때 붙인다")
     sv.add_argument("--no-open", action="store_true", help="브라우저를 열지 않는다")
-    sv.add_argument("--kind", help="지금 쓰는 문서 종류. 테마 고르기가 이 종류로 열린다")
+    sv.add_argument("--kind", help="지금 쓰는 문서 종류. 테마 설정 탭이 이 종류로 열린다")
     sv.add_argument("--audience", help="지금 문서의 독자. 쉼표로 잇는다")
     sv.add_argument("--set", action="append", metavar="축=값", help="지금 문서에 대화로 정한 값")
     pk = sub.add_parser("picked")
