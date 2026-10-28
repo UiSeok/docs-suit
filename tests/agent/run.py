@@ -229,9 +229,37 @@ def grade(case, calls):
 FOLLOWUP = "더 줄 정보는 없어. 모르는 곳은 [확인 필요]로 비워 두고 지금 써 줘."
 
 
+CHECKED = re.compile(r"check\s+-\s[^\n]*<<\s*'?(\w+)'?\n(.*?)\n\1(?:\n|$)", re.S)
+
+
+def checked_body(transcripts):
+    """에이전트가 마지막으로 check 에 heredoc 으로 넘긴 본문. SKILL.md 가 답에 보이는 본문을 검사한 본문과 같게 두라고
+    하므로, 앞뒤 안내와 채울 곳 목록이 섞인 답보다 이것을 잰다. 에이전트마다 기록 꼴이 달라 JSON 안의 문자열을 다 훑는다."""
+    found = []
+
+    def walk(x):
+        if isinstance(x, str):
+            found.extend(m.group(2) for m in CHECKED.finditer(x))
+        elif isinstance(x, dict):
+            for v in x.values():
+                walk(v)
+        elif isinstance(x, list):
+            for v in x:
+                walk(v)
+    for t in transcripts:
+        for line in t.splitlines():
+            try:
+                walk(json.loads(line))
+            except ValueError:
+                continue
+    return found[-1] if found else ""
+
+
 def doc_text(reply, proj):
     """에이전트가 쓴 본문. 작업 폴더에 만든 .md 가 있으면 그것을, 없으면 답의 코드 블록이나 --- 사이, 메일 꼴,
     답 전체 순으로 쓴다. 질문만 하고 멈췄으면 빈 문자열을 돌려준다."""
+    # 답 끝의 `성장:` 줄은 check 가 만든 줄이라 본문이 아니다. 남겨 두면 분량을 잴 때 함께 센다.
+    reply = re.sub(r"^성장:.*$", "", reply, flags=re.M).rstrip()
     made = [f for f in proj.rglob("*.md") if not {".agents", ".claude"} & set(f.parts)]
     if made:
         return max(made, key=lambda f: f.stat().st_size).read_text(encoding="utf-8")
@@ -328,9 +356,11 @@ def load_case(agent, case, base):
                    if (tmp / name).exists()]
     meta = finish_meta(agent, tmp, transcripts, ok)
     meta["followup"] = len(transcripts) > 1
-    # 재촉했으면 두 답 가운데 본문이 더 긴 쪽을 쓴다. 첫 답에 본문을 쓰고 둘째 답은 안내만 하는 경우가 있다.
+    # check 에 넘긴 본문이 있으면 그것을 잰다. 없으면 답에서 뽑되, 재촉했으면 두 답 가운데 본문이 더 긴 쪽을 쓴다.
+    # 첫 답에 본문을 쓰고 둘째 답은 안내만 하는 경우가 있다.
     replies = [AGENTS[agent]["meta"](t)["reply"] for t in transcripts] or [meta["reply"]]
-    doc = max((doc_text(r, tmp / "proj") for r in replies), key=lambda d: len(suit.body_lines(d))) if vals else ""
+    doc = (checked_body(transcripts)
+           or max((doc_text(r, tmp / "proj") for r in replies), key=lambda d: len(suit.body_lines(d)))) if vals else ""
     kind = compose_args(next(c for c in reversed(read_calls(tmp)) if c[:1] == ["compose"] and "--help" not in c)).kind if vals else None
     meta["doc"] = None if not vals else suit.check_doc(doc, vals, chars, kind, th) if doc else None
     # 본문을 다 쓴 뒤 check 로 성장 기록을 남겼는지는 기록 파일로 본다. 빈 본문으로 부른 check 는 기록을 남기지 않는다.

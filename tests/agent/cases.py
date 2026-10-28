@@ -65,7 +65,8 @@ CASES = [
      "ask": "교수님께 낼 정류장 대기 시간 조사 보고서 써 줘. 이번에는 합쇼체로 써 줘."},
     {"id": "set-voice-length", "kind": "postmortem", "want": {"voice": "prose", "length": "brief"},
      "ask": "어제 캐시 서버가 30분 멈춘 건 회고 문서로 써 줘. 개조식 말고 줄글로, 짧게."},
-    {"id": "set-exposure", "kind": "blog", "want": {"exposure": "team"},
+    # 사내 위키에 올릴 글이라 가이드·README·위키로 골라도 맞다. 재는 것은 공개 범위다.
+    {"id": "set-exposure", "kind": ["blog", "guide"], "want": {"exposure": "team"},
      "ask": "사내 위키에만 올릴 기술 글 써 줘. 밖에는 공개하지 않아. 주제는 로그 수집 파이프라인을 정리한 이야기야."},
     {"id": "set-markup", "kind": "notice", "want": {"markup": "plain"},
      "ask": "동아리 단톡방에 올릴 공지 써 줘. 다음 주 모임 장소가 정류장 앞 카페로 바뀌어. 단톡방이라 마크다운 기호는 그대로 보여."},
@@ -84,8 +85,11 @@ CASES = [
             "혹시 마감을 일주일 정도 연장해 주실 수 있을지 여쭙고 싶습니다. 바쁘신 와중에 죄송합니다. 감사합니다."},
 
     # 경계
-    {"id": "no-kind", "kind": "",
+    # 축사는 소리 내어 읽는 글이라 발표 원고로 골라도 맞다. 종류가 정말 없는 글은 손편지로 잰다.
+    {"id": "toast", "kind": ["script", ""],
      "ask": "친구 결혼식 축사 써 줘. 대학 동아리에서 만난 친구야."},
+    {"id": "no-kind", "kind": "",
+     "ask": "부모님 결혼 30주년에 드릴 손편지 글 써 줘. 내가 대학 다니는 동안 뒷바라지하느라 고생 많으셨어."},
     {"id": "skip-code", "expect": "skip",
      "ask": "이 정규식이 왜 이메일 주소를 못 잡는지 설명해 줘: ^[a-z]+@[a-z]+$"},
     {"id": "skip-question", "expect": "skip",
