@@ -2776,7 +2776,7 @@ SERVE_FILES = {"index.html": "text/html", "character.html": "text/html", "theme.
                "dashboard.js": "text/javascript", "character.js": "text/javascript",
                "create.html": "text/html", "app.js": "text/javascript",
                "create.js": "text/javascript", "core.js": "text/javascript", "local.js": "text/javascript",
-               "style.css": "text/css"}
+               "style.css": "text/css", "favicon.svg": "image/svg+xml"}
 SERVE_IDLE = 30 * 60  # 이만큼 쓰지 않으면 스스로 꺼진다
 
 
@@ -3842,6 +3842,7 @@ def selftest(th):
 
             code, page = req("/create.html", tok=None)
             check(code == 200 and f'content="{token}"' in page, "로컬 화면에 열쇠를 심지 않는다")
+            check(req("/favicon.svg", tok=None)[0] == 200, "로컬 화면이 탭 아이콘을 내주지 않는다")
             check(req("/api/state", tok="wrong-token")[0] == 403 and req("/api/state", host="evil.example")[0] == 403
                   and req("/api/defaults", {"defaults": {}}, tok=None)[0] == 403,
                   "열쇠가 틀리거나 다른 주소로 온 요청을 받았다")
