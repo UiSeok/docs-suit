@@ -196,8 +196,11 @@ def grade(case, calls):
         p = argparse.ArgumentParser(add_help=False)
         p.add_argument("--page", default="index")
         p.add_argument("--detach", action="store_true")
+        p.add_argument("--kind")
         a, _ = p.parse_known_args(serves[-1][1:])
         why = ([] if a.detach else ["--detach 없이 띄웠다"]) + ([] if a.page == case["page"] else [f"화면이 {a.page} 이다"])
+        if case.get("serve_kind") and a.kind != case["serve_kind"]:
+            why.append(f"화면을 종류 {a.kind or '없이'} 로 띄웠다")
         return not why, "; ".join(describe(c) for c in serves), ", ".join(why), None, None
     if not composes:
         return False, shown, "compose 를 부르지 않았다", None, None
@@ -284,6 +287,23 @@ def doc_text(reply, proj):
     return reply
 
 
+def file_checks(ext, tmp, vals, chars, kind):
+    """문서 파일을 만들어 달라는 케이스. 파일을 만들었는지, 그 파일을 check 에 넘겼는지 보고, 파일에서 뽑은 글을 잰다."""
+    proj = tmp / "proj"
+    made = sorted((f for f in proj.rglob(f"*{ext}") if not {".agents", ".claude"} & set(f.parts)),
+                  key=lambda f: f.stat().st_mtime)
+    if not made:
+        return [("file", False, f"{ext} 파일을 만들지 않았다")]
+    calls = read_calls(tmp) + read_calls(tmp, "calls-2.jsonl")
+    passed = [c[1] for c in calls if c[:1] == ["check"] and len(c) > 1 and c[1].endswith(ext)]
+    out = [("file", bool(passed), f"{made[-1].name} 를 check 에 넘김" if passed else f"{made[-1].name} 를 check 에 넘기지 않았다")]
+    try:
+        text, _ = suit.doc_file_text(made[-1])
+    except ValueError as e:
+        return out + [("file", False, f"파일을 읽지 못했다: {e}")]
+    return out + suit.check_doc(text, vals, chars, kind, th)
+
+
 def doc_summary(checks):
     if checks is None:
         return "본문 없음"
@@ -368,6 +388,8 @@ def load_case(agent, case, base):
            or max((doc_text(r, tmp / "proj") for r in replies), key=lambda d: len(suit.body_lines(d)))) if vals else ""
     kind = compose_args(next(c for c in reversed(read_calls(tmp)) if c[:1] == ["compose"] and "--help" not in c)).kind if vals else None
     meta["doc"] = None if not vals else suit.check_doc(doc, vals, chars, kind, th) if doc else None
+    if vals and case.get("file"):
+        meta["doc"] = file_checks(case["file"], tmp, vals, chars, kind)
     # 본문을 다 쓴 뒤 check 로 성장 기록을 남겼는지는 기록 파일로 본다. 빈 본문으로 부른 check 는 기록을 남기지 않는다.
     # 프로필 없이 시작한 케이스는 슬롯이 없어 기록이 남지 않으므로 호출만 본다. 재촉한 턴의 호출은 calls-2.jsonl 에 있다.
     calls = read_calls(tmp) + read_calls(tmp, "calls-2.jsonl")
@@ -385,7 +407,8 @@ def run_case(agent, case, base, model, glob=False):
     (tmp / "stderr.txt").write_text(err or "", encoding="utf-8")
     first = AGENTS[agent]["meta"](out)
     vals = grade(case, read_calls(tmp))[3]
-    if vals and first["session"] and not doc_text(first["reply"], proj):
+    made = case.get("file") and any(f for f in proj.rglob(f"*{case['file']}") if ".agents" not in f.parts)
+    if vals and first["session"] and not made and not doc_text(first["reply"], proj):
         env2 = dict(env, DOCS_SUIT_LOG=str(tmp / "calls-2.jsonl"))
         out2, err2 = invoke(agent, FOLLOWUP, tmp, proj, env2, model, first["session"], keep=True)
         (tmp / "transcript-2.jsonl").write_text(out2, encoding="utf-8")
@@ -472,7 +495,7 @@ def expected(case):
     if expect == "skip":
         return "부르지 않음"
     if expect == "serve":
-        return f"serve --detach, 화면 {case['page']}"
+        return f"serve --detach, 화면 {case['page']}" + (f", 종류 {case['serve_kind']}" if case.get("serve_kind") else "")
     kinds =case["kind"] if isinstance(case["kind"], list) else [case["kind"]]
     parts = [" 또는 ".join(k or "종류 없음" for k in kinds)]
     if case.get("audience"):
@@ -482,6 +505,8 @@ def expected(case):
         parts.append(f"{case['chars']}자")
     if case.get("revise"):
         parts.append("다듬기")
+    if case.get("file"):
+        parts.append(f"{case['file']} 파일")
     return ", ".join(parts)
 
 

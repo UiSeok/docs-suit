@@ -86,6 +86,13 @@ CASES = [
             "제가 정류장 대기 시간을 주제로 조사를 하고 있는데, 데이터를 모으는 데 시간이 생각보다 오래 걸려서요, "
             "혹시 마감을 일주일 정도 연장해 주실 수 있을지 여쭙고 싶습니다. 바쁘신 와중에 죄송합니다. 감사합니다."},
 
+    # 문서 파일. 만든 파일을 check 에 넘기는지 보고, 파일에서 뽑은 글을 잰다
+    {"id": "make-pptx", "kind": "slides", "file": ".pptx",
+     "ask": "동아리 발표 자료를 pptx 파일로 만들어 줘. 정류장 대기 시간을 평일 아침 사흘 동안 쟀더니 평균 7분이었고, "
+            "출근 시간대가 가장 길었어. 5분 발표야."},
+    {"id": "make-docx", "kind": "work-report", "audience": "manager", "file": ".docx",
+     "ask": "팀장님께 올릴 주간 업무 보고를 워드 파일(docx)로 만들어 줘. 이번 주에는 로그인 오류를 고쳤고, 다음 주에는 알림 재시도를 붙여."},
+
     # 경계
     # 축사는 소리 내어 읽는 글이라 발표 원고로 골라도 맞다. 종류가 정말 없는 글은 손편지로 잰다.
     {"id": "toast", "kind": ["script", ""],
@@ -100,6 +107,8 @@ CASES = [
      "ask": "팀장님께 올릴 주간 업무 보고 써 줘. 이번 주에는 로그인 오류를 고쳤어."},
 
     # 화면. 사용자가 화면에서 고르겠다고 하면 에이전트가 serve --detach 로 띄워 준다
+    {"id": "screen-kind", "expect": "serve", "page": "index", "serve_kind": "work-report",
+     "ask": "업무 보고 말투를 카드 보면서 바꾸고 싶어. 화면 열어 줘."},
     {"id": "screen-theme", "expect": "serve", "page": "index",
      "ask": "docs-suit 테마를 카드 보면서 직접 고르고 싶어. 화면 열어 줘."},
     {"id": "screen-setup", "expect": "serve", "page": "create", "profile": False,
