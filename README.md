@@ -145,6 +145,10 @@ docs-suit 는 쓰기 전에 문서 종류와 읽는 사람, 말투에 맞춰 규
 git clone https://github.com/dodokim-lab/docs-suit.git && cd docs-suit && python3 suit.py bootstrap
 ```
 
+`bootstrap` 이 클래스와 쓰는 AI 도구, 캐릭터의 머리 모양을 묻고 고른 도구에 스킬을 깝니다. 끝나면 그 도구를 새로 열고 "업무 보고 써 줘" 처럼 평소대로 부탁하면 됩니다. 스킬이 규칙을 조립해 따르고, 다 쓴 글을 재서 캐릭터를 키웁니다.
+
+깐 스킬은 받은 폴더의 `suit.py` 를 부르니, 받은 폴더는 옮기거나 지우지 마세요.
+
 ## 쓰는 법
 
 클래스 고르기와 지침 조립, 검사, 문체 배우기, 캐릭터 키우기는 [GUIDE.md](GUIDE.md) 에 있습니다.

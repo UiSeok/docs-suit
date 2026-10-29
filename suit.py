@@ -1952,10 +1952,11 @@ def bootstrap_interactive(th):
     print("\n=== docs-suit 캐릭터 만들기 ===\n")
     print("1단계. 클래스(직업)를 고른다. 클래스가 기본 말투와 주력 문서를 정한다.\n")
     ids = list(th.classes)
+    wide = max(display_width(th.classes[cid]["label"]) for cid in ids) + 2
     for i, cid in enumerate(ids, 1):
         c = th.classes[cid]
         kinds = ", ".join(th.kinds[k]["label"] for k in c["kinds"])
-        print(f"  {i}. {c['label']:<10} {c['desc']}")
+        print(f"  {i}. {c['label']}{' ' * (wide - display_width(c['label']))}{c['desc']}")
         print(f"     주력 문서: {kinds}")
     cls = None
     while cls is None:
@@ -1965,12 +1966,17 @@ def bootstrap_interactive(th):
     print(f"\n→ {c['label']} 클래스를 골랐다.\n")
     preset = None
     order = preset_order(th, cls)
+    mine = [k for k in order if th.presets[k].get("class") == cls]
+    order = mine + [k for k in order if k not in mine]
     if order:
         print("다른 사람이 기여한 테마 조합으로 시작할 수 있다. Enter 면 클래스 기본값으로 시작한다.\n")
         for i, k in enumerate(order, 1):
             v = th.presets[k]
+            if mine and i == len(mine) + 1:
+                print("\n  다른 클래스의 조합")
             mark = " · 추천" if str(v.get("featured")) == "true" else ""
-            print(f"  {i}. {v.get('label', k)} · @{v.get('by', '')}{mark}\n     {v.get('desc', '')}")
+            owner = "" if k in mine else f" · {th.classes.get(v.get('class'), {}).get('label', v.get('class'))}"
+            print(f"  {i}. {v.get('label', k)}{owner} · @{v.get('by', '')}{mark}\n     {v.get('desc', '')}")
         picked = _pick_numbers(_ask("\n번호를 고른다: "), order)
         preset = picked[0] if picked else None
         print()
@@ -2052,6 +2058,7 @@ def cmd_bootstrap(a, th):
         if not sys.stdin.isatty():
             raise Missing("대화형 입력을 받을 수 없다. --class 와 --yes 로 진행한다")
         cls, persona, agents, hair, preset = bootstrap_interactive(th)
+        a.talk = True
     expand_agents(agents)
     if hair and hair not in (th.look.get("hair") or {}):
         raise Missing(f"모르는 머리 모양: {hair}. 고를 수 있는 것은 {', '.join(th.look.get('hair') or {})}")
@@ -2069,13 +2076,39 @@ def cmd_bootstrap(a, th):
     print(f"\n프로필을 저장했다: {write_profile(data, a.profile)}")
     if a.here:
         print(f"폴더 파일 {bind_folder(a.profile)} 이 슬롯 {a.profile} 을 쓴다. 이 폴더와 아래 폴더에서 이 캐릭터가 자란다")
+    written = []
     if agents:
         if not a.yes and _ask("고른 도구에 스킬을 설치할까? [Y/n] ", "y").lower() not in ("y", "yes", "ㅛ"):
             print("설치를 건너뛰었다. 나중에 `suit.py export --agent …` 로 설치한다.")
         else:
-            export(th, agents, profile=load_profile(name=a.profile))
-    print("\n이제 `python3 suit.py compose --kind <종류>` 로 지침을 조립한다. 종류는 `python3 suit.py list` 로 본다.")
+            written = export(th, agents, profile=load_profile(name=a.profile))
+    if not getattr(a, "talk", False):
+        print("\n이제 `python3 suit.py compose --kind <종류>` 로 지침을 조립한다. 종류는 `python3 suit.py list` 로 본다.")
+        return 0
+    print()
+    cmd_card(argparse.Namespace(profile=a.profile, json=False, color="auto"), th)
+    print("\n" + "\n".join(bootstrap_next(th, cls, agents, written)))
     return 0
+
+
+def bootstrap_next(th, cls, agents, written):
+    """터미널에서 캐릭터를 만든 사람에게 다음에 할 일을 고른 도구에 맞춰 알린다."""
+    ask = f"\"{th.kinds[th.classes[cls]['kinds'][0]]['label']} 써 줘\""
+    tools = {"claude": "Claude Code", "codex": "Codex", "antigravity": "Antigravity", "cursor": "Cursor", "grok": "Grok Build"}
+    picked = [tools[x] for x in agents if x in tools]
+    web = next((p for p in written if p.name == "prompt.md"), None)
+    out = ["다음에 할 일"]
+    if picked and written:
+        out.append(f"- {', '.join(picked)} 를 새로 열고 {ask} 처럼 평소대로 부탁한다. 스킬이 규칙을 조립하고, 다 쓴 글을 재서 캐릭터를 키운다.")
+    if web:
+        out.append(f"- 웹 채팅에는 {web} 의 내용을 대화 맨 앞에 붙여 넣고 {ask} 처럼 부탁한다.")
+    if not written:
+        out.append(f"- 스킬을 깔지 않았다. `python3 suit.py export --agent claude` 처럼 쓰는 도구에 깔거나, "
+                   f"`python3 suit.py compose --kind {th.classes[cls]['kinds'][0]}` 로 지침을 뽑아 AI 에 붙여 넣는다.")
+    out.append("- 캐릭터는 `python3 suit.py card` 로 다시 본다.")
+    if picked and written:
+        out.append("- 이 저장소 폴더는 옮기거나 지우지 않는다. 깐 스킬이 이 폴더의 suit.py 를 부른다.")
+    return out
 
 
 # ---------------------------------------------------------------- 명령
