@@ -113,7 +113,7 @@ docs-suit 는 쓰기 전에 문서 종류와 읽는 사람, 말투에 맞춰 규
 
 ## 빌려 온 것
 
-규칙과 본문 검사는 아래 자료에서 아이디어를 빌려 새로 썼고, 문구와 정규식은 옮기지 않았습니다. 파일째 넣은 것은 CSS 두 개뿐이고, 출처와 해시는 [themes/ko/PROVENANCE.md](themes/ko/PROVENANCE.md) 에 있습니다.
+규칙과 본문 검사는 아래 자료에서 아이디어를 빌려 새로 썼고, 문구와 정규식은 옮기지 않았습니다. 파일째 넣은 것은 CSS 두 개와 글꼴 하나뿐이고, 출처와 해시는 [themes/ko/PROVENANCE.md](themes/ko/PROVENANCE.md) 에 있습니다.
 
 | 자료 | 빌린 것 |
 |---|---|
@@ -125,8 +125,9 @@ docs-suit 는 쓰기 전에 문서 종류와 읽는 사람, 말투에 맞춰 규
 | [vale-ai-tells](https://github.com/krishnasunkam/vale-ai-tells) | 오류와 제안으로 나눈 두 층, 깨끗한 글에서 걸리지 않는지 재는 방식 |
 | [humanizer](https://github.com/blader/humanizer) | 패턴 분류와, 검출기를 피하려는 게 아니라 사람 독자를 위해 고친다는 목표 |
 | [new.css](https://github.com/xz/new.css), [sakura](https://github.com/oxalorg/sakura) | HTML 로 낼 때 입히는 CSS. 파일째 넣었고 각자의 MIT 라이선스를 따름 |
+| [Neo둥근모](https://github.com/neodgm/neodgm) | 웹 판 써 보기의 제목 띠와 이름표 글꼴. 파일째 넣었고 SIL OFL 1.1 을 따름 |
 | [Agent Skills](https://agentskills.io) | 에이전트에 스킬로 까는 공용 규격 |
-| 90년대 국산 2D 온라인 게임 | 1차부터 4차까지 전직하는 구조와 도트 그림의 느낌. 그림과 칭호는 새로 그림 |
+| 90년대 국산 2D 온라인 게임 | 1차부터 4차까지 전직하는 구조와 도트 그림, 웹 판 화면의 느낌. 그림과 칭호, 맵은 새로 그림 |
 
 ## 글을 쓸수록 캐릭터가 자랍니다
 

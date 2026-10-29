@@ -388,4 +388,4 @@ docs-suit 는 한국어 어법과 클래스, 문서 종류, 독자를 축으로 
 
 ## 라이선스
 
-MIT 입니다. `themes/ko/visual-doc/` 의 CSS 두 개는 각자의 MIT 라이선스를 따르고, 출처와 해시는 `themes/ko/PROVENANCE.md` 에 있습니다. 앞으로 할 일은 `ROADMAP.md` 에 있습니다.
+MIT 입니다. `themes/ko/visual-doc/` 의 CSS 두 개는 각자의 MIT 라이선스를, `docs/fonts/` 의 글꼴은 SIL OFL 1.1 을 따르고, 출처와 해시는 `themes/ko/PROVENANCE.md` 에 있습니다. 앞으로 할 일은 `ROADMAP.md` 에 있습니다.

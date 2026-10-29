@@ -1,0 +1,90 @@
+/* 웹 판 써 보기의 옛 온라인 게임 풍 모양. style.css 위에 얹고 body.retro 아래에서만 먹는다.
+   입체 테두리 창과 붉은 제목 띠, 머리 위 이름표로 분위기를 내고, 둥근모 글꼴은 제목 띠와 로고, 이름표에만 쓴다.
+   대사와 고르는 칸, 단추는 휴대폰에서 바로 읽히게 본문 글꼴로 둔다 */
+@font-face { font-family: NeoDunggeunmo; src: url("fonts/neodgm.woff2") format("woff2"); font-display: swap; }
+body.retro {
+  --px: NeoDunggeunmo, "Apple SD Gothic Neo", monospace;
+  --frame: #1a1410; --hi: #fff3d6; --lo: #8a6a42;
+  --panel: #f2e6c9; --ink: #2a1e12; --muted: #6b5638; --line: #8a6a42;
+  --bar1: #8c2f1f; --bar2: #6e2316; --bar-ink: #ffe3a1;
+  --gold: #f2b632; --accent: #1f6e5a; --accent-tint: #dcebd9; --chosen: #1f6e5a;
+  --field: #fffaea; --picked: #fff4c4; --portrait: #c9b78f;
+  --bg: #d9c7a0; --surface: var(--panel);
+  background: var(--bg) repeating-linear-gradient(0deg, transparent 0 3px, rgba(120, 90, 50, .06) 3px 4px);
+}
+@media (prefers-color-scheme: dark) {
+  body.retro {
+    --frame: #000; --hi: #6b5a40; --lo: #120d08;
+    --panel: #2a2119; --ink: #f0e3c2; --muted: #c2ad85; --line: #6b5a40;
+    --bar1: #6e2316; --bar2: #4e170e; --bar-ink: #ffd98a;
+    --accent: #8fd6b4; --accent-tint: #23352b; --chosen: #8fd6b4;
+    --field: #1b1510; --picked: #4a3a1c; --portrait: #4a3d2c;
+    --bg: #14100b;
+  }
+}
+body.retro main.try { padding-top: 0; }
+
+/* 창: 밝은 위·왼쪽, 어두운 아래·오른쪽 테두리에 검은 바깥 선 */
+body.retro .win, body.retro .opt, body.retro .pick, body.retro .go, body.retro .compare, body.retro textarea, body.retro dialog#confirm, body.retro .yn .btn {
+  border: 2px solid; border-color: var(--hi) var(--lo) var(--lo) var(--hi); border-radius: 0;
+  box-shadow: 0 0 0 2px var(--frame); background: var(--panel); color: var(--ink);
+}
+body.retro .win { margin: 0 2px 22px; padding: 0 12px 14px; }
+body.retro .win > h2 { margin: 0 -12px 12px; padding: 5px 10px 4px; font: 16px/1.4 var(--px); color: var(--bar-ink);
+  background: linear-gradient(var(--bar1) 0 50%, var(--bar2) 50%); border-bottom: 2px solid var(--frame); text-shadow: 1px 1px 0 #000; }
+body.retro .win > h2 .now { font: 13px var(--px); color: #f3d9a8; }
+
+/* 머리 맵: map.js 가 그린 타일 위에 고른 클래스의 다섯 단계가 이름표를 달고 선다 */
+.map { position: relative; height: 250px; margin: 0 -16px 18px; overflow: hidden; border-bottom: 2px solid var(--frame); background: #6aa84f; }
+#scene { position: absolute; left: 0; top: 0; image-rendering: pixelated; }
+body.retro .map h1 { position: relative; display: inline-flex; align-items: center; margin: 10px 0 0 14px; padding: 4px 10px 3px;
+  font: 24px/1.3 var(--px); color: #ffe3a1; background: linear-gradient(#8c2f1f 0 50%, #6e2316 50%);
+  border: 2px solid; border-color: #c46a4f #3a0f08 #3a0f08 #c46a4f; box-shadow: 0 0 0 2px #1a1410; text-shadow: 2px 2px 0 #000; }
+.map h1 .logo { width: 21px; height: 24px; margin-right: 8px; }
+.stage { position: absolute; left: 0; right: 0; bottom: 14px; display: flex; justify-content: center; align-items: flex-end; gap: 12px; }
+.stage figure { margin: 0; display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.stage canvas { image-rendering: pixelated; display: block; }
+.stage figcaption { order: -1; font: 12px var(--px); color: #fff; white-space: nowrap;
+  text-shadow: 1px 0 #000, -1px 0 #000, 0 1px #000, 0 -1px #000, 1px 1px #000, -1px -1px #000, 1px -1px #000, -1px 1px #000; }
+.stage figure:last-child figcaption { color: #ffe066; }
+
+/* 안내 창: 왼쪽 초상과 오른쪽 대사 */
+body.retro .npc .body { display: flex; gap: 12px; align-items: flex-start; }
+#npc { image-rendering: pixelated; flex: none; background: var(--portrait); border: 2px solid; border-color: var(--lo) var(--hi) var(--hi) var(--lo); padding: 2px; }
+body.retro .npc .lead { margin: 0; font-size: 16px; font-weight: 500; line-height: 1.75; position: relative; padding-bottom: 14px; flex: 1; }
+body.retro .npc .lead::after { content: "▼"; position: absolute; right: 0; bottom: -2px; font-size: 11px; color: var(--muted); animation: blink 1s steps(2) infinite; }
+@keyframes blink { 50% { opacity: 0; } }
+
+/* 1. 클래스 고르기 */
+.picks { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+body.retro .pick { font: inherit; cursor: pointer; margin: 2px; padding: 8px 0 6px; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.pick canvas { image-rendering: pixelated; display: block; }
+.pick b { font-size: 13px; line-height: 1.3; text-align: center; }
+body.retro .pick[aria-pressed="true"] { background: var(--picked); box-shadow: 0 0 0 2px var(--frame), 0 0 0 5px var(--gold); }
+.pick:focus-visible { outline: 2px solid var(--accent); outline-offset: 6px; }
+
+/* 2. 글 고르기 */
+body.retro .try .opts { gap: 12px; }
+body.retro .opt { margin: 2px; }
+body.retro .opt[aria-pressed="true"] { box-shadow: 0 0 0 2px var(--frame), 0 0 0 5px var(--gold); }
+body.retro .opt[aria-pressed="true"] b::before { content: "▶ "; color: var(--bar1); }
+
+/* 3. 요청: 안으로 들어간 칸 */
+body.retro textarea { border-color: var(--lo) var(--hi) var(--hi) var(--lo); background: var(--field); width: calc(100% - 4px); margin: 2px; }
+body.retro button.btn.link, body.retro details.fold > summary { color: var(--accent); }
+
+/* 4. 단추: 튀어나왔다가 누르면 들어간다 */
+body.retro .launch { gap: 10px; }
+body.retro .go { margin: 2px; padding: 12px 4px 10px; transition: none; }
+body.retro .go:active { border-color: var(--lo) var(--hi) var(--hi) var(--lo); transform: translate(1px, 1px); }
+body.retro .compare { margin: 16px 2px 10px; }
+
+/* 설치 권유 */
+body.retro .try .install { border-top: 2px solid; padding-top: 0; }
+body.retro .install h2::before { content: "★ "; color: var(--gold); }
+
+/* 확인 창 */
+body.retro dialog#confirm { padding: 16px; }
+body.retro dialog#confirm .q { font: 18px/1.4 var(--px); }
+body.retro dialog#confirm .yn .btn.primary { background: var(--bar1); color: var(--bar-ink); }
+@media (prefers-reduced-motion: reduce) { body.retro .npc .lead::after { animation: none; } }

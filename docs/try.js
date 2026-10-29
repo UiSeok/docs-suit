@@ -3,6 +3,7 @@
 // 클래스마다 끝에 두는 자유 형식은 종류 없이 조립해, 말투와 분량을 요청에 적은 대로 따르게 한다.
 // ChatGPT 와 Claude 는 주소의 q 로 입력창을 채운다. Gemini 는 긴 주소를 받지 않아 복사해 두고 연다.
 // 다른 사이트로 넘어가는 일이라 열기 전에 한 번 묻는다. 예를 누른 그 손짓 안에서 복사하고 새 창을 연다.
+// 클래스 칸에는 그 클래스의 4차 전직 모습을, 머리 맵에는 고른 클래스가 전직하는 다섯 단계를 그린다.
 (function () {
   "use strict";
   const $ = (id) => document.getElementById(id);
@@ -36,9 +37,26 @@
 
   function withRules() { return `${rules()}\n---\n\n위 지침을 이번 글의 규칙으로 따른다.\n\n${$("ask").value.trim()}\n`; }
 
+  function draw(canvas, grid, scale) {
+    canvas.width = grid[0].length * scale;
+    canvas.height = grid.length * scale;
+    const ctx = canvas.getContext("2d");
+    grid.forEach((row, y) => row.forEach((c, x) => {
+      if (!c) return;
+      ctx.fillStyle = c;
+      ctx.fillRect(x * scale, y * scale, scale, scale);
+    }));
+  }
+
+  function gridOf(cls, tier) { return C.lookGrid(C.lookOf({ profile: { class: cls } }, tier)); }
+
   function buildClasses() {
     $("classes").innerHTML = Object.keys(T.classes).map((c) =>
-      `<button type="button" class="chip" data-cls="${c}" aria-pressed="${c === state.cls}">${esc(T.classes[c].label)}</button>`).join("");
+      `<button type="button" class="pick" data-cls="${c}" aria-pressed="${c === state.cls}"><canvas></canvas><b>${esc(T.classes[c].label)}</b></button>`).join("");
+    $("classes").querySelectorAll("[data-cls]").forEach((b) => draw(b.querySelector("canvas"), gridOf(b.dataset.cls, 4), 3));
+    $("stage").innerHTML = [0, 1, 2, 3, 4].map((t) => `<figure><canvas></canvas><figcaption>${esc(C.titleOf(state.cls, t))}</figcaption></figure>`).join("");
+    $("stage").querySelectorAll("canvas").forEach((cv, t) => draw(cv, gridOf(state.cls, t), t === 4 ? 4 : 3));
+    draw($("npc"), gridOf(state.cls, 0), 3);
   }
 
   function buildTrials() {

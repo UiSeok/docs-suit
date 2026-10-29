@@ -6,12 +6,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>docs-suit · 써 보기</title>
 <!-- 링크를 붙였을 때 뜨는 미리보기 카드. 웹 판의 첫 주소는 index.html 이고 스크립트를 돌리지 않는 미리보기 수집기도 읽게 두 화면에 함께 둔다 -->
-<meta name="description" content="AI 가 쓴 티가 나지 않게 하는 지침을 붙여, 지금 쓰는 ChatGPT 나 Claude 로 바로 써 봅니다. 설치하지 않아도 됩니다.">
+<meta name="description" content="AI 가 쓴 티가 나지 않게 글을 작성해 볼까요? 지금 쓰는 ChatGPT 나 Claude 에서 바로 써 봐요. 설치는 필요 없어요!">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="docs-suit">
 <meta property="og:locale" content="ko_KR">
 <meta property="og:title" content="docs-suit · AI 가 쓴 티 없이 바로 써 보기">
-<meta property="og:description" content="AI 가 쓴 티가 나지 않게 하는 지침을 붙여, 지금 쓰는 ChatGPT 나 Claude 로 바로 써 봅니다. 설치하지 않아도 됩니다.">
+<meta property="og:description" content="AI 가 쓴 티가 나지 않게 글을 작성해 볼까요? 지금 쓰는 ChatGPT 나 Claude 에서 바로 써 봐요. 설치는 필요 없어요!">
 <meta property="og:url" content="https://dodokim-lab.github.io/docs-suit/">
 <meta property="og:image" content="https://dodokim-lab.github.io/docs-suit/readme/social-preview.png">
 <meta property="og:image:width" content="1280">
@@ -20,32 +20,38 @@
 <meta name="twitter:card" content="summary_large_image">
 <link rel="icon" href="favicon.svg?v=50cfe72599" type="image/svg+xml">
 <link rel="stylesheet" href="style.css?v=2f39be3485">
+<link rel="stylesheet" href="retro.css?v=be6e16cb3d">
 </head>
-<body>
+<body class="retro">
 <main class="try">
-  <header>
+  <header class="map">
+    <canvas id="scene" aria-hidden="true"></canvas>
     <h1><img class="logo" src="favicon.svg?v=50cfe72599" alt="" width="28" height="32">docs-suit</h1>
+    <div class="stage" id="stage" aria-hidden="true"></div>
   </header>
-  <p class="lead">AI 가 쓴 티가 나지 않게 하는 지침을 요청에 붙여, 지금 쓰는 ChatGPT 나 Claude 에서 바로 써 봅니다. 설치하지 않아도 됩니다.</p>
-
-  <section class="step">
-    <h2>1. 당신은 누구인가요?</h2>
-    <div class="chips" id="classes" role="group" aria-label="클래스"></div>
+  <section class="win npc">
+    <h2>안내</h2>
+    <div class="body"><canvas id="npc" aria-hidden="true"></canvas><p class="lead">AI 가 쓴 티가 나지 않게 글을 작성해 볼까요? 지금 쓰는 ChatGPT 나 Claude 에서 바로 써 봐요. 설치는 필요 없어요!</p></div>
   </section>
 
-  <section class="step">
+  <section class="step win">
+    <h2>1. 당신은 누구인가요?</h2>
+    <div class="picks" id="classes" role="group" aria-label="클래스"></div>
+  </section>
+
+  <section class="step win">
     <h2>2. 어떤 글을 쓰실 건가요?</h2>
     <div class="opts" id="trials" role="group" aria-label="문서 종류"></div>
   </section>
 
-  <section class="step">
+  <section class="step win">
     <h2>3. 어떤 이야기를 써 보실래요?</h2>
     <p class="note" id="askNote"></p>
     <textarea id="ask" class="ask" spellcheck="false" aria-label="AI 에 보낼 요청"></textarea>
     <div class="actions"><button type="button" class="btn link" id="reset">예시로 되돌리기</button></div>
   </section>
 
-  <section class="step">
+  <section class="step win">
     <h2>4. AI 로 바로 글 써 보기 <span class="now" id="picked"></span></h2>
     <div class="launch">
       <button type="button" class="go" data-ai="gpt"><svg class="logo-ai gpt" viewBox="0 0 24 24" aria-hidden="true"><path d="M22.2819 9.8211a5.9847 5.9847 0 0 0-.5157-4.9108 6.0462 6.0462 0 0 0-6.5098-2.9A6.0651 6.0651 0 0 0 4.9807 4.1818a5.9847 5.9847 0 0 0-3.9977 2.9 6.0462 6.0462 0 0 0 .7427 7.0966 5.98 5.98 0 0 0 .511 4.9107 6.051 6.051 0 0 0 6.5146 2.9001A5.9847 5.9847 0 0 0 13.2599 24a6.0557 6.0557 0 0 0 5.7718-4.2058 5.9894 5.9894 0 0 0 3.9977-2.9001 6.0557 6.0557 0 0 0-.7475-7.0729zm-9.022 12.6081a4.4755 4.4755 0 0 1-2.8764-1.0408l.1419-.0804 4.7783-2.7582a.7948.7948 0 0 0 .3927-.6813v-6.7369l2.02 1.1686a.071.071 0 0 1 .038.052v5.5826a4.504 4.504 0 0 1-4.4945 4.4944zm-9.6607-4.1254a4.4708 4.4708 0 0 1-.5346-3.0137l.142.0852 4.783 2.7582a.7712.7712 0 0 0 .7806 0l5.8428-3.3685v2.3324a.0804.0804 0 0 1-.0332.0615L9.74 19.9502a4.4992 4.4992 0 0 1-6.1408-1.6464zM2.3408 7.8956a4.485 4.485 0 0 1 2.3655-1.9728V11.6a.7664.7664 0 0 0 .3879.6765l5.8144 3.3543-2.0201 1.1685a.0757.0757 0 0 1-.071 0l-4.8303-2.7865A4.504 4.504 0 0 1 2.3408 7.872zm16.5963 3.8558L13.1038 8.364 15.1192 7.2a.0757.0757 0 0 1 .071 0l4.8303 2.7913a4.4944 4.4944 0 0 1-.6765 8.1042v-5.6772a.79.79 0 0 0-.407-.667zm2.0107-3.0231l-.142-.0852-4.7735-2.7818a.7759.7759 0 0 0-.7854 0L9.409 9.2297V6.8974a.0662.0662 0 0 1 .0284-.0615l4.8303-2.7866a4.4992 4.4992 0 0 1 6.6802 4.66zM8.3065 12.863l-2.02-1.1638a.0804.0804 0 0 1-.038-.0567V6.0742a4.4992 4.4992 0 0 1 7.3757-3.4537l-.142.0805L8.704 5.459a.7948.7948 0 0 0-.3927.6813zm1.0976-2.3654l2.602-1.4998 2.6069 1.4998v2.9994l-2.5974 1.4997-2.6067-1.4997Z"/></svg><span class="t">ChatGPT</span><span class="s">로 쓰기 <span aria-hidden="true">↗</span></span></button>
@@ -65,7 +71,7 @@
     </details>
   </section>
 
-  <section class="step install">
+  <section class="step win install">
     <h2>말투와 분량을 내게 맞추려면</h2>
     <p>여기서는 템플릿마다 정해 둔 기본값으로 쓰고, 자유 형식은 말투와 분량을 매번 요청에 적어야 합니다. PC 에 설치하면 읽는 사람과 말투, 분량을 한 번 정해 두고, 다 쓴 글을 같은 규칙으로 재고, 쓸수록 자라는 캐릭터를 키웁니다. Claude Code 와 Codex 같은 AI 도구에 스킬로 깔립니다.</p>
     <p><a href="https://github.com/dodokim-lab/docs-suit#빠른-시작" target="_blank" rel="noopener">설치 방법 보기</a></p>
@@ -81,6 +87,7 @@
 </dialog>
 <script src="local.js?v=9795dc0285"></script>
 <script src="core.js?v=228f293bc4"></script>
-<script src="try.js?v=01d7105e53"></script>
+<script src="try.js?v=e83a067fc9"></script>
+<script src="map.js?v=7eb47662d5"></script>
 </body>
 </html>
