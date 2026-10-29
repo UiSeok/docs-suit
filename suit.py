@@ -107,7 +107,7 @@ TEMPLATE = "template"
 TALK_KEEP = ("exposure", "markup", "visual-doc", "visual-deck")
 CONFIG_DEFAULT = "~/.config/docs-suit"  # 기본 슬롯은 profile.yaml, 이름 붙은 슬롯은 profiles/<이름>.yaml
 FOLDER_FILE = ".docs-suit.yaml"
-FOLDER_KEYS = ("profile", "defaults", "audiences", "kinds")
+FOLDER_KEYS = ("profile", "defaults", "audiences", "kinds", "words")
 PRESET_HEAD = ("# docs-suit 테마 조합. suit.py preset use <이름> 으로 내 슬롯에 입힌다.\n"
                "# 공개 저장소에 올라가므로 페르소나와 회사, 사람 이름은 넣지 않는다.")
 SLOT_RE = re.compile(r"^[\w-]+$")
@@ -445,6 +445,9 @@ def merge_folder(profile, folder):
                 both.setdefault(k, {}).update(v)
         if both:
             out[key] = both
+    words = {**(profile.get("words") or {}), **(folder.get("words") or {})}  # 용어집은 틀린 말: 바른 말 이다
+    if words:
+        out["words"] = words
     return out
 
 
@@ -617,14 +620,24 @@ def persona_section(th, cls, persona):
             "사용자가 넣으라고 하지 않는 한 본문에 옮겨 적지 않는다.\n\n" + "\n".join(rows))
 
 
-def rule_sections(th, kind, vals, chars=None, revise=False, voice=None):
+WORDS_HEAD = "이 폴더의 문서는 아래 표기를 따른다. 화살표 왼쪽 말을 쓰지 않고 오른쪽 말로 쓴다. 인용한 원문은 고치지 않는다."
+
+
+def words_section(words):
+    return WORDS_HEAD + "\n\n" + "\n".join(f"- {w} → {r}" for w, r in words.items())
+
+
+def rule_sections(th, kind, vals, chars=None, revise=False, voice=None, words=None):
     """compose 와 review 가 같이 쓰는 규칙 절. [(제목, 본문)] 이고, 앞에 나온 절이 이긴다.
-    voice 는 슬롯의 내 문체 문서다. 맨 끝에 실어 다른 규칙이 정하지 않은 곳만 채운다."""
+    voice 는 슬롯의 내 문체 문서다. 맨 끝에 실어 다른 규칙이 정하지 않은 곳만 채운다.
+    words 는 폴더 파일의 용어집이다. 팀이 정한 표기라 문서 종류 바로 뒤에 실어 축 규칙보다 앞세운다."""
     out = [("공통 바닥", _body(th.root / "base.md"))]
     if revise:
         out.append(("다듬기", _body(th.root / "revise.md")))
     if kind:
         out.append((f"문서 종류 · {th.kinds[kind]['label']}", _body(th.kind_path(kind))))
+    if words:
+        out.append(("표기 · 용어집", words_section(words)))
     talk = [axis for axis in COMPOSE_ORDER if vals[axis][0] is None]
     if talk:
         out.append(("대화로 정하기", f"정하지 않은 축: {', '.join(th.axes[ax]['label'] for ax in talk)}\n\n"
@@ -658,7 +671,8 @@ def compose(th, kind=None, audiences=None, sets=None, profile=None, cls=None, ch
     profile = profile or {}
     vals, auds, cls = resolve(th, kind, audiences, sets, profile, cls, warn, talk)
     kind_label, aud_label = _labels(th, kind, auds)
-    sections = [f"## {head}\n\n{body}" for head, body in rule_sections(th, kind, vals, chars, revise, voice)]
+    sections = [f"## {head}\n\n{body}" for head, body in rule_sections(th, kind, vals, chars, revise, voice,
+                                                                         profile.get("words"))]
     who = persona_section(th, cls, profile.get("persona"))
     parts = [
         f"# 글쓰기 테마 · {kind_label} · 독자 {aud_label}",
@@ -687,7 +701,8 @@ def review(th, kind=None, audiences=None, sets=None, profile=None, cls=None, cha
     vals, auds, _ = resolve(th, kind, audiences, sets, profile or {}, cls, warn, talk)
     kind_label, aud_label = _labels(th, kind, auds)
     parts = [f"# 검토 지침 · {kind_label} · 독자 {aud_label}", _body(th.root / "review.md")]
-    parts += [f"## 채점 기준 · {head}\n\n{body}" for head, body in rule_sections(th, kind, vals, chars, voice=voice)]
+    parts += [f"## 채점 기준 · {head}\n\n{body}"
+              for head, body in rule_sections(th, kind, vals, chars, voice=voice, words=(profile or {}).get("words"))]
     parts.append("## 원문\n\n" + (source.strip() if source and source.strip() else REVIEW_SOURCE))
     parts.append("## 검토할 글\n\n" + (doc.strip() if doc and doc.strip() else REVIEW_DOC))
     return "\n\n".join(parts) + "\n"
@@ -936,7 +951,8 @@ ENDING = (("polite", "합쇼체", ("니다", "니까", "십시오")), ("haeyo", 
 UNRESOLVED = re.compile(r"(?<!`)\[확인 필요|`\[확인 필요:\s*[^\]`…\s][^\]`]*\]`")
 CHECK_HINT = {"register": "{want} 로 맞춘다", "voice": {"bullet": "줄글을 목록으로 나눈다", "prose": "목록을 줄글로 푼다"},
               "length": "한도 안으로 줄인다", "emphasis": "굵은 글씨를 뺀다",
-              "markup": "마크다운 기호를 빼고 줄바꿈과 짧은 소제목으로 나눈다", "kind": "틀이 정한 절을 더한다"}
+              "markup": "마크다운 기호를 빼고 줄바꿈과 짧은 소제목으로 나눈다", "kind": "틀이 정한 절을 더한다",
+              "words": "용어집의 오른쪽 말로 바꾼다"}
 
 
 def body_lines(doc):
@@ -961,7 +977,7 @@ def endings(lines):
 
 
 # 축이 아닌 검사의 이름. 문장 규칙에 걸린 패턴은 `tells:<이름>` 으로 남기고 이름은 tells.yaml 에서 읽는다.
-CHECK_LABEL = {"markup": "출력 형식", "kind": "문서 종류의 틀", "tells": "문장 규칙"}
+CHECK_LABEL = {"markup": "출력 형식", "kind": "문서 종류의 틀", "tells": "문장 규칙", "words": "용어집"}
 QUOTED = re.compile(r'"[^"\n]*"|“[^”\n]*”|「[^」\n]*」|‘[^’\n]*’|\'[^\'\n]*\'|`[^`\n]*`')
 CONNECTIVE_COMMA = re.compile(r"(?:지만|면서|며|는데|아서|어서|라서|니까|므로|[하되있없았었였겠]고),")
 CHOPPY_SKIP = ("slides", "sns", "resume", "interview", "script")  # 원래 짧게 끊어 쓰는 종류
@@ -1012,6 +1028,10 @@ LATE_RISK = re.compile(r"면[ ,][^.\n]*(?:(?:되|뜨|돌|열리|켜지|시작되
                        r"|(?:지워|지웁|삭제)(?:져|집|돼|됩|해요|합니다|한다|된다|진다)")
 STEP_LONG = 60  # 절차문은 설명문보다 짧게 잰다. 설명문의 긴 문장 기준은 80자다
 STEP_KINDS = ("guide",)  # 번호 목록이 절차인 종류. 다른 종류의 번호 목록은 할 일이나 순위라 재지 않는다
+# 한 문서 안에서 섞어 쓰면 읽는 사람이 같은 날인지 다시 보게 되는 날짜 표기
+DATE_FORMS = (("YYYY-MM-DD", re.compile(r"(?<![\d-])20\d\d-\d{1,2}-\d{1,2}(?![\d-])")),
+              ("YYYY. MM. DD.", re.compile(r"(?<![\d.])20\d\d\. ?\d{1,2}\. ?\d{1,2}\.?(?!\d)")),
+              ("M월 D일", re.compile(r"(?<!\d)\d{1,2}월 \d{1,2}일")))
 
 
 def steps(doc):
@@ -1058,13 +1078,31 @@ def suggest_doc(th, doc, vals, kind=None):
         if long_steps:
             out.append(("step-long", "긴 단계", f"{STEP_LONG}자 넘는 문장이 든 단계 {len(long_steps)}/{len(items)}",
                         "단계 하나에 동작 하나만 쓴다"))
+    clean = plain_text(doc)
+    forms = [label for label, rx in DATE_FORMS if rx.search(clean)]
+    if len(forms) > 1:
+        out.append(("date-mix", "날짜 표기 섞임", ", ".join(forms), "한 문서 안에서는 날짜를 한 가지 꼴로 쓴다"))
     if kind not in CHOPPY_SKIP and any(all(len(s) <= 20 for s in r[i:i + 3]) for r in rows for i in range(len(r) - 2)):
         out.append(("choppy", "토막 문장", "20자 안쪽 문장이 세 개 이어짐", "같은 맥락은 연결어미로 잇는다"))
     return out
 
 
-def check_doc(doc, vals, chars, kind=None, th=None):
-    """[(검사, 맞았나, 잰 값)]. 잴 거리가 모자라면 그 검사는 빼고 낸다. th 를 주면 출력 형식과 틀, 문장 규칙도 잰다."""
+def words_found(doc, words):
+    """[(틀린 말, 횟수, 바른 말)]. 따옴표와 코드 안은 걷고 센다. 바른 말 안에 틀린 말이 든 경우는 바른 말을 먼저 걷는다."""
+    clean = plain_text(doc)
+    out = []
+    for wrong, right in (words or {}).items():
+        text = clean.replace(str(right), " ") if str(wrong) in str(right) else clean
+        tail = r"(?![A-Za-z0-9])" if re.search(r"[A-Za-z0-9]$", str(wrong)) else ""
+        n = len(re.findall(r"(?<![가-힣A-Za-z0-9])" + re.escape(str(wrong)) + tail, text))
+        if n:
+            out.append((wrong, n, right))
+    return out
+
+
+def check_doc(doc, vals, chars, kind=None, th=None, words=None):
+    """[(검사, 맞았나, 잰 값)]. 잴 거리가 모자라면 그 검사는 빼고 낸다. th 를 주면 출력 형식과 틀, 문장 규칙도 잰다.
+    words 는 폴더 파일의 용어집이다. 있으면 틀린 말이 남았는지 잰다."""
     out = []
     pick = lambda axis: (vals.get(axis) or (None,))[0]
     lines = body_lines(doc)
@@ -1096,6 +1134,9 @@ def check_doc(doc, vals, chars, kind=None, th=None):
     if kind in th.must:
         missing = [w for w in th.must[kind] if w not in doc]
         out.append(("kind", not missing, "빠짐: " + ", ".join(missing) if missing else "다 있음"))
+    if words:
+        found = words_found(doc, words)
+        out.append(("words", not found, ", ".join(f"{w} {n}곳 → {r}" for w, n, r in found) if found else "다 맞음"))
     errors = [(n, c, ex) for n, c, ex in tells_found(th, doc, vals, kind) if th.tells[n].get("layer") == "error"]
     out += [(f"tells:{n}", False, f"{c}곳 {ex}") for n, c, ex in errors] or [("tells", True, "걸린 것 없음")]
     return out
@@ -1146,7 +1187,8 @@ def learn_sample(th, name, text, is_doc):
         out["voice"] = "bullet" if ratio >= 0.5 else "prose" if ratio <= 0.25 else None
     hits = tells_found(th, text, {})
     out["secret"] = any(n == "secret" for n, _, _ in hits)
-    out["ai"] = [f"{th.tells[n]['label']} {c}곳" for n, c, _ in hits if n not in ("secret", "contact", "placeholder")]
+    out["ai"] = [f"{th.tells[n]['label']} {c}곳" for n, c, _ in hits
+                 if n not in ("secret", "contact", "placeholder") and str(th.tells[n].get("ai")) != "false"]
     flat = [x for r in sentences(text) for x in r]
     if len(flat) >= 5:
         k = sum(1 for x in flat if CONNECTIVE_COMMA.search(x))
@@ -1470,7 +1512,44 @@ def growth_line(th, before, after, key, kind, cls=None):
     return f"성장: {head} · {lv} · {left}"
 
 
-def record_check(th, name, src, text, kind, checks, left, warn=lambda m: None):
+RECHECK_MINUTES = 60  # 표준 입력으로 받은 본문은 경로가 없어, 이 시간 안에 같은 종류를 검사한 기록을 고친 판으로 본다
+
+
+def last_check(name, src, text, kind, warn=lambda m: None):
+    """(지난 기록, 찾은 방법) 또는 None. 파일은 같은 경로의 기록을 찾고, 표준 입력은 같은 종류의 바로 앞 검사를 찾는다."""
+    slot_data = read_slot(profile_path(name), warn)
+    if not growth_on(slot_data):
+        return None
+    entries = class_growth(growth_path(name), slot_data, warn)
+    if src != "-":
+        key = doc_key(src, text)
+        same = [e for e in entries if e["doc"] == key]
+        return (same[-1], "file") if same else None
+    if not entries or entries[-1].get("kind") != kind:
+        return None
+    try:
+        gap = (datetime.now() - datetime.fromisoformat(str(entries[-1].get("at")))).total_seconds() / 60
+    except ValueError:
+        return None
+    if entries[-1]["doc"] == doc_key(src, text):
+        return entries[-1], "same"
+    return (entries[-1], f"{int(gap)}분 전") if 0 <= gap <= RECHECK_MINUTES else None
+
+
+def compare_line(prev, how, checks, hints, left):
+    """지난 검사와 견준 한 줄. 지난 기록에 △ 개수가 없으면 △ 는 빼고 견준다."""
+    before = sum(1 for ok in (prev.get("checks") or {}).values() if not ok)
+    now = sum(1 for _, ok, _ in checks if not ok)
+    parts = [f"✗ {before} → {now}"]
+    if "hints" in prev:
+        parts.append(f"△ {prev['hints']} → {hints}")
+    if prev.get("unresolved") or left:
+        parts.append(f"[확인 필요] {prev.get('unresolved') or 0} → {left}")
+    where = {"file": "같은 파일의 지난 검사", "same": "같은 본문의 지난 검사"}.get(how, f"같은 종류의 바로 앞 검사({how})")
+    return f"· {where}와 견줌: " + ", ".join(parts)
+
+
+def record_check(th, name, src, text, kind, checks, left, warn=lambda m: None, hints=0):
     """캐릭터 키우기가 켜져 있으면 기록 한 줄을 남기고 성장 줄을 돌려준다. 꺼져 있거나 슬롯이 없으면 None."""
     slot_data = read_slot(profile_path(name), warn)
     if not growth_on(slot_data):
@@ -1479,7 +1558,7 @@ def record_check(th, name, src, text, kind, checks, left, warn=lambda m: None):
     entries = class_growth(path, slot_data, warn)
     entry = {"v": 1, "at": datetime.now().isoformat(timespec="minutes"), "doc": doc_key(src, text), "kind": kind,
              "class": slot_class(slot_data),
-             "checks": {axis: ok for axis, ok, _ in checks}, "unresolved": left,
+             "checks": {axis: ok for axis, ok, _ in checks}, "hints": hints, "unresolved": left,
              "chars": len("\n".join(body_lines(text)))}
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "a", encoding="utf-8") as f:
@@ -1886,6 +1965,7 @@ description: 문서를 쓰거나 다듬거나 검토할 때 docs-suit 테마를 
    - 계속 쓰고 싶어 하거나, 처음부터 "앞으로 이렇게 써 줘" 라고 하면 `{run} set <축> <값>` 으로 이 캐릭터의 프로필에 남긴다. 프로필에 남긴 값은 이 캐릭터를 쓰는 모든 폴더에서 먹는다. 이런 선호는 AGENTS.md 나 CLAUDE.md 같은 에이전트 지침 파일에 적지 않는다. 그 파일에 적으면 docs-suit 가 조립하는 값과 따로 놀아 축 값과 부딪친다.
    - "팀장님께 쓰는 글" 처럼 읽는 사람을 말했으면 `--audience <독자>` 를, "업무 보고는" 처럼 문서 종류를 말했으면 `--kind <종류>` 를 붙인다. 문서 종류가 권하는 값은 기본값을 이기지만 `--audience` 와 `--kind` 로 남긴 값에는 진다.
    - 사용자가 이 폴더에서만 그렇게 쓰겠다고 말했을 때만 `--here` 를 붙여 폴더 파일 `.docs-suit.yaml` 에 남긴다. 폴더를 말하지 않았으면 `--here` 없이 프로필에 남긴다.
+   - "이 폴더에서는 어플 말고 앱으로 써" 처럼 낱말의 표기를 정하면 `{run} word <틀린 말> <바른 말>` 로 폴더 파일의 용어집에 남긴다. 용어집은 그 폴더와 아래 폴더의 문서에 먹고, compose 가 지침에 싣고 check 가 남은 틀린 말을 잡는다. 지울 때는 `{run} word <틀린 말> --unset` 이다.
    - 종류 없는 글은 프로필 값을 쓰지 않으니, 그런 글에서 잡은 말투는 그 대화에서만 지키고, 남겨 달라고 하면 종류가 있는 글에만 먹는다고 알려 준다.
    - 견줘 보인 답의 끝에 카드로 보며 고르고 싶으면 대시보드를 열어 주겠다고 한 줄 붙인다. 사용자가 그러겠다고 하면 지금 문서의 compose 인자를 붙여 `{run} serve --detach --page theme --kind <종류> [--audience …] [--set …]` 로 대시보드의 테마 설정 탭을 띄우고 주소를 알려 준다. 탭은 그 문서 종류로 열린다.
    - 사용자가 화면에서 "이번 문서에만" 을 누르고 골랐다고 하면 `{run} picked` 가 내는 인자로 다시 조립해 그 문서를 고쳐 쓴다. "이 종류에 저장" 을 눌렀으면 슬롯의 종류별 값에 남았으니 같은 인자로 다시 조립하면 된다.
@@ -2306,6 +2386,36 @@ def cmd_set(a, th):
     return 0
 
 
+WORD_BAD = re.compile(r"[:#\[\]{},\"'\n]")
+
+
+def cmd_word(a, th):
+    """폴더 파일의 용어집. 표기는 팀과 프로젝트를 따르므로 슬롯이 아니라 지금 폴더의 폴더 파일에만 쓴다."""
+    if a.wrong is None:
+        words = folder_settings(warn=warn_stderr)[0].get("words") or {}
+        print("\n".join(f"- {w} → {r}" for w, r in words.items()) if words else "용어집이 없다. 이 폴더의 표기는 word <틀린 말> <바른 말> 로 남긴다")
+        return 0
+    for w in (a.wrong, a.right):
+        if w is not None and (not w.strip() or WORD_BAD.search(w) or len(w) > 40):
+            raise Missing(f"용어는 40자 안으로 쓰고 : # [ ] {{ }} , 따옴표를 넣지 않는다: {w}")
+    if a.unset == (a.right is not None):
+        raise Missing("바른 말을 주거나 --unset 중 하나만 쓴다")
+    path = Path.cwd() / FOLDER_FILE
+    data = read_folder(path, warn_stderr)
+    words = dict(data.get("words") or {})
+    if a.unset:
+        if words.pop(a.wrong.strip(), None) is None:
+            raise Missing(f"이 폴더의 용어집에 {a.wrong} 가 없다")
+    else:
+        words[a.wrong.strip()] = a.right.strip()
+    data.pop("words", None)
+    if words:
+        data["words"] = words
+    p = write_folder(data)
+    print(f"폴더 파일 {p} 의 용어집에 " + (f"{a.wrong} (지움)" if a.unset else f"{a.wrong} → {a.right}"))
+    return 0
+
+
 def cmd_export(a, th):
     agents = [x.strip() for x in a.agent.split(",") if x.strip()]
     export(th, agents, a.dest, a.dry_run, load_profile(warn_stderr, a.profile), voice=voice_text(a.profile))
@@ -2321,19 +2431,22 @@ def cmd_check(a, th):
         print("오류: 본문이 비어 있다. 파일 경로를 주거나, - 를 쓰고 본문 전체를 heredoc 으로 넘긴다: "
               "check - --kind <종류> <<'EOF' … EOF", file=sys.stderr)
         return 1
-    vals, auds, _ = resolve(th, a.kind, _auds(a.audience), _sets(a.set), load_profile(warn_stderr, a.profile), a.cls,
-                            warn_stderr, talk=True)
+    profile = load_profile(warn_stderr, a.profile)
+    vals, auds, _ = resolve(th, a.kind, _auds(a.audience), _sets(a.set), profile, a.cls, warn_stderr, talk=True)
     if docfile:
         # 문서 파일은 마크다운 기호가 새어 나올 일이 없어 출력 형식을 재지 않는다
         vals = {k: v for k, v in vals.items() if k != "markup"}
-    checks = check_doc(text, vals, a.chars, a.kind, th)
+    checks = check_doc(text, vals, a.chars, a.kind, th, profile.get("words"))
     hints = suggest_doc(th, text, vals, a.kind)
     left = len(UNRESOLVED.findall(text))
-    line = None if a.no_record else record_check(th, a.profile, a.file, text, a.kind, checks, left, warn_stderr)
+    prev = last_check(a.profile, a.file, text, a.kind, warn_stderr)
+    versus = compare_line(prev[0], prev[1], checks, len(hints), left) if prev else None
+    line = None if a.no_record else record_check(th, a.profile, a.file, text, a.kind, checks, left, warn_stderr,
+                                                 len(hints))
     if a.json:
         print(json.dumps({"checks": [{"axis": ax, "ok": ok, "got": got} for ax, ok, got in checks],
                           "suggest": [{"name": n, "label": lab, "got": got, "hint": h} for n, lab, got, h in hints],
-                          "unresolved": left, "growth": line}, ensure_ascii=False, indent=1))
+                          "unresolved": left, "previous": versus, "growth": line}, ensure_ascii=False, indent=1))
         return 0
     kind_label = th.kinds[a.kind]["label"] if a.kind else "일반 글"
     print(f"검사 · {kind_label} · 독자 {', '.join(th.audiences[x]['label'] for x in auds) or '정하지 않음'}")
@@ -2347,6 +2460,8 @@ def cmd_check(a, th):
         print("· 잴 거리가 없다")
     if left:
         print(f"· [확인 필요] {left}곳이 남았다")
+    if versus:
+        print(versus)
     if line:
         print(line)
     return 0
@@ -3503,6 +3618,30 @@ def selftest(th):
               "check 가 틀린 축에 붙일 안내를 만들지 못한다")
         got = {k: ok for k, ok, _ in check_doc("원인은 셋이다.\n", neutral, None, None, th)}
         check(got.get("tells:count") is False and "tells" not in got, f"문장 규칙에 걸린 것을 따로 남기지 않는다: {got}")
+        found = {n for n, _, _ in tells_found(th, "일이 잘 됬다. 몇일 걸린다. 내일 할께요. 할수 있다. 갈때 본다.\n"
+                                                  "회의를 통해 정했다. 일정을 정함에 있어서 늦었다. 방법을 통해 줄였다. 슬롯에 있어서 바뀐다.\n", neutral)}
+        check({"spelling", "spacing", "translated"} <= found, f"맞춤법, 띄어쓰기, 번역투를 놓친다: {sorted(found)}")
+        found = {n for n, _, _ in tells_found(th, "하지 않되 줄인다. 되도록 빨리 한다. 선생님께 드린다. 할 수 있다.\n"
+                                                  "![](a.png)\n", neutral)}
+        check(not {"spelling", "spacing"} & found and "alt" in found, f"바른 말을 맞춤법으로 잡거나 공개 글의 그림 설명을 놓친다: {sorted(found)}")
+        team = resolve(th, audiences=["teammate"])[0]
+        check("alt" not in {n for n, _, _ in tells_found(th, "![](a.png)\n", team)}, "팀 내부 글의 그림 설명을 잰다")
+        tips = {n for n, *_ in suggest_doc(th, "마감은 2026-10-29 이다. 발표는 11월 3일 이다.\n", neutral)}
+        check("date-mix" in tips, f"섞어 쓴 날짜 표기를 잡지 못한다: {sorted(tips)}")
+        tips = {n for n, *_ in suggest_doc(th, "마감은 2026-10-29 이고 발표는 2026-11-03 이다. 버전은 1.2.3 이다.\n", neutral)}
+        check("date-mix" not in tips, f"한 가지 날짜 표기를 섞였다고 본다: {sorted(tips)}")
+        check(not learn_sample(th, "a", "일이 잘 됬다. 몇일 걸린다. 할수 있다. 갈때 본다.\n", False)["ai"],
+              "맞춤법처럼 사람 글에 흔한 패턴을 AI 글의 표지로 센다")
+        words = {"어플": "앱", "서버": "서버리스"}
+        got = dict((k, (ok, v)) for k, ok, v in check_doc("어플을 연다. 앱도 연다. 서버리스로 바꾼다. 웹어플은 둔다. `어플`\n",
+                                                           neutral, None, None, th, words))
+        check(got.get("words") == (False, "어플 1곳 → 앱"), f"용어집의 틀린 말을 다르게 센다: {got.get('words')}")
+        text, _ = compose(th, kind="email", profile={"words": {"어플": "앱"}})
+        check("## 표기 · 용어집" in text and "- 어플 → 앱" in text
+              and text.index("## 표기 · 용어집") < text.index("## 어법"), "compose 가 용어집을 문서 종류 바로 뒤에 싣지 않는다")
+        check("- 어플 → 앱" in review(th, kind="email", profile={"words": {"어플": "앱"}}), "검토 지침에 용어집이 없다")
+        check(merge_folder({"words": {"a": "b"}}, {"words": {"c": "d", "a": "e"}})["words"] == {"a": "e", "c": "d"},
+              "폴더 파일의 용어집을 겹치지 못한다")
     rules = argparse.Namespace(growth={
         "exp": {k: {"points": p, "label": k} for k, p in (("done", "10"), ("clean", "10"), ("resolved", "5"), ("new-kind", "20"))},
         "limit": {"daily-kind": "2"}, "level": {"1": "50", "2": "75"}, "max": "4",
@@ -3691,10 +3830,16 @@ def selftest(th):
             check(grow == Path(td) / "profile.growth.jsonl" and len(read_growth(grow)) == 2,
                   "환경 변수로 정한 프로필 옆에 성장 기록이 남지 않는다")
             entry = read_growth(grow)[0]
-            check(set(entry) == {"v", "at", "doc", "kind", "class", "checks", "unresolved", "chars"}
+            check(set(entry) == {"v", "at", "doc", "kind", "class", "checks", "hints", "unresolved", "chars"}
                   and entry["class"] == "developer" and str(td) not in json.dumps(entry),
                   f"성장 기록에 본문이나 경로가 남는다: {entry}")
             check(growth_state(th, read_growth(grow))["docs"] == 1, "같은 파일을 다시 검사했는데 문서가 두 건으로 셌다")
+            prev = last_check(None, str(doc), doc.read_text(encoding="utf-8"), "pr")
+            check(prev and prev[1] == "file" and "✗ 0 → 1" in compare_line(prev[0], prev[1], [("tells", False, "")], 1, 0),
+                  "같은 파일의 지난 검사를 찾아 견주지 못한다")
+            prev = last_check(None, "-", "고친 본문이다.", "pr")
+            check(prev and prev[1].endswith("분 전") and last_check(None, "-", "메일이다.", "email") is None,
+                  "표준 입력 본문을 같은 종류의 바로 앞 검사와 견주지 못하거나 다른 종류와 견준다")
             empty = Path(td) / "empty.md"
             empty.write_text("\n", encoding="utf-8")
             code = quiet(cmd_check, argparse.Namespace(**{**vars(ns), "file": str(empty)}), th)
@@ -3779,6 +3924,21 @@ def selftest(th):
                 quiet(cmd_bootstrap, here, th)
             finally:
                 os.chdir(cwd_was)
+            try:
+                os.chdir(fresh)
+                quiet(cmd_word, argparse.Namespace(wrong="어플", right="앱", unset=False), th)
+                quiet(cmd_word, argparse.Namespace(wrong="로그 인", right="로그인", unset=False), th)
+                quiet(cmd_word, argparse.Namespace(wrong="로그 인", right=None, unset=True), th)
+                try:
+                    quiet(cmd_word, argparse.Namespace(wrong="a:b", right="c", unset=False), th)
+                    problems.append("용어집이 YAML 을 깨는 낱말을 받았다")
+                except Missing:
+                    pass
+            finally:
+                os.chdir(cwd_was)
+            check(read_folder(fresh / FOLDER_FILE).get("words") == {"어플": "앱"}
+                  and load_profile(start=fresh).get("words") == {"어플": "앱"},
+                  "word 가 폴더 파일의 용어집에 남기거나 지우지 못한다")
             check(read_folder(fresh / FOLDER_FILE).get("profile") == "내-프로젝트-2"
                   and profile_source(start=fresh)[1:4:2] == ("내-프로젝트-2", "folder")
                   and read_slot(slot_path("내-프로젝트-2")).get("profile", {}).get("class") == "student",
@@ -4092,6 +4252,10 @@ def main(argv=None):
     s.add_argument("--audience", help="이 독자에게 쓰는 글에만 쓴다")
     s.add_argument("--kind", help="이 문서 종류에만 쓴다. 문서 종류가 권하는 값을 이긴다")
     s.add_argument("--here", action="store_true", help="슬롯 대신 지금 폴더의 .docs-suit.yaml 에 쓴다")
+    w = sub.add_parser("word", help="지금 폴더의 용어집에 틀린 말과 바른 말을 남긴다. 인자 없이 부르면 용어집을 보인다")
+    w.add_argument("wrong", nargs="?")
+    w.add_argument("right", nargs="?")
+    w.add_argument("--unset", action="store_true")
     e = sub.add_parser("export", parents=[slot])
     e.add_argument("--agent", required=True, help="claude, agents, codex, antigravity, cursor, grok, web, all")
     e.add_argument("--dest", help="에이전트별 하위 폴더로 이 폴더 아래에 쓴다. 시험용")
@@ -4180,7 +4344,7 @@ def main(argv=None):
         if a.cmd == "selftest":
             return selftest(th)
         return {"bootstrap": cmd_bootstrap, "profile": cmd_profile, "list": cmd_list, "get": cmd_get,
-                "compose": cmd_compose, "set": cmd_set, "export": cmd_export, "check": cmd_check, "review": cmd_review,
+                "compose": cmd_compose, "set": cmd_set, "word": cmd_word, "export": cmd_export, "check": cmd_check, "review": cmd_review,
                 "card": cmd_card, "learn": cmd_learn, "voice": cmd_voice,
                 "look": cmd_look, "preset": cmd_preset, "promote": cmd_promote, "growth": cmd_growth, "status": cmd_status, "widget": cmd_widget, "serve": cmd_serve, "picked": cmd_picked,
                 "bundle": cmd_bundle}[a.cmd](a, th)
