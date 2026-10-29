@@ -204,6 +204,10 @@ main.try { max-width: 760px; }
 .go { display: flex; flex-direction: column; align-items: center; gap: 2px; font: inherit; padding: 14px 6px;
   border: 1px solid var(--line); border-radius: 12px; background: var(--surface); color: var(--ink); cursor: pointer;
   box-shadow: 0 2px 0 var(--line); transition: transform .08s, box-shadow .08s; }
+/* 로고는 simple-icons(CC0)의 그림을 그대로 넣었다. ChatGPT 는 글자 색을 따라 어두운 화면에서도 보이게 한다 */
+.go .logo-ai { width: 30px; height: 30px; margin-bottom: 6px; fill: currentColor; }
+.go .logo-ai.claude { fill: #d97757; }
+.go .logo-ai.gemini { fill: #8e75b2; }
 .go .t { font-size: 16px; font-weight: 700; }
 .go .s { font-size: 12.5px; color: var(--accent); font-weight: 600; }
 .go:hover { border-color: var(--accent); }

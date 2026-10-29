@@ -11,6 +11,8 @@
 
 `visual-doc/print/theme.css` 는 받아 온 파일이 아니라 이 저장소에서 새로 썼고, 저장소의 라이선스를 따른다.
 
+웹 판 써 보기(`docs/try.html`)의 ChatGPT, Claude, Gemini 로고는 simple-icons 15.0.0 의 `openai.svg`, `claude.svg`, `googlegemini.svg` 에서 그림 경로만 옮겼다. 원본은 https://cdn.jsdelivr.net/npm/simple-icons@15.0.0/icons/ 아래에 있다. 그림 데이터는 CC0-1.0 이고 로고의 상표권은 각 회사에 있으며, 그 서비스를 여는 단추에만 쓴다.
+
 ## 본문 검사와 문장 규칙의 출처
 
 `tells.yaml` 의 패턴과 `base.md` 의 문장 규칙, 상투 표현 규칙은 아래 공개 자료에서 아이디어를 빌려 새로 썼다. 문구와 정규식은 옮기지 않았다. 외부 자료끼리 판정이 엇갈리거나 사람 글에도 흔하다고 잰 표현은 `error` 에 넣지 않았다.
