@@ -74,6 +74,8 @@ CASES = [
     # 사내 위키에 올릴 글이라 가이드·README·위키로 골라도 맞다. 재는 것은 공개 범위다.
     {"id": "set-exposure", "kind": ["blog", "guide"], "want": {"exposure": "team"},
      "ask": "사내 위키에만 올릴 기술 글 써 줘. 밖에는 공개하지 않아. 주제는 로그 수집 파이프라인을 정리한 이야기야."},
+    {"id": "set-voice-gov", "kind": "work-report", "audience": "manager", "want": {"voice": "gov"},
+     "ask": "한글 파일 보고서에 붙일 거라 □ ○ 기호 쓰는 공문서식 개조식으로 팀장님께 업무 보고 써 줘. 결제 오류를 고쳤고 재발 방지 모니터링을 붙이는 중이야."},
     {"id": "set-markup", "kind": "notice", "want": {"markup": "plain"},
      "ask": "동아리 단톡방에 올릴 공지 써 줘. 다음 주 모임 장소가 정류장 앞 카페로 바뀌어. 단톡방이라 마크다운 기호는 그대로 보여."},
     {"id": "audience-stakeholder", "kind": "report", "audience": "stakeholder",
@@ -126,6 +128,9 @@ CASES = [
      "ask": "docs-suit 캐릭터 꾸미고 싶어."},
     {"id": "growth-log", "expect": "call", "call": "growth", "args": ["log"],
      "ask": "docs-suit 성장 기록 보여 줘. 어떤 문서로 경험치를 받았는지 궁금해."},
+    # 팀이 정한 표기는 폴더 용어집에 남긴다
+    {"id": "word", "expect": "call", "call": "word", "args": ["어플", "앱"],
+     "ask": "이 폴더에서 쓰는 문서는 앞으로 '어플' 말고 '앱'으로 써 줘. 팀 표기 규칙이야."},
 ]
 
 # 여러 턴 흐름. 턴마다 같은 세션을 이어 가고, 끝난 뒤 프로필과 폴더 파일에 남은 값을 본다.
