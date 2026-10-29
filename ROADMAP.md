@@ -52,6 +52,8 @@
 
 - **웹 채팅만 쓰는 사람의 성장.** 붙여 넣은 본문을 웹에서 검사하고 브라우저에 기록한다. `check_doc` 을 `core.js` 로 옮겨야 한다.
 - **화면 위에 떠 있는 위젯.** Document Picture-in-Picture 로 웹 고르개가 항상 위에 뜨는 작은 창을 연다. Chrome 과 Edge, Firefox 에서 되고 Safari 와 모바일에서는 안 된다. 브라우저 확장과 에디터 플러그인도 후보다.
+- **그림 값 archify.** 그림 축에 `archify` 값을 더한다. 발표 자료와 블로그에 넣을 구성도를 공개 스킬 archify(https://github.com/tt-a1i/archify)로 그리고, 스킬이 없거나 Node 18 이상이 없으면 mermaid 로 그린다. 웹 판은 렌더러를 돌릴 수 없으므로 mermaid 로 바꿔 조립한다. 스킬은 저장소에 넣지 않고 있으면 쓴다고만 적으므로, 규칙 문서 한 장과 `axes.yaml` 한 줄이면 된다.
+- **그림 값 draw.io.** 위키와 설계 문서처럼 나중에 다른 사람이 고칠 그림은 `.drawio` 원본을 함께 남긴다. 에이전트가 노드 좌표를 적은 명세를 쓰면 렌더러가 `.drawio` 와 PNG 를 만들고, 노드 겹침과 노드를 지나는 간선, 넘친 라벨을 재서 걸리면 좌표를 고쳐 다시 그리게 한다. 다른 곳에서 자동 배치 엔진으로 펴 보니 한 줄로 길게 늘어지고 순환 간선이 크게 돌아 손 좌표에 못 미쳤으므로, 좌표는 그리는 쪽이 정한다. Chrome 과 draw.io 뷰어가 필요한 선택 기능이고 렌더러를 새로 써야 해서, archify 다음에 따로 설계한다.
 - **다른 에이전트 검증.** 검증 대상은 Claude Code, Codex CLI, Antigravity CLI 세 가지로 정했다. Cursor 와 Grok Build 는 필요할 때 `tests/agent/run.py` 에 붙여 확인하고 `AGENT_TARGETS` 의 `checked` 를 갱신한다.
 
 ## 아이디어
