@@ -9,6 +9,8 @@
 | `visual-doc/sakura/theme.css` | https://cdn.jsdelivr.net/npm/sakura.css@1.5.0/css/sakura.css | 1.5.0 | MIT | c997043b8e58936644e2bd47acb561c2f997a1167daf5706ab6ad2ca4fe9629c |
 | `visual-doc/sakura/LICENSE` | https://cdn.jsdelivr.net/npm/sakura.css@1.5.0/LICENSE.txt | 1.5.0 | MIT | 2b225c797073b287572ceefd27af71cf209d413c90938ddc87b5cb58b8e69209 |
 
+`visual-doc/print/theme.css` 는 받아 온 파일이 아니라 이 저장소에서 새로 썼고, 저장소의 라이선스를 따른다.
+
 ## 본문 검사와 문장 규칙의 출처
 
 `tells.yaml` 의 패턴과 `base.md` 의 문장 규칙, 상투 표현 규칙은 아래 공개 자료에서 아이디어를 빌려 새로 썼다. 문구와 정규식은 옮기지 않았다. 외부 자료끼리 판정이 엇갈리거나 사람 글에도 흔하다고 잰 표현은 `error` 에 넣지 않았다.

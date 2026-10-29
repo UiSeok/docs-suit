@@ -7,6 +7,7 @@ visual-doc:
   label: 디자인 · 문서
   sakura: Sakura
   newcss: new.css
+  print: A4 인쇄
 
 visual-deck:
   label: 디자인 · 발표
@@ -18,6 +19,7 @@ voice:
   label: 문체
   prose: 줄글
   bullet: 개조식
+  gov: 공문서식 개조식 (□ ○ -)
 
 register:
   label: 어법

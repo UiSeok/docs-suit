@@ -949,10 +949,16 @@ ENDING = (("polite", "합쇼체", ("니다", "니까", "십시오")), ("haeyo", 
           ("plain", "평어체", ("다", "까", "라")))
 # 백틱 안의 `[확인 필요]` 는 표시 방식을 설명한 말일 수 있어 빼되, 내용이 든 `[확인 필요: 영향 범위]` 는 표시로 센다.
 UNRESOLVED = re.compile(r"(?<!`)\[확인 필요|`\[확인 필요:\s*[^\]`…\s][^\]`]*\]`")
-CHECK_HINT = {"register": "{want} 로 맞춘다", "voice": {"bullet": "줄글을 목록으로 나눈다", "prose": "목록을 줄글로 푼다"},
+CHECK_HINT = {"register": "{want} 로 맞춘다",
+              "voice": {"bullet": "줄글을 목록으로 나눈다", "prose": "목록을 줄글로 푼다", "gov": "줄글을 □ ○ - 기호 항목으로 나눈다"},
               "length": "한도 안으로 줄인다", "emphasis": "굵은 글씨를 뺀다",
               "markup": "마크다운 기호를 빼고 줄바꿈과 짧은 소제목으로 나눈다", "kind": "틀이 정한 절을 더한다",
               "words": "용어집의 오른쪽 말로 바꾼다"}
+
+
+# 목록 줄의 머리. 마크다운 목록과 번호 목록에 공문서식 개조식의 □ ○ ※ 기호를 더한다.
+LIST_MARK = r"(?:[-*+]|\d+[.)]|[□○◦※■●▪])\s"
+GOV_MARK = re.compile(r"\s*[□○◦※■●▪]\s")
 
 
 def body_lines(doc):
@@ -963,7 +969,7 @@ def body_lines(doc):
 def endings(lines):
     count = {k: 0 for k, _, _ in ENDING}
     for ln in lines:
-        for sent in re.split(r"(?<=[.!?])\s+", re.sub(r"^([-*+]|\d+[.)])\s+", "", ln)):
+        for sent in re.split(r"(?<=[.!?])\s+", re.sub("^" + LIST_MARK + r"+", "", ln)):
             if sent.rstrip(" *`\"'”’)").endswith("?"):
                 continue  # 질문 문장은 본문에 실린 예상 질문일 수 있어 어법을 세지 않는다
             tail = re.sub(r"(\[[^\]]*\]|\([^)]*\)|[\s.!?\"'”’*`:])+$", "", sent)
@@ -1014,7 +1020,7 @@ def sentences(doc):
     """목록과 표, 제목을 뺀 줄글의 문장. 줄마다 [문장] 으로 낸다."""
     rows = []
     for ln in body_lines(plain_text(doc)):
-        if re.match(r"([-*+]|\d+[.)])\s", ln):
+        if re.match(LIST_MARK, ln):
             continue
         ln = re.sub(r"\[\d+\]", "", ln)
         rows.append([s.strip() for s in re.split(r"(?<=[.!?])\s+", ln) if s.strip()])
@@ -1114,8 +1120,8 @@ def check_doc(doc, vals, chars, kind=None, th=None, words=None):
                     " · ".join(f"{label} {count[k]}" for k, label, _ in ENDING if count[k])))
     # 틀이 정한 문서는 골격 규칙이 문체 규칙보다 앞서서 문체를 재지 않는다.
     if len(lines) >= 4 and pick("skeleton") not in (TEMPLATE, None):
-        ratio = sum(1 for ln in lines if re.match(r"([-*+]|\d+[.)])\s", ln)) / len(lines)
-        ok = ratio >= 0.3 if pick("voice") == "bullet" else ratio <= 0.5
+        ratio = sum(1 for ln in lines if re.match(LIST_MARK, ln)) / len(lines)
+        ok = ratio >= 0.3 if pick("voice") in ("bullet", "gov") else ratio <= 0.5
         out.append(("voice", ok, f"목록 줄 {ratio:.0%}"))
     size = len("\n".join(lines))
     limit = int(chars * 1.1) if chars else None if kind == "slides" else LENGTH_LIMIT.get(pick("length"))
@@ -1182,9 +1188,12 @@ def learn_sample(th, name, text, is_doc):
     if len(lines) >= 4:
         # 긴 문단 몇 개와 짧은 목록 몇 줄이 섞인 글을 개조식으로 보지 않게 줄 수가 아니라 글자 수로 센다
         size = sum(len(ln) for ln in lines)
-        ratio = sum(len(ln) for ln in lines if re.match(r"([-*+]|\d+[.)])\s", ln)) / size
+        ratio = sum(len(ln) for ln in lines if re.match(LIST_MARK, ln)) / size
         out["list_ratio"] = round(ratio, 2)
         out["voice"] = "bullet" if ratio >= 0.5 else "prose" if ratio <= 0.25 else None
+        listed = [ln for ln in lines if re.match(LIST_MARK, ln)]
+        if out["voice"] == "bullet" and sum(1 for ln in listed if GOV_MARK.match(ln)) * 2 >= len(listed):
+            out["voice"] = "gov"  # 목록 줄의 절반 넘게 □ ○ 기호로 시작하면 공문서식 개조식이다
     hits = tells_found(th, text, {})
     out["secret"] = any(n == "secret" for n, _, _ in hits)
     out["ai"] = [f"{th.tells[n]['label']} {c}곳" for n, c, _ in hits
@@ -3632,6 +3641,11 @@ def selftest(th):
         check("date-mix" not in tips, f"한 가지 날짜 표기를 섞였다고 본다: {sorted(tips)}")
         check(not learn_sample(th, "a", "일이 잘 됬다. 몇일 걸린다. 할수 있다. 갈때 본다.\n", False)["ai"],
               "맞춤법처럼 사람 글에 흔한 패턴을 AI 글의 표지로 센다")
+        gov = "□ 출근 시간대 대기가 2배임\n  ○ 8시대 평균 대기 12분\n  ○ 배차 간격은 같음\n□ 8시대 증차를 제안함\n"
+        got = {k: ok for k, ok, _ in check_doc(gov, resolve(th, sets={"voice": "gov"})[0], None, None, th)}
+        check(got.get("voice") is True and "choppy" not in {n for n, *_ in suggest_doc(th, gov, neutral)}
+              and learn_sample(th, "a", gov * 2, False)["voice"] == "gov",
+              f"공문서식 개조식의 □ ○ 기호를 목록으로 세지 못한다: {got}")
         words = {"어플": "앱", "서버": "서버리스"}
         got = dict((k, (ok, v)) for k, ok, v in check_doc("어플을 연다. 앱도 연다. 서버리스로 바꾼다. 웹어플은 둔다. `어플`\n",
                                                            neutral, None, None, th, words))

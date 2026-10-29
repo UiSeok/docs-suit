@@ -1,0 +1,53 @@
+/* docs-suit A4 인쇄. 이 저장소에서 새로 쓴 CSS 이고 저장소의 라이선스를 따른다. 바깥에서 아무것도 받지 않는다. */
+:root {
+  --ink: #1d1d1f;
+  --muted: #5b5b60;
+  --line: #c9c9ce;
+  --head: #f1f1f3;
+  --accent: #1f3a68;
+}
+html { background: #e9e9ec; }
+body {
+  box-sizing: border-box;
+  max-width: 210mm;
+  min-height: 297mm;
+  margin: 16px auto;
+  padding: 20mm 18mm;
+  background: #fff;
+  color: var(--ink);
+  font-family: "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", "맑은 고딕", "Noto Sans KR", "Nanum Gothic", sans-serif;
+  font-size: 10.5pt;
+  line-height: 1.7;
+  word-break: keep-all;
+  overflow-wrap: break-word;
+}
+h1, h2, h3, h4 { line-height: 1.35; break-after: avoid; }
+h1 { font-size: 20pt; margin: 0 0 8mm; padding-bottom: 3mm; border-bottom: 3px double var(--accent); color: var(--accent); }
+h2 { font-size: 14pt; margin: 9mm 0 3mm; padding-left: 3mm; border-left: 4px solid var(--accent); }
+h3 { font-size: 12pt; margin: 6mm 0 2mm; }
+h4 { font-size: 10.5pt; margin: 4mm 0 1mm; }
+p, ul, ol { margin: 0 0 3mm; }
+li + li { margin-top: 1mm; }
+table { width: 100%; border-collapse: collapse; margin: 3mm 0 5mm; font-size: 9.5pt; break-inside: avoid; }
+thead { display: table-header-group; }
+th, td { border: 1px solid var(--line); padding: 1.5mm 2.5mm; text-align: left; vertical-align: top; }
+th { background: var(--head); font-weight: 700; }
+blockquote { margin: 3mm 0 5mm; padding: 2.5mm 4mm; border: 1px solid var(--line); background: #fafafb; break-inside: avoid; }
+blockquote > :last-child { margin-bottom: 0; }
+figure, img, pre { break-inside: avoid; }
+img { max-width: 100%; }
+pre, code { font-family: "D2Coding", "SFMono-Regular", Menlo, Consolas, monospace; font-size: 9pt; }
+pre { padding: 3mm; border: 1px solid var(--line); background: #fafafb; white-space: pre-wrap; }
+a { color: var(--accent); }
+hr { border: 0; border-top: 1px solid var(--line); margin: 6mm 0; }
+small, figcaption { color: var(--muted); font-size: 9pt; }
+@page {
+  size: A4;
+  margin: 20mm 18mm;
+  @bottom-center { content: counter(page) " / " counter(pages); font-size: 9pt; color: #5b5b60; }
+}
+@media print {
+  html { background: none; }
+  body { max-width: none; min-height: 0; margin: 0; padding: 0; }
+  a[href^="http"]::after { content: " (" attr(href) ")"; color: var(--muted); font-size: 8.5pt; word-break: break-all; }
+}
