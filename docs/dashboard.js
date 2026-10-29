@@ -1,4 +1,4 @@
-// 대시보드. 써 보기, 캐릭터, 캐릭터 설정, 테마 설정 화면을 탭으로 품는다. 써 보기는 웹 판에만 있다. 화면마다 따로 열어도 되도록 탭은 iframe 으로 둔다.
+// 대시보드. 로컬 판은 캐릭터, 캐릭터 설정, 테마 설정 세 화면을 탭으로 품고, 웹 판은 써 보기 화면 하나만 연다. 화면마다 따로 열어도 되도록 탭은 iframe 으로 둔다.
 // suit.py serve 로 띄우면 맨 위 띠에서 슬롯을 고르고, 탭 주소의 ?slot= 으로 넘긴다. 한 탭에서 저장하면 다른 탭은 다음에 열 때 다시 읽는다.
 (function () {
   "use strict";
@@ -11,7 +11,7 @@
   function src(tab) { return PAGES[tab] + (slot ? `?slot=${encodeURIComponent(slot)}` : ""); }
 
   function show(tab) {
-    if (!(tab in PAGES)) return;
+    if (!(tab in PAGES) || (L ? tab === "try" : tab !== "try")) return;
     current = tab;
     for (const [t, f] of Object.entries(frames)) {
       f.hidden = t !== tab;
@@ -35,11 +35,11 @@
   }
 
   // 처음 열 탭. 주소의 탭, 이 폴더에 이은 캐릭터가 있으면 캐릭터, 없으면 캐릭터 설정 순이다. 엔진의 serve_page 와 같다
-  // 웹 판은 설치 없이 들어온 사람이 먼저 써 보게 써 보기 탭으로 연다. 써 보기는 웹 판에만 있다
+  // 웹 판은 써 보기 탭 하나만 연다. 캐릭터와 설정은 이 컴퓨터의 슬롯에 쓰는 화면이라 설치한 사람의 로컬 판에만 둔다
   function firstTab(st) {
-    const hash = location.hash.slice(1);
-    if (hash in PAGES && !(L && hash === "try")) return hash;
     if (!L) return "try";
+    const hash = location.hash.slice(1);
+    if (hash in PAGES && hash !== "try") return hash;
     if (st && st.exists && ["env", "arg", "folder"].indexOf(st.why) >= 0) return "character";
     return "setup";
   }
