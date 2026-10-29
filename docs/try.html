@@ -10,41 +10,40 @@
 <body>
 <main class="try">
   <header>
-    <h1>docs-suit</h1>
+    <h1><img class="logo" src="favicon.svg" alt="" width="28" height="32">docs-suit</h1>
   </header>
   <p class="lead">AI 가 쓴 티가 나지 않게 하는 지침을 요청에 붙여, 지금 쓰는 ChatGPT 나 Claude 에서 바로 써 봅니다. 설치하지 않아도 됩니다.</p>
 
   <section class="step">
-    <h2>1. 누가 쓰나요</h2>
+    <h2>1. 당신은 누구인가요?</h2>
     <div class="chips" id="classes" role="group" aria-label="클래스"></div>
   </section>
 
   <section class="step">
-    <h2>2. 무슨 글을 쓰나요</h2>
+    <h2>2. 어떤 글을 쓰실 건가요?</h2>
     <div class="opts" id="trials" role="group" aria-label="문서 종류"></div>
   </section>
 
   <section class="step">
-    <h2>3. 무엇을 쓸지</h2>
+    <h2>3. 어떤 이야기를 써 보실래요?</h2>
     <p class="note" id="askNote"></p>
     <textarea id="ask" class="ask" spellcheck="false" aria-label="AI 에 보낼 요청"></textarea>
     <div class="actions"><button type="button" class="btn link" id="reset">예시로 되돌리기</button></div>
   </section>
 
   <section class="step">
-    <h2>4. 내 AI 로 보내기 <span class="now" id="picked"></span></h2>
-    <div class="send">
-      <a class="go primary" id="gpt" target="_blank" rel="noopener">ChatGPT 에서 쓰기</a>
-      <a class="go" id="claude" target="_blank" rel="noopener">Claude 에서 쓰기</a>
-      <a class="go" id="gemini" target="_blank" rel="noopener" href="https://gemini.google.com/app">Gemini 에서 쓰기</a>
-      <button type="button" class="go" id="copy">복사만 하기</button>
+    <h2>4. AI 로 바로 글 써 보기 <span class="now" id="picked"></span></h2>
+    <div class="launch">
+      <button type="button" class="go primary" data-ai="gpt"><span class="t">ChatGPT 로 쓰기</span><span class="s">요청이 채워진 채로 열립니다</span><span class="arrow" aria-hidden="true">↗</span></button>
+      <button type="button" class="go" data-ai="claude"><span class="t">Claude 로 쓰기</span><span class="s">요청이 채워진 채로 열립니다</span><span class="arrow" aria-hidden="true">↗</span></button>
+      <button type="button" class="go" data-ai="gemini"><span class="t">Gemini 로 쓰기</span><span class="s">요청을 복사해 두고 엽니다</span><span class="arrow" aria-hidden="true">↗</span></button>
     </div>
-    <p class="note">지침이 붙은 요청이 입력창에 채워져 열립니다. 보내기만 누르면 됩니다. Gemini 는 요청을 복사해 두니 입력창에 붙여 넣으세요.</p>
+    <div class="actions"><button type="button" class="btn link" id="copy">요청만 복사하기</button></div>
     <div class="status" id="status" aria-live="polite"></div>
     <div class="compare">
       <b>지침 없이 같은 요청 보내기</b>
       <span>두 답을 나란히 놓고 견줘 보세요.</span>
-      <span class="links"><a id="gptRaw" target="_blank" rel="noopener">ChatGPT</a> · <a id="claudeRaw" target="_blank" rel="noopener">Claude</a></span>
+      <span class="links"><button type="button" class="btn link" data-ai="gpt" data-raw="1">ChatGPT</button> · <button type="button" class="btn link" data-ai="claude" data-raw="1">Claude</button></span>
     </div>
     <details class="fold">
       <summary>붙는 지침 보기</summary>
@@ -58,6 +57,14 @@
     <p><a href="https://github.com/dodokim-lab/docs-suit#빠른-시작" target="_blank" rel="noopener">설치 방법 보기</a></p>
   </section>
 </main>
+<dialog id="confirm" aria-labelledby="cfmTitle">
+  <p class="q" id="cfmTitle"></p>
+  <p class="d" id="cfmBody"></p>
+  <div class="yn">
+    <button type="button" class="btn" id="cfmNo">아니요</button>
+    <button type="button" class="btn primary" id="cfmYes">예</button>
+  </div>
+</dialog>
 <script src="local.js"></script>
 <script src="core.js"></script>
 <script src="try.js"></script>
