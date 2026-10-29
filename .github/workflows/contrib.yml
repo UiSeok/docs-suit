@@ -1,0 +1,94 @@
+# 외부 기여 PR 을 판정하고 처리한다. 판정 규칙은 tools/contrib-eval.py 에 있다.
+# pull_request_target 은 main 의 워크플로와 코드로 돈다. PR 의 파일은 git 객체로만 읽고 실행하지 않는다.
+# 비밀값은 차단 job 만 moderation 환경에서 받는다. PR 을 읽는 job 에 비밀값이 있으면 새어 나갈 수 있어서다.
+name: contrib
+on:
+  pull_request_target:
+    types: [opened, reopened, synchronize, edited, ready_for_review]
+  workflow_dispatch:  # BLOCK_TOKEN 이 차단 목록을 읽는지 확인한다
+permissions: {}
+concurrency:
+  group: contrib-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+jobs:
+  judge:
+    if: >-
+      github.event_name == 'pull_request_target' &&
+      github.event.pull_request.state == 'open' &&
+      !contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.pull_request.author_association)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    outputs:
+      verdict: ${{ steps.judge.outputs.verdict }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: PR 객체 받기
+        env:
+          PR: ${{ github.event.pull_request.number }}
+        run: git fetch --no-tags origin "refs/pull/$PR/head:refs/contrib/head"
+      - id: judge
+        name: 판정
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python3 tools/contrib-eval.py judge --head refs/contrib/head
+
+  act:
+    needs: judge
+    # 판정이 실패해도 관리자가 알도록 처리 job 은 돈다. 새 push 로 취소된 판정은 건너뛴다
+    if: always() && (needs.judge.result == 'success' || needs.judge.result == 'failure')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      issues: write
+      pull-requests: write
+    outputs:
+      block: ${{ steps.act.outputs.block }}
+      user: ${{ steps.act.outputs.user }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
+        with:
+          persist-credentials: false
+      - id: act
+        name: 라벨과 댓글, 닫기, 리뷰 요청
+        env:
+          VERDICT: ${{ needs.judge.outputs.verdict }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python3 tools/contrib-eval.py act
+
+  block:
+    needs: act
+    if: needs.act.outputs.block == 'yes'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: moderation
+    permissions: {}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
+        with:
+          persist-credentials: false
+      - name: 작성자 차단
+        env:
+          BLOCK_TOKEN: ${{ secrets.BLOCK_TOKEN }}
+          BLOCK_USER: ${{ needs.act.outputs.user }}
+          REPO_OWNER: ${{ github.repository_owner }}
+        run: python3 tools/contrib-eval.py block
+
+  token-check:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: moderation
+    permissions: {}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
+        with:
+          persist-credentials: false
+      - name: 차단 토큰 확인
+        env:
+          BLOCK_TOKEN: ${{ secrets.BLOCK_TOKEN }}
+        run: python3 tools/contrib-eval.py token-check

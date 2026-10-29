@@ -13,3 +13,4 @@ jobs:
           node-version: "20"
       - run: python3 suit.py selftest
       - run: node tests/parity.js
+      - run: python3 tools/contrib-eval.py selftest
