@@ -28,12 +28,12 @@ docs-suit 를 고치는 사람과 AI 에이전트가 읽는 작업 규칙이다.
 ## 고친 뒤에는 세 가지를 돌린다
 
 ```sh
-python3 suit.py bundle      # 테마를 고쳤으면 웹 묶음을 다시 만든다
+python3 suit.py bundle      # 테마나 웹 화면을 고쳤으면 웹 묶음과 화면의 주소 해시를 다시 만든다
 python3 suit.py selftest    # 데이터 정합과 값 정하는 순서, bootstrap, export 계약
 node tests/parity.js        # 웹과 엔진이 같은 지침을 내는지
 ```
 
-CI 가 같은 검사를 돌린다. `docs/themes.json` 이 테마와 다르면 selftest 가 실패한다.
+CI 가 같은 검사를 돌린다. `docs/themes.json` 이 테마와 다르거나, 웹 화면이 부르는 CSS 와 JS 의 `?v=` 해시가 파일과 다르면 selftest 가 실패한다. 해시는 GitHub Pages 의 10분 캐시 때문에 새 HTML 과 옛 CSS 가 섞이지 않게 붙인다.
 
 ## 요청을 고르는 단계는 동작 테스트로 본다
 

@@ -3389,10 +3389,41 @@ def cmd_serve(a, th):
     return 0
 
 
+# 웹 화면이 부르는 파일 주소에 내용 해시를 붙인다. GitHub Pages 는 파일마다 10분씩 캐시하게 해서, 배포 직후에
+# 새 HTML 과 옛 CSS 가 섞여 화면이 깨진다. 주소가 내용에 따라 바뀌면 브라우저가 옛 파일을 섞어 쓰지 않는다.
+# themes.json 은 스크립트가 부르므로 해시를 HTML 의 docs-suit-data 메타에 두고, 스크립트가 그 값을 붙여 부른다.
+STAMP_RE = re.compile(r'((?:href|src)=")([\w.-]+\.(?:css|js|svg))(?:\?v=[0-9a-f]+)?(")')
+DATA_META_RE = re.compile(r'<meta name="docs-suit-data" content="[0-9a-f]*">')
+
+
+def _short_hash(path):
+    return hashlib.sha256(path.read_bytes()).hexdigest()[:10]
+
+
+def stamped_pages(docs):
+    """해시를 붙인 HTML 을 이름별로 돌려준다. 파일이 없는 주소는 그대로 둔다."""
+    data = f'<meta name="docs-suit-data" content="{_short_hash(docs / "themes.json")}">'
+    out = {}
+    for page in sorted(docs.glob("*.html")):
+        text = page.read_text(encoding="utf-8")
+        text = STAMP_RE.sub(lambda m: m.group(1) + m.group(2) + (f"?v={_short_hash(docs / m.group(2))}" if (docs / m.group(2)).is_file() else "") + m.group(3), text)
+        if DATA_META_RE.search(text):
+            text = DATA_META_RE.sub(data, text)
+        else:
+            text = text.replace('<meta charset="utf-8">\n', f'<meta charset="utf-8">\n{data}\n', 1)
+        out[page.name] = text
+    return out
+
+
 def cmd_bundle(a, th):
     out = HERE / "docs" / "themes.json"
     out.write_text(bundle_text(th), encoding="utf-8")
     print(f"썼다: {out}")
+    for name, text in stamped_pages(HERE / "docs").items():
+        page = HERE / "docs" / name
+        if page.read_text(encoding="utf-8") != text:
+            page.write_text(text, encoding="utf-8")
+            print(f"주소 해시를 고쳤다: {page}")
     return 0
 
 
@@ -4207,6 +4238,8 @@ def selftest(th):
     if (HERE / "docs").is_dir() and th.root.resolve() == (HERE / "themes" / DEFAULT_LANG).resolve():
         check(web.exists() and web.read_text(encoding="utf-8") == bundle_text(th),
               "docs/themes.json 이 테마와 다르다. python3 suit.py bundle 을 돌린다")
+        stale = [n for n, t in stamped_pages(HERE / "docs").items() if (HERE / "docs" / n).read_text(encoding="utf-8") != t]
+        check(not stale, f"웹 화면 {', '.join(stale)} 이 부르는 파일의 주소 해시가 옛것이다. python3 suit.py bundle 을 돌린다")
 
     for p in problems:
         print(f"✗ {p}")

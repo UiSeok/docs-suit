@@ -176,7 +176,7 @@
     });
   }
 
-  fetch("themes.json").then((r) => r.json()).then(async (data) => {
+  fetch("themes.json" + ((m) => (m ? `?v=${m.content}` : ""))(document.querySelector('meta[name="docs-suit-data"]'))).then((r) => r.json()).then(async (data) => {
     T = data;
     C = ThemeCore(T);
     if (!L) return empty("캐릭터 탭은 이 컴퓨터의 기록을 읽어서 suit.py serve 로 띄운 화면에서 보입니다. 에이전트에게 \"docs-suit 대시보드 열어 줘\" 라고 하면 됩니다.", "setup");

@@ -441,7 +441,7 @@
     });
   }
 
-  fetch("themes.json").then((r) => r.json()).then(async (data) => {
+  fetch("themes.json" + ((m) => (m ? `?v=${m.content}` : ""))(document.querySelector('meta[name="docs-suit-data"]'))).then((r) => r.json()).then(async (data) => {
     T = data;
     C = ThemeCore(T);
     wire();

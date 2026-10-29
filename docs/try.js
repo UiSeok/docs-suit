@@ -125,7 +125,7 @@
     $("copy").addEventListener("click", () => { if (!empty()) copy(withRules(), "지침을 붙인 요청을 복사했습니다. 쓰는 AI 의 입력창에 붙여 넣으세요."); });
   }
 
-  fetch("themes.json").then((r) => r.json()).then((data) => {
+  fetch("themes.json" + ((m) => (m ? `?v=${m.content}` : ""))(document.querySelector('meta[name="docs-suit-data"]'))).then((r) => r.json()).then((data) => {
     T = data;
     C = ThemeCore(T);
     wire();
