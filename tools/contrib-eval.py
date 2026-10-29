@@ -865,7 +865,7 @@ def cmd_act(a):
 
 
 def cmd_block(a):
-    who, token = os.environ.get("BLOCK_USER", ""), os.environ.get("BLOCK_TOKEN", "")
+    who, token = os.environ.get("BLOCK_USER", ""), os.environ.get("BLOCK_TOKEN", "").strip()
     if not re.fullmatch(r"[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})", who) or not token:
         print("오류: BLOCK_USER 나 BLOCK_TOKEN 이 없거나 틀렸다", file=sys.stderr)
         return 1
@@ -884,7 +884,7 @@ def cmd_block(a):
 
 
 def cmd_token_check(a):
-    code, _ = api("GET", "/user/blocks?per_page=1", os.environ.get("BLOCK_TOKEN", ""))
+    code, _ = api("GET", "/user/blocks?per_page=1", os.environ.get("BLOCK_TOKEN", "").strip())
     print("BLOCK_TOKEN 으로 차단 목록을 읽었다" if code == 200 else f"오류: BLOCK_TOKEN 으로 차단 목록을 읽지 못했다 (HTTP {code})")
     return 0 if code == 200 else 1
 
