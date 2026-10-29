@@ -320,6 +320,14 @@ def file_checks(ext, tmp, vals, chars, kind):
     return out + suit.check_doc(text, {k: v for k, v in vals.items() if k != "markup"}, chars, kind, th)
 
 
+def facts_kept(case, doc):
+    """(남은 수, 빠진 사실). 띄어쓰기와 대소문자는 가리지 않는다. 짧고 깔끔해졌어도 준 사실이 빠졌으면 나아진 글이 아니다."""
+    flat = re.sub(r"\s+", "", doc).lower()
+    missing = [f if isinstance(f, str) else f[0] for f in case.get("facts", [])
+               if not any(re.sub(r"\s+", "", x).lower() in flat for x in ([f] if isinstance(f, str) else f))]
+    return len(case.get("facts", [])) - len(missing), missing
+
+
 def doc_summary(checks):
     if checks is None:
         return "본문 없음"
@@ -407,6 +415,7 @@ def load_case(agent, case, base):
     meta["doc"] = None if not vals else suit.check_doc(doc, vals, chars, kind, th) if doc else None
     if vals and case.get("file"):
         meta["doc"] = file_checks(case["file"], tmp, vals, chars, kind)
+    meta["facts"] = facts_kept(case, doc) if doc and case.get("facts") else None
     # 본문을 다 쓴 뒤 check 로 성장 기록을 남겼는지는 기록 파일로 본다. 빈 본문으로 부른 check 는 기록을 남기지 않는다.
     # 프로필 없이 시작한 케이스는 슬롯이 없어 기록이 남지 않으므로 호출만 본다. 재촉한 턴의 호출은 calls-2.jsonl 에 있다.
     calls = read_calls(tmp) + read_calls(tmp, "calls-2.jsonl")
@@ -564,6 +573,9 @@ def report(agent, results, flows, version, model=None, glob=False):
              f"- 고르기: {sum(1 for _, ok, *_ in results if ok)}/{len(results) - unmeasured} 맞음"
              + (f" (재지 못한 {unmeasured}건 제외)" if unmeasured else ""),
              f"- 본문 검사: {doc_ok}/{len(docs)} 맞음. 어법, 문체, 분량, 강조를 어림 기준으로 잰다",
+             *([f"- 사실 보존: 요청에 준 사실 {sum(len(c.get('facts', [])) for c, *_, m in results if m.get('facts'))}개 가운데 "
+                f"{sum(m['facts'][0] for *_, m in results if m.get('facts'))}개가 본문에 남았다. 본문 검사의 맞음에는 넣지 않는다"]
+              if any(m.get("facts") for *_, m in results) else []),
              f"- 검사 기록: 본문을 쓴 {len(written)}건 가운데 {sum(1 for m in written if m.get('checked'))}건이 check 로 성장 기록을 남겼다",
              *([f"- 여러 턴 흐름: {sum(1 for _, ok, *_ in flows if ok)}/{len(flows) - flow_unmeasured} 맞음"
                 + (f" (재지 못한 {flow_unmeasured}건 제외)" if flow_unmeasured else "")] if flows else []),
@@ -586,6 +598,7 @@ def note(m):
     others = sorted({s for s in m["skills"] if s and s != "docs-suit"})
     return ", ".join(([f"같이 불린 스킬 {', '.join(others)}"] if others else [])
                      + ([f"거절된 도구 {m['denied']}건"] if m["denied"] else [])
+                     + ([f"빠진 사실 {', '.join(m['facts'][1])}"] if m.get("facts") and m["facts"][1] else [])
                      + (["먼저 질문해 한 번 더 재촉함"] if m.get("followup") else [])
                      + (["check 를 부르지 않음"] if m.get("doc") is not None and not m.get("checked") else []))
 

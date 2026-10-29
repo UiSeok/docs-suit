@@ -22,3 +22,4 @@
 | textlint-rule-preset-ai-writing, https://github.com/textlint-ja/textlint-rule-preset-ai-writing | 술어 뒤 쌍점, 기계적인 강조, 과장어 규칙 | MIT |
 | vale-ai-tells, https://github.com/krishnasunkam/vale-ai-tells | 오류와 제안의 두 층, 깨끗한 글에서 걸리지 않는지 재는 방식 | MIT |
 | blader/humanizer, https://github.com/blader/humanizer | 패턴 분류와 검출기를 피하려는 게 아니라 사람 독자를 위해 고친다는 목표 | MIT |
+| ASD-STE100 Simplified Technical English, https://www.asd-ste100.org/ | 절차문을 설명문보다 짧게 쓰고, 단계 하나에 동작 하나, 조건과 주의는 동작 앞에 둔다는 규칙. 가이드 틀의 단계 규칙과 `check` 의 단계 검사가 이것을 빌렸다 | 표준 문서는 ASD 가 무료로 배포한다 |

@@ -989,6 +989,35 @@ def sentences(doc):
     return rows
 
 
+# 번호 목록 단계에서 동작 뒤에 붙은 주의와 조건. 단계는 읽는 대로 실행하므로 이런 말은 동작 앞에 와야 한다.
+LATE_CAUTION = re.compile(r"^(?:단[,\s]|다만|주의|※|이때|이 때|참고로|그 전에|먼저 )")
+# 명령 뒤에 붙은 문단에서 "~이면 ~하지 않는다" 꼴의 조건과 데이터를 지운다는 경고. 둘 다 명령보다 앞에 와야 한다
+LATE_RISK = re.compile(r"면[ ,][^.\n]*(?:(?:되|뜨|돌|열리|켜지|시작되|실행되|붙)지 않|안 (?:되|뜨|돌|열)|못 |실패)"
+                       r"|(?:지워|지웁|삭제)(?:져|집|돼|됩|해요|합니다|한다|된다|진다)")
+STEP_LONG = 60  # 절차문은 설명문보다 짧게 잰다. 설명문의 긴 문장 기준은 80자다
+STEP_KINDS = ("guide",)  # 번호 목록이 절차인 종류. 다른 종류의 번호 목록은 할 일이나 순위라 재지 않는다
+
+
+def steps(doc):
+    """번호 목록 항목마다 [문장]. 이어지는 줄은 세지 않는다."""
+    rows = []
+    for ln in body_lines(plain_text(doc)):
+        m = re.match(r"\d+[.)]\s+(.*)", ln)
+        if m:
+            rows.append([s.strip() for s in re.split(r"(?<=[.!?])\s+", m.group(1)) if s.strip()])
+    return rows
+
+
+def after_commands(doc):
+    """코드 블록 바로 뒤 문단의 문장. 목록으로 시작하는 문단은 다음 단계라 빼고, 문단은 빈 줄에서 끝난다."""
+    out = []
+    for m in re.finditer(r"```[^\n]*\n.*?\n[ \t]*```[ \t]*\n(?:[ \t]*\n)*((?:[ \t]*(?!```)[^\s#>|][^\n]*(?:\n|$))+)", doc, re.S):
+        para = " ".join(QUOTED.sub(" ", m.group(1)).split())
+        if not re.match(r"(?:[-*+]|\d+[.)])\s", para):
+            out += [x for x in re.split(r"(?<=[.!?])\s+", para) if x]
+    return out
+
+
 def suggest_doc(th, doc, vals, kind=None):
     """[(이름, 이름표, 잰 값, 고칠 방향)]. 보여 주기만 하고 성장 기록에는 넣지 않는다."""
     out = [(f"tells:{n}", th.tells[n]["label"], f"{c}곳 {ex}", th.tells[n]["hint"])
@@ -1003,6 +1032,16 @@ def suggest_doc(th, doc, vals, kind=None):
         over = sum(1 for s in flat if len(s) > 80)
         if avg > 55 or over / len(flat) > 0.1:
             out.append(("long", "긴 문장", f"평균 {avg:.0f}자, 80자 넘는 문장 {over}/{len(flat)}", "맥락이 바뀌는 곳에서 나눈다"))
+    if kind in STEP_KINDS:
+        items = steps(doc)
+        late = (sum(1 for r in items if any(LATE_CAUTION.match(x) for x in r[1:]))
+                + sum(1 for x in after_commands(doc) if LATE_CAUTION.match(x) or LATE_RISK.search(x)))
+        if late:
+            out.append(("step-caution", "동작 뒤의 주의", f"{late}곳", "주의와 조건을 그 동작 앞에 쓴다"))
+        long_steps = [r for r in items if any(len(x) > STEP_LONG for x in r)]
+        if long_steps:
+            out.append(("step-long", "긴 단계", f"{STEP_LONG}자 넘는 문장이 든 단계 {len(long_steps)}/{len(items)}",
+                        "단계 하나에 동작 하나만 쓴다"))
     if kind not in CHOPPY_SKIP and any(all(len(s) <= 20 for s in r[i:i + 3]) for r in rows for i in range(len(r) - 2)):
         out.append(("choppy", "토막 문장", "20자 안쪽 문장이 세 개 이어짐", "같은 맥락은 연결어미로 잇는다"))
     return out
@@ -3381,6 +3420,20 @@ def selftest(th):
               "숫자 범위나 따옴표, 코드 블록 안의 예문을 문장 규칙으로 잡는다")
         tips = {n for n, *_ in suggest_doc(th, "속도가 아니라 방향이다. 양이 아니라 질이다. 결론적으로 다양한 방법이 있다.", neutral)}
         check({"tells:not-but", "tells:wrapup", "tells:vague"} <= tips, f"제안 패턴이 다르다: {sorted(tips)}")
+        tips = {n for n, *_ in suggest_doc(th, "1. `make run` 을 실행한다. 단, 8080 포트가 비어 있어야 한다.\n"
+                                                "2. 저장소를 받아 의존성을 설치하고 환경 변수 파일을 복사해 값을 채운 뒤 데이터베이스를 띄우고 "
+                                                "마이그레이션을 돌려 서버를 연다.\n", neutral, "guide")}
+        check({"step-caution", "step-long"} <= tips, f"번호 목록 단계의 주의와 길이를 잡지 못한다: {sorted(tips)}")
+        tips = {n for n, *_ in suggest_doc(th, "1. 서버를 실행한다.\n\n   ```sh\n   make run\n   ```\n\n"
+                                                "   8080 포트를 다른 프로그램이 쓰고 있으면 서버가 뜨지 않는다.\n", neutral, "guide")}
+        check("step-caution" in tips, f"명령 뒤 문단에 붙은 조건을 잡지 못한다: {sorted(tips)}")
+        tips = {n for n, *_ in suggest_doc(th, "1. 8080 포트가 비어 있는지 본다.\n\n   ```sh\n   lsof -i :8080\n   ```\n\n"
+                                                "   아무것도 나오지 않으면 비어 있다.\n2. `make run` 을 실행한다. 서버가 뜬다.\n\n"
+                                                "`make reset` 은 데이터를 모두 지운다.\n\n```sh\nmake reset\n```\n", neutral, "guide")}
+        check(not {"step-caution", "step-long"} & tips, f"동작 하나씩 쓴 단계를 잡는다: {sorted(tips)}")
+        tips = {n for n, *_ in suggest_doc(th, "1. 저장소를 받아 의존성을 설치하고 환경 변수 파일을 복사해 값을 채운 뒤 "
+                                                "데이터베이스를 띄우고 마이그레이션을 돌려 서버를 연다.\n", neutral, "report")}
+        check("step-long" not in tips, "가이드가 아닌 문서의 번호 목록을 절차로 잰다")
         got = {k: ok for k, ok, _ in check_doc("**제목**\n\n| 시간 | 대기 |\n", resolve(th, kind="email")[0], None, "email", th)}
         check(got.get("markup") is False and got.get("tells") is True and "emphasis" not in got,
               f"서식 없음 문서의 마크다운을 잡지 못하거나 굵은 글씨를 두 번 센다: {got}")
