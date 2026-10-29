@@ -10,7 +10,7 @@ AI 와 문서를 쓰다 보면 AI 가 쓴 티가 묻어납니다.<br>
 
 ![직장인 캐릭터가 사원에서 부장까지 전직하는 모습과 일곱 클래스의 4차 전직 모습](docs/readme/characters.svg)
 
-설치 없이 웹에서 캐릭터를 만들고 테마를 골라 볼 수 있습니다. 고른 지침은 복사해서 ChatGPT 나 Claude 같은 웹 채팅에 붙여 씁니다.<br>
+설치 없이 웹에서 바로 써 볼 수 있습니다. 쓸 글을 고르면 지침을 붙인 요청이 내 ChatGPT 나 Claude 입력창에 채워져 열립니다.<br>
 https://dodokim-lab.github.io/docs-suit/
 
 ## 같은 보고에서 AI 가 쓴 티가 빠집니다

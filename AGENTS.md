@@ -17,10 +17,11 @@ docs-suit 를 고치는 사람과 AI 에이전트가 읽는 작업 규칙이다.
 | `themes/ko/growth.yaml` | 캐릭터 성장 규칙. 문서 한 건이 받는 경험치와 레벨, 전직 문턱 |
 | `themes/ko/look.yaml` | 기본 캐릭터와 머리 모양, 클래스마다 전직할 때 여는 꾸미기(`rewards`), 부품과 옷 색 목록 |
 | `themes/ko/presets/<이름>.yaml` | 기여받은 테마 조합. 축 기본값과 독자별 값, 소개, 만든 사람 |
+| `themes/ko/trials/<이름>.md` | 웹 판 써 보기 탭의 템플릿. 첫 줄은 이름, 빈 줄까지는 클래스와 문서 종류, 독자, 그 아래는 AI 에 보낼 예시 요청이다. 예시는 정류장 대기 시간 조사에서 지어낸 사실로만 쓰고, 클래스마다 하나 이상 둔다 |
 | `themes/ko/sprites/<부위>/<값>.txt` | 도트 그림 부품. 기본 몸(`base`) 위에 옷(`top`), 머리(`hair`), 소품(`prop`) 순으로 겹친다. 모두 같은 크기다 |
 | `tools/issue-key.py` | 관리자가 승급 키를 만드는 도구. 개인 키는 저장소 밖 `~/.config/docs-suit-admin/` 에 둔다 |
 | `tools/readme-art.py` | README 의 캐릭터 그림 `docs/readme/characters.svg` 를 엔진의 그림 함수로 다시 그린다. 부품이나 `look.yaml` 의 보상을 바꾸면 돌린다 |
-| `docs/` | 웹 화면. 대시보드(`index.html`, `dashboard.js`)가 캐릭터(`character.html`, `character.js`)와 캐릭터 설정(`create.html`, `create.js`), 테마 설정(`theme.html`, `app.js`) 세 탭을 품고, 모두 `style.css` 를 함께 쓴다. `core.js` 가 조립과 캐릭터 그림, 슬롯 파일 쓰기를 하고 `themes.json` 은 `suit.py bundle` 이 만든다. `local.js` 는 `suit.py serve` 로 띄웠을 때만 켜져 바로 적용하게 한다 |
+| `docs/` | 웹 화면. 대시보드(`index.html`, `dashboard.js`)가 웹 판에만 있는 써 보기(`try.html`, `try.js`), 캐릭터(`character.html`, `character.js`), 캐릭터 설정(`create.html`, `create.js`), 테마 설정(`theme.html`, `app.js`) 네 탭을 품고, 모두 `style.css` 를 함께 쓴다. `core.js` 가 조립과 캐릭터 그림, 슬롯 파일 쓰기를 하고 `themes.json` 은 `suit.py bundle` 이 만든다. `local.js` 는 `suit.py serve` 로 띄웠을 때만 켜져 바로 적용하게 한다 |
 | `tests/parity.js` | 웹과 엔진의 조립 결과를 견준다 |
 | `tests/agent/` | 실제 에이전트에 요청을 넣는 동작 테스트. 케이스는 `cases.py`, 에이전트별 결과는 `results/`, 문체 배우기 흐름의 지어낸 샘플은 `samples/` |
 

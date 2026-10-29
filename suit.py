@@ -260,6 +260,16 @@ def clean_text(s):
 
 
 # ---------------------------------------------------------------- 테마 모음
+def read_trial(path):
+    """웹 써 보기의 템플릿 한 장. 첫 줄은 `# 이름`, 빈 줄까지는 `키: 값`, 그 아래는 AI 에 보낼 요청이다."""
+    head, _, body = path.read_text(encoding="utf-8").partition("\n\n")
+    lines = head.splitlines()
+    data = parse_yaml("\n".join(lines[1:]))
+    data["label"] = lines[0].lstrip("# ").strip() if lines else path.stem
+    data["ask"] = body.strip()
+    return data
+
+
 class Themes:
     def __init__(self, root):
         self.root = Path(root)
@@ -299,6 +309,12 @@ class Themes:
             d = parse_yaml(f.read_text(encoding="utf-8"))
             self.presets[f.stem] = {**d.get("preset", {}), "defaults": d.get("defaults", {}),
                                     "audiences": d.get("audiences", {})}
+        self.trials = {}
+        for f in sorted((self.root / "trials").glob("*.md")):
+            self.trials[f.stem] = read_trial(f)
+        rank = list(self.classes)
+        self.trials = dict(sorted(self.trials.items(), key=lambda kv: (
+            rank.index(kv[1].get("class")) if kv[1].get("class") in rank else len(rank), int(kv[1].get("order") or 0), kv[0])))
 
     def part_path(self, part, name):
         """캐릭터 그림 한 장. part 는 base, top, hair, prop 이다."""
@@ -1801,6 +1817,7 @@ def bundle_data(th):
         "prefer": th.prefer,
         "classes": th.classes,
         "persona": th.persona,
+        "trials": th.trials,
         "base": _body(th.root / "base.md"),
         "revise": _body(th.root / "revise.md"),
         "talk": _body(th.root / "talk.md"),
@@ -3363,6 +3380,15 @@ def selftest(th):
         for aud, vals in (v.get("audiences") or {}).items():
             check(aud in th.audiences and isinstance(vals, dict), f"조합 {k} 의 독자 {aud} 를 모른다")
             check_profile(f"조합 {k} 독자 {aud}", vals if isinstance(vals, dict) else {}, False)
+
+    # 웹 써 보기의 템플릿. 클래스마다 하나 이상 있고, 고른 종류와 독자가 실제 값이라야 지침을 조립한다
+    for k, v in th.trials.items():
+        check(v.get("class") in th.classes, f"써 보기 {k} 의 클래스를 모른다")
+        check(v.get("kind") in th.kinds, f"써 보기 {k} 의 문서 종류를 모른다")
+        check(v.get("audience") in th.audiences, f"써 보기 {k} 의 독자를 모른다")
+        check(v.get("label") and v.get("ask"), f"써 보기 {k} 에 이름이나 요청이 없다")
+    for cid in th.classes:
+        check(any(v.get("class") == cid for v in th.trials.values()), f"클래스 {cid} 의 써 보기 템플릿이 없다")
 
     # 캐릭터 그림과 꾸미기. 모든 그림은 기본 몸과 같은 크기라야 겹쳐 그릴 수 있다.
     lk = th.look

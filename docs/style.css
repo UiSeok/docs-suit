@@ -1,4 +1,4 @@
-/* docs-suit 웹 화면 공통 모양. 대시보드(index.html)와 그 탭인 캐릭터(character.html), 캐릭터 설정(create.html), 테마 설정(theme.html)이 함께 쓴다. */
+/* docs-suit 웹 화면 공통 모양. 대시보드(index.html)와 그 탭인 써 보기(try.html), 캐릭터(character.html), 캐릭터 설정(create.html), 테마 설정(theme.html)이 함께 쓴다. */
 :root {
   --bg: #f6f5f2; --surface: #ffffff; --line: #e4e1db; --ink: #1c1917; --muted: #6b6560;
   --accent: #0f766e; --accent-tint: #e6f4f1; --warn: #9f1239; --chosen: #0f766e;
@@ -192,3 +192,23 @@ label.grow input { flex: 1; width: auto; font: inherit; padding: 5px 8px; backgr
 @media (max-width: 900px) {
   .charlayout { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* 웹 판의 써 보기 탭. 휴대폰에서 링크를 눌러 들어온 사람이 위에서 아래로 한 번에 따라오게 한 열로 둔다 */
+main.try { max-width: 760px; }
+.try .lead { font-size: 15px; margin: 0 0 20px; }
+.try .opts { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
+.try textarea.ask { height: auto; min-height: 190px; font: 14px/1.6 Pretendard, "Apple SD Gothic Neo", "Noto Sans KR", system-ui, sans-serif; }
+.try textarea#rules { margin-top: 6px; }
+.send { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 8px; }
+.go { display: block; text-align: center; font: inherit; font-size: 15px; font-weight: 600; padding: 12px 10px; border: 1px solid var(--line);
+  background: var(--surface); color: var(--ink); text-decoration: none; cursor: pointer; }
+.go.primary { background: var(--accent); border-color: var(--accent); color: var(--bg); }
+.go:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.try .note { margin: 8px 0 0; }
+.compare { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; font-size: 13.5px; margin: 14px 0 10px; padding: 10px 12px;
+  border: 1px dashed var(--line); background: var(--surface); }
+.compare span { color: var(--muted); }
+.compare .links a { color: var(--accent); font-weight: 600; }
+.try .install { border-top: 1px solid var(--line); padding-top: 16px; font-size: 14px; }
+.try .install p { margin: 0 0 8px; color: var(--muted); }
+.try .install a { color: var(--accent); font-weight: 600; }
