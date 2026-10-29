@@ -1,4 +1,4 @@
-# 정류장 대기 시간 조사 과제
+# 과제 레포트
 class: student
 kind: report
 audience: professor

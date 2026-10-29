@@ -1,4 +1,4 @@
-# 조사 경험으로 쓰는 지원 동기
+# 자기소개서
 class: jobseeker
 kind: cover-letter
 audience: recruiter

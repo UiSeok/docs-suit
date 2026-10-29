@@ -1,4 +1,4 @@
-# 정류장 조사 주간 보고
+# 주간 보고
 class: office
 kind: work-report
 audience: manager

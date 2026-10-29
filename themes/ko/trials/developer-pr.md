@@ -1,4 +1,4 @@
-# 대기 시간 집계 스크립트 PR
+# PR 설명
 class: developer
 kind: pr
 audience: peer-dev

@@ -1,4 +1,4 @@
-# 조사 결과 회의록
+# 회의록
 class: planner
 kind: minutes
 audience: teammate

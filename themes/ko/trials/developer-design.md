@@ -1,4 +1,4 @@
-# 대기 시간 매일 집계 설계
+# 설계 문서
 class: developer
 kind: design-doc
 audience: peer-dev

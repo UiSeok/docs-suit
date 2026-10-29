@@ -28,7 +28,7 @@
   function buildTrials() {
     $("trials").innerHTML = trialsOf(state.cls).map((k) => {
       const t = T.trials[k];
-      const sub = `${T.kinds[t.kind].label} · 읽는 사람 ${T.audiences[t.audience].label}`;
+      const sub = `읽는 사람 ${T.audiences[t.audience].label}`;
       return `<button type="button" class="opt" data-trial="${k}" aria-pressed="${k === state.trial}"><b>${esc(t.label)}</b><span class="d">${esc(sub)}</span></button>`;
     }).join("");
   }

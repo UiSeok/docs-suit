@@ -1,4 +1,4 @@
-# 운수사에 증차 견적 요청
+# 견적 요청 메일
 class: office
 kind: email
 audience: stakeholder

@@ -1,4 +1,4 @@
-# 조별 과제 발표 자료
+# 발표 자료
 class: student
 kind: slides
 audience: listener

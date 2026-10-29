@@ -1,4 +1,4 @@
-# 8시대 증차 기획서
+# 기획서
 class: planner
 kind: spec
 audience: stakeholder

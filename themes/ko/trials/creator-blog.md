@@ -1,4 +1,4 @@
-# 정류장 대기 시간을 재 본 이야기
+# 블로그 글
 class: creator
 kind: blog
 audience: reader

@@ -1,4 +1,4 @@
-# 출근 시간대 대기 분석 초록
+# 논문 초록
 class: researcher
 kind: abstract
 audience: reviewer

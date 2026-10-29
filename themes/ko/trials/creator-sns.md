@@ -1,4 +1,4 @@
-# 정류장 조사 공유 글
+# SNS 글
 class: creator
 kind: sns
 audience: reader
