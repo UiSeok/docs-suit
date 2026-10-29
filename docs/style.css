@@ -214,3 +214,4 @@ main.try { max-width: 760px; }
 .try .install { border-top: 1px solid var(--line); padding-top: 16px; font-size: 14px; }
 .try .install p { margin: 0 0 8px; color: var(--muted); }
 .try .install a { color: var(--accent); font-weight: 600; }
+.try #askNote { margin: -2px 0 8px; }
