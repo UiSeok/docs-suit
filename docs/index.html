@@ -8,6 +8,11 @@
 <link rel="stylesheet" href="style.css">
 </head>
 <body class="dash">
+<script>
+  // 웹 판은 써 보기 화면 하나라 대시보드를 거치지 않고 바로 연다. 화면이 iframe 안에서 스크롤되면 휴대폰의 당겨서 새로고침이 먹지 않는다.
+  // suit.py serve 가 띄운 로컬 판은 머리에 열쇠를 심으므로 그대로 대시보드를 그린다
+  if (!document.querySelector('meta[name="docs-suit-token"]')) location.replace("try.html" + location.search);
+</script>
 <header class="dashhead">
   <h1><img class="logo" src="favicon.svg" alt="" width="24" height="28">docs-suit</h1>
   <nav class="tabs" role="tablist" aria-label="대시보드">
@@ -18,7 +23,6 @@
 </header>
 <div id="local"></div>
 <div class="frames">
-  <iframe data-tab="try" title="써 보기" hidden></iframe>
   <iframe data-tab="character" title="캐릭터" hidden></iframe>
   <iframe data-tab="setup" title="캐릭터 설정" hidden></iframe>
   <iframe data-tab="theme" title="테마 설정" hidden></iframe>

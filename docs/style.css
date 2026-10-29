@@ -156,8 +156,6 @@ body.dash { height: 100vh; display: flex; flex-direction: column; overflow: hidd
 .dashhead { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 22px; padding: 16px 16px 0; max-width: 1320px; width: 100%; margin: 0 auto; }
 .dashhead h1 { font-size: 24px; margin: 0; }
 .tabs { display: flex; gap: 2px; }
-/* 웹 판은 써 보기 화면 하나라 탭 줄을 그리지 않는다 */
-body.dash:not(.is-local) .tabs { display: none; }
 .tabs [role=tab] { font: inherit; font-size: 14px; padding: 8px 14px; border: 0; border-bottom: 2px solid transparent; background: none; color: var(--muted); cursor: pointer; }
 .tabs [role=tab][aria-selected="true"] { color: var(--ink); border-bottom-color: var(--accent); font-weight: 700; }
 body.dash #local { max-width: 1320px; width: calc(100% - 32px); margin: 10px auto 0; }
