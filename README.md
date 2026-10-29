@@ -10,6 +10,9 @@ AI 와 문서를 쓰다 보면 AI 가 쓴 티가 묻어납니다.<br>
 
 ![직장인 캐릭터가 사원에서 부장까지 전직하는 모습과 일곱 클래스의 4차 전직 모습](docs/readme/characters.svg)
 
+설치 없이 웹에서 캐릭터를 만들고 테마를 골라 볼 수 있습니다. 고른 지침은 복사해서 ChatGPT 나 Claude 같은 웹 채팅에 붙여 씁니다.<br>
+https://dodokim-lab.github.io/docs-suit/
+
 ## 같은 보고에서 AI 가 쓴 티가 빠집니다
 
 팀장님께 올리는 정류장 대기 시간 조사 주간 보고를 예로 듭니다. 지침 없이 맡기면 이런 모양이 나오기 쉽습니다.
@@ -145,5 +148,9 @@ git clone https://github.com/dodokim-lab/docs-suit.git && cd docs-suit && python
 ## 쓰는 법
 
 클래스 고르기와 지침 조립, 검사, 문체 배우기, 캐릭터 키우기는 [GUIDE.md](GUIDE.md) 에 있습니다.
+
+## 만든 사람
+
+김도도가 만들고 있습니다. AI 와 일하며 만든 것과 배운 것은 [Threads](https://www.threads.com/@dodokim_lab) 와 [velog](https://velog.io/@dodokim_lab) 에 씁니다.
 
 MIT 라이선스입니다.
