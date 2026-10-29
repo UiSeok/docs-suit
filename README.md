@@ -96,19 +96,47 @@ $ python3 suit.py check 보고.md --kind work-report --audience manager
 
 ## 비슷한 도구와 무엇이 다른가
 
-비슷한 도구는 이미 있었지만 제 요구에는 모자랐습니다.
-- 한국어 AI 말투를 다루는 epoko77-ai/im-not-ai 와 devswha/patina 는 이미 쓴 글을 고쳐 씁니다. 저는 처음부터 그 문서와 독자에 맞게 쓰게 하고 싶었습니다. docs-suit 는 쓰기 전에 규칙을 조립해 주고, 다 쓴 뒤에는 같은 규칙으로 잽니다.
-- microsoft/PromptKit 은 페르소나와 형식을 조립하지만 엔지니어링 문서용이고, 문체와 독자를 고르는 기능이 없습니다. docs-suit 는 평어체와 합쇼체, 해요체 같은 어법과 읽는 사람을 따로 골라 문서마다 갈아입힙니다.
+비슷한 도구는 이미 있었지만 제 요구에는 모자랐습니다. 만들기 전에 견줘 본 프로젝트와 모자랐던 점입니다.
 
-조립한 지침은 마크다운 한 장입니다. Claude Code, Codex, Cursor 같은 에이전트에는 스킬로 깔고, 웹 채팅에는 붙여 넣어 씁니다.
+| 프로젝트 | 모자랐던 점 |
+|---|---|
+| [im-not-ai](https://github.com/epoko77-ai/im-not-ai) | 한국어 AI 말투를 잘 잡지만, 이미 쓴 글을 고쳐 쓰는 도구라 처음부터 문서와 독자에 맞게 쓰게 하지는 않음 |
+| [patina](https://github.com/devswha/patina) | 한국어를 포함한 여러 언어의 AI 티를 지우지만, 역시 다 쓴 글을 고치는 도구 |
+| [microsoft/PromptKit](https://github.com/microsoft/PromptKit) | 페르소나와 형식을 조립하지만 엔지니어링 문서용이고, 어법과 읽는 사람을 고르는 기능이 없음 |
+| [simonpainter/tone](https://github.com/simonpainter/tone) | 공통 기준과 형식별 지침을 두지만 영어 전용이고 조립하는 엔진이 없음 |
+
+docs-suit 는 쓰기 전에 문서 종류와 읽는 사람, 말투에 맞춰 규칙을 조립하고, 다 쓴 뒤에는 같은 규칙으로 잽니다.
+
+## 빌려 온 것
+
+규칙과 본문 검사는 아래 자료에서 아이디어를 빌려 새로 썼고, 문구와 정규식은 옮기지 않았습니다. 파일째 넣은 것은 CSS 두 개뿐이고, 출처와 해시는 [themes/ko/PROVENANCE.md](themes/ko/PROVENANCE.md) 에 있습니다.
+
+| 자료 | 빌린 것 |
+|---|---|
+| [im-not-ai](https://github.com/epoko77-ai/im-not-ai) | 한국어 AI 말투의 분류와 사람 글에 견준 빈도, 금지어로 두면 안 되는 표현과 오탐 사례 |
+| [patina](https://github.com/devswha/patina) | 사람 글보다 자주 나오는 표현 목록, 낱말만 고친 글에 AI 티가 남는다는 실험 |
+| [KatFishNet 논문](https://arxiv.org/abs/2503.00032) | 연결어미 뒤 쉼표가 사람 글보다 AI 글에 잦다는 측정 |
+| [Wikipedia: Signs of AI writing](https://en.wikipedia.org/wiki/Wikipedia:Signs_of_AI_writing) | 예고와 인사, 맺음 요약, 굵은 라벨 목록 같은 신호의 분류와 신호 하나로 판정하지 않는다는 원칙 |
+| [textlint-rule-preset-ai-writing](https://github.com/textlint-ja/textlint-rule-preset-ai-writing) | 술어 뒤 쌍점, 기계적인 강조, 과장어 규칙 |
+| [vale-ai-tells](https://github.com/krishnasunkam/vale-ai-tells) | 오류와 제안으로 나눈 두 층, 깨끗한 글에서 걸리지 않는지 재는 방식 |
+| [humanizer](https://github.com/blader/humanizer) | 패턴 분류와, 검출기를 피하려는 게 아니라 사람 독자를 위해 고친다는 목표 |
+| [new.css](https://github.com/xz/new.css), [sakura](https://github.com/oxalorg/sakura) | HTML 로 낼 때 입히는 CSS. 파일째 넣었고 각자의 MIT 라이선스를 따름 |
+| [Agent Skills](https://agentskills.io) | 에이전트에 스킬로 까는 공용 규격 |
+| 90년대 국산 2D 온라인 게임 | 1차부터 4차까지 전직하는 구조와 도트 그림의 느낌. 그림과 칭호는 새로 그림 |
 
 ## 글을 쓸수록 캐릭터가 자랍니다
 
 처음에 학생, 개발자, 직장인 같은 클래스를 골라 캐릭터를 만듭니다. 규칙을 지킨 문서가 쌓이면 경험치가 올라 전직하고, 칭호와 꾸밀 거리가 열립니다. 캐릭터는 Claude Code 의 상태 줄에도 뜹니다.
 
+## 지금은 한국어 판만 있습니다
+
+규칙과 예문, 본문 검사가 모두 한국어 글에 맞춰져 있습니다. 영어 판은 엔진은 그대로 두고 영어 규칙 묶음을 더하는 방식으로 나중에 넣을 예정입니다.
+
+> Currently Korean only. An English rule pack is planned.
+
 ## 빠른 시작
 
-파이썬 3.9 이상만 있으면 됩니다.
+조립한 지침은 마크다운 한 장입니다. Claude Code, Codex, Cursor 같은 에이전트에는 스킬로 깔고, 웹 채팅에는 붙여 넣어 씁니다. 파이썬 3.9 이상만 있으면 됩니다.
 
 ```sh
 git clone https://github.com/dodokim-lab/docs-suit.git && cd docs-suit && python3 suit.py bootstrap
