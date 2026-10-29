@@ -1,7 +1,7 @@
 # 중립 기본값과 독자 풀, 문서 종류 풀. suit.py 와 웹 고르개가 읽는다.
 # 클래스(직업)는 classes/<id>.yaml 에 있고, 이 풀에서 주력 문서 종류를 고르고 기본값을 얹는다.
 # 형식의 defaults: blog nightmare portfolio pr minutes postmortem spec work-report biz-report guide notice
-  kinds as extensions:
+kinds as extensions:
   - name: blog
     title: 블로그 · 기술 글
     file: kinds/blog.md
@@ -17,32 +17,32 @@
     file: kinds/portfolio.md
     extension: .md
 
-   - name: pr
+  - name: pr
     title: PR 설명
     file: kinds/pr.md
     extension: .md
 
-   - name: minutes
+  - name: minutes
     title: 회의록
     file: kinds/minutes.md
     extension: .md
 
-   - name: postmortem
+  - name: postmortem
     title: 사후 분석
     file: kinds/postmortem.md
     extension: .md
 
-   - name: spec
+  - name: spec
     title: 명세서
     file: kinds/spec.md
     extension: .md
 
-   - name: work-report
+  - name: work-report
     title: 업무 보고
     file: kinds/work-report.md
     extension: .md
 
-   - name: biz-report
+  - name: biz-report
     title: 비즈니스 리포트
     file: kinds/biz-report.md
     extension: .md
@@ -52,7 +52,7 @@
     file: kinds/guide.md
     extension: .md
 
-   - name: notice
+  - name: notice
     title: 공지사항
     file: kinds/notice.md
     extension: .md
@@ -60,11 +60,6 @@
   - name: abstract
     title: 초록
     file: kinds/abstract.md
-    extension: .md
-
-  - name: biz-report
-    title: 비즈니스 리포트
-    file: kinds/biz-report.md
     extension: .md
 
   - name: cover-letter
@@ -82,11 +77,6 @@
     file: kinds/email.md
     extension: .md
 
-  - name: guide
-    title: 가이드
-    file: kinds/guide.md
-    extension: .md
-
   - name: interview
     title: 인터뷰
     file: kinds/interview.md
@@ -95,36 +85,6 @@
   - name: newsletter
     title: 뉴스레터
     file: kinds/newsletter.md
-    extension: .md
-
-  - name: notice
-    title: 공지사항
-    file: kinds/notice.md
-    extension: .md
-
-  - name: portfolio
-    title: 포트폴리오
-    file: kinds/portfolio.md
-    extension: .md
-
-   - name: pr
-    title: PR 설명
-    file: kinds/pr.md
-    extension: .md
-
-   - name: postmortem
-    title: 사후 분석
-    file: kinds/postmortem.md
-    extension: .md
-
-   - name: spec
-    title: 명세서
-    file: kinds/spec.md
-    extension: .md
-
-   - name: work-report
-    title: 업무 보고
-    file: kinds/work-report.md
     extension: .md
 
   - name: book-review
