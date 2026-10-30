@@ -23,6 +23,8 @@ rewards:
   planner: {1: [color.mustard, color.navy], 2: [prop.lanyard], 3: [top.blazer], 4: [prop.clipboard]}
   office: {1: [color.navy, color.charcoal], 2: [prop.lanyard], 3: [prop.tie], 4: [top.suit]}
   creator: {1: [color.pink, color.wine], 2: [prop.beret], 3: [top.stripe], 4: [prop.camera]}
+  doctor: {1: [color.sky, color.green], 2: [top.scrubs], 3: [prop.stethoscope], 4: [top.coat]}
+  licensed: {1: [color.navy, color.charcoal], 2: [prop.badge], 3: [top.suit], 4: [prop.briefcase]}
 
 top:
   shirt: 흰 셔츠
@@ -34,6 +36,7 @@ top:
   uniform: 교복
   turtleneck: 터틀넥
   stripe: 줄무늬 티
+  scrubs: 수술복
 
 hair:
   short: 짧은 머리
@@ -54,6 +57,9 @@ prop:
   laptop: 노트북
   clipboard: 클립보드
   camera: 카메라
+  stethoscope: 청진기
+  badge: 회원 배지
+  briefcase: 서류 가방
 
 # 옷 색. 옷 그림에서 * 가 붙은 색을 바꾼다.
 colors:

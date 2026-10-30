@@ -56,7 +56,7 @@ body.retro .npc .lead::after { content: "▼"; position: absolute; right: 0; bot
 @keyframes blink { 50% { opacity: 0; } }
 
 /* 1. 클래스 고르기 */
-.picks { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.picks { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
 body.retro .pick { font: inherit; cursor: pointer; margin: 2px; padding: 8px 0 6px; display: flex; flex-direction: column; align-items: center; gap: 4px; }
 .pick canvas { image-rendering: pixelated; display: block; }
 .pick b { font-size: 13px; line-height: 1.3; text-align: center; }

@@ -41,6 +41,8 @@ audiences:
   manager: {label: 상사·리더, voice: bullet, register: polite, terms: everyday, length: brief, exposure: team}
   stakeholder: {label: 다른 팀·외부 협력, register: polite, terms: explained, exposure: submit}
   reviewer: {label: 심사위원·리뷰어, register: plain, terms: major, exposure: submit}
+  patient: {label: 환자·보호자, voice: bullet, register: haeyo, terms: everyday, length: brief, exposure: public}
+  client: {label: 의뢰인·고객, register: polite, terms: explained, exposure: submit}
 
 # 문서 종류 풀. audience 는 독자를 말하지 않을 때 쓰는 기본 독자이고, 나머지 축 키는 그 종류가 고정하는 값이다.
 # 값 template 은 그 축을 kinds/<종류>.md 의 틀이 정한다는 뜻이다.
@@ -67,6 +69,8 @@ kinds:
   guide: {label: 가이드·README·위키, audience: [reader], skeleton: template}
   notice: {label: 공지, audience: [stakeholder], skeleton: template}
   script: {label: 발표 원고, audience: [listener], skeleton: template, voice: prose, diagram: none}
+  patient-guide: {label: 환자 안내문, audience: [patient], skeleton: template}
+  opinion: {label: 의견서·자문 답변, audience: [client], skeleton: template}
 
 # 문서 종류가 권하는 값. 고정은 아니라서 인자와 프로필의 독자별 값이 바꿀 수 있다.
 prefer:
@@ -92,6 +96,8 @@ prefer:
   guide: {sources: link, diagram: table}
   notice: {length: brief, diagram: table}
   script: {emphasis: none, markup: plain}
+  patient-guide: {voice: bullet, length: brief, terms: everyday, visual-doc: print}
+  opinion: {length: page, diagram: table, sources: footnote}
 
 # 문서 종류의 틀이 꼭 쓰라고 한 절. suit.py check 가 본문에 이 낱말이 있는지 잰다.
 # 낱말은 kinds/<종류>.md 의 틀에 그대로 나와야 하고, 틀이 이름을 정하지 않은 절은 넣지 않는다.
@@ -107,3 +113,5 @@ must:
   biz-report: [요약, 요청 사항]
   guide: [빠른 시작]
   notice: [적용 시점, 할 일, 문의]
+  patient-guide: [주의 사항, 바로 연락할 때]
+  opinion: [결론, 전제, 근거]
