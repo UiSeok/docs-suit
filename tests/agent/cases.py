@@ -5,7 +5,9 @@ expect 가 compose 이면 에이전트가 suit.py compose 를 불러야 한다. 
 page 탭을 띄워야 한다. page 가 auto 면 --page 를 빼고 엔진에 맡겨도 맞다. expect 가 call 이면 대시보드를 띄우지 않고
 suit.py <call> <args> 를 불러야 하고, offer 가 True 면 답에서 대시보드를 권해야 한다. want 는 조립 결과에서 이 값이어야 하는 축이다. audience 는 실제로
 쓰인 독자에 들어 있어야 하는 키다. revise 가 True 면 --revise 를 붙여야 하고, 아니면 붙이지 않아야 한다. expect 가 skip 이면 suit.py 를 부르지 않아야 한다. profile 이 False 이면 프로필 없이
-시작한다. facts 는 요청에 준 사실 가운데 본문에 남아야 하는 말이고, 목록 안의 목록은 그 가운데 하나만 있으면 된다. folder 는 작업 폴더에 둘 .docs-suit.yaml 이다. 어느 케이스든 사용자의 답 없이 bootstrap 으로 프로필을 저장하면
+시작한다. facts 는 요청에 준 사실 가운데 본문에 남아야 하는 말이고, 목록 안의 목록은 그 가운데 하나만 있으면 된다. folder 는 작업 폴더에 둘 .docs-suit.yaml 이고, files 는 작업 폴더에 둘 다른 파일이다.
+expect 가 conflict 이면 files 의 에이전트 지침 파일이 docs-suit 와 다른 값을 정해 둔 것이다. 첫 답에서 쓰기 전에 mention 가운데 하나를
+들어 어느 쪽을 따를지 물어야 하고, 재촉받은 뒤에는 want 의 값으로 조립해야 한다. 어느 케이스든 사용자의 답 없이 bootstrap 으로 프로필을 저장하면
 틀린다.
 """
 
@@ -73,6 +75,12 @@ CASES = [
     # 사용자가 축을 말한 요청
     {"id": "set-register", "kind": "report", "want": {"register": "polite"},
      "ask": "교수님께 낼 정류장 대기 시간 조사 보고서 써 줘. 이번에는 합쇼체로 써 줘."},
+    # 작업 폴더의 지침 파일이 정한 어법이 docs-suit 의 값(동료 개발자에게 평어체)과 다르다. 쓰기 전에 고르게 해야 한다
+    {"id": "conflict-guide", "kind": "design-doc", "expect": "conflict", "want": {"register": "polite"},
+     "mention": ["합쇼체", "AGENTS.md", "CLAUDE.md", "polite"],
+     "files": {name: "# 이 저장소에서 일하는 법\n\n- 설계 문서와 PR 설명은 합쇼체로 쓴다. 팀 문서의 말투를 맞추기 위해서다.\n"
+                     "- 테스트는 make test 로 돌린다.\n" for name in ("AGENTS.md", "CLAUDE.md")},
+     "ask": "알림 서비스 재시도 큐 설계 문서 써 줘. 지금은 발송에 실패하면 그냥 버리는데, 지수 백오프로 세 번까지 다시 보내려고 해."},
     {"id": "set-voice-length", "kind": "postmortem", "want": {"voice": "prose", "length": "brief"},
      "ask": "어제 캐시 서버가 30분 멈춘 건 회고 문서로 써 줘. 개조식 말고 줄글로, 짧게."},
     # 사내 위키에 올릴 글이라 가이드·README·위키로 골라도 맞다. 재는 것은 공개 범위다.

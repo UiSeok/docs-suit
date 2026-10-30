@@ -46,7 +46,6 @@ selftest 와 parity 는 문서 종류와 독자를 넘겨받은 뒤의 조립만
 python3 tests/agent/run.py --agent claude             # 케이스와 여러 턴 흐름 전체
 python3 tests/agent/run.py --agent antigravity --only sns  # 몇 건만
 python3 tests/agent/run.py --agent claude --record    # 결과를 tests/agent/results/ 에 남긴다
-python3 tests/agent/run.py --agent codex --global --only sns  # 홈 폴더에 깐 스킬이 불리는지
 python3 tests/agent/run.py --agent claude --regrade <기록 폴더>  # 에이전트를 부르지 않고 다시 채점
 ```
 
@@ -80,5 +79,6 @@ Antigravity CLI 는 한 번 실행 모드에서 확인 창을 띄우지 못해 �
 - 테마 조합 PR 은 축 값이 알려진 값인지, 소개가 쓰임새를 말하는지, 회사와 사람 이름이 없는지 보고 머지한다. 머지하면 `tools/issue-key.py issue --tier 4` 로 키를 만들어 PR 댓글로 준다.
 - 성장 기록에는 본문과 파일 경로를 남기지 않는다. 같은 문서인지는 경로의 해시로만 가린다.
 - 문체 배우기는 샘플 원문을 남기지 않는다. `learn` 은 재기만 하고, "내 문체" 문서는 사용자가 승인한 판만 `voice set` 으로 남긴다.
-- 홈 폴더에 깐 스킬은 이 저장소의 `suit.py` 를 그대로 부른다. 기본 작업 트리에서 고치는 중에 `suit.py` 가 깨지면 사용자의 실제 세션과 상태 줄도 함께 깨지므로, 큰 작업은 `git worktree` 로 따로 연 작업 트리에서 하고 끝난 뒤 main 에 넣는다.
-- 프로필은 `~/.config/docs-suit/` 에 두고 저장소에 넣지 않는다. export 를 시험할 때는 `--dest` 로 임시 폴더에 쓰고, 실제 홈 폴더의 스킬 자리에 쓰는 일은 사람에게 확인받은 뒤에 한다.
+- 작업 폴더에 깐 스킬은 이 저장소의 `suit.py` 를 그대로 부른다. 기본 작업 트리에서 고치는 중에 `suit.py` 가 깨지면 사용자의 실제 세션과 상태 줄도 함께 깨지므로, 큰 작업은 `git worktree` 로 따로 연 작업 트리에서 하고 끝난 뒤 main 에 넣는다.
+- 프로필은 `~/.config/docs-suit/` 에 두고 저장소에 넣지 않는다. export 를 시험할 때는 `--dest` 나 임시 작업 폴더에 쓰고, 사람이 쓰는 작업 폴더에 깔거나 거두는 일은 확인받은 뒤에 한다.
+- 스킬은 글을 쓰는 작업 폴더에만 깔고 홈 폴더에는 깔지 않는다. 홈 폴더의 스킬은 모든 프로젝트에서 불려 다른 프로젝트의 문체 체계를 덮기 때문이다. `OLD_HOME_SKILLS` 는 예전 판이 깐 사본을 `export --remove --global` 로 거둘 때만 쓴다.

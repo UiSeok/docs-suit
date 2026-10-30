@@ -339,7 +339,7 @@
       $("install").textContent = !slotOk ? "슬롯 이름은 글자, 숫자, -, _ 로 씁니다." : [
         `${dest} 에 씁니다. 있던 파일은 .bak 으로 남깁니다.`,
         slot && $("useHere").checked ? "실행한 폴더의 .docs-suit.yaml 이 이 슬롯을 쓰게 합니다." : null,
-        $("installSkills").checked && agents.length ? `${agents.join(", ")} 에 스킬을 깝니다.` : null,
+        $("installSkills").checked && agents.length ? `실행한 폴더에 ${agents.join(", ")} 스킬을 깝니다. 그 폴더에서 연 에이전트만 부릅니다.` : null,
       ].filter(Boolean).join("\n");
       return;
     }
@@ -347,7 +347,7 @@
       `mkdir -p ${dest.replace(/\/[^/]+$/, "")}`,
       `mv ~/Downloads/${file} ${dest}`,
       slot ? `cd <작업 폴더> && python3 <docs-suit 경로>/suit.py profile use ${slot} --here` : null,
-      agents.length ? `python3 <docs-suit 경로>/suit.py export --agent ${agents.join(",")}` : null,
+      agents.length ? `cd <작업 폴더> && python3 <docs-suit 경로>/suit.py export --agent ${agents.join(",")}` : null,
       state.agents.indexOf("web") >= 0 ? "웹 채팅은 '웹 채팅용 지침 복사' 로 받은 지침을 맞춤 지침에 붙여 넣습니다" : null,
     ].filter(Boolean).join("\n");
   }

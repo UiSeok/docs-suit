@@ -37,7 +37,9 @@ profiles/<이름>.yaml 이다. 폴더의 .docs-suit.yaml 은 쓸 슬롯과 그 �
                                                     --revise 는 사용자가 준 원문을 다듬을 때 붙인다
   python3 suit.py set <축> <값> [--audience A] [--here]   프로필에 쓴다. --here 는 지금 폴더의 폴더 파일에 쓴다
   python3 suit.py set <축> --unset [--audience A] [--here]
-  python3 suit.py export --agent claude,agents,antigravity,cursor,grok,web|all [--dest 폴더] [--dry-run]
+  python3 suit.py export --agent claude,agents,antigravity,cursor,grok,web|all [--dry-run]
+                                                    지금 폴더에 스킬을 깐다. 그 폴더에서 연 에이전트만 부른다
+  python3 suit.py export --remove [--agent …] [--global]   깐 스킬을 거둔다. --global 은 예전 판이 홈 폴더에 깐 것
   python3 suit.py check <파일|-> [--kind K] [--audience A] [--set 축=값]... [--chars N] [--no-record] [--json]
                                                     다 쓴 본문을 조립한 값대로 재고 성장 기록에 남긴다.
                                                     ✗ 는 고쳐 쓸 것, △ 는 제안이다
@@ -116,15 +118,21 @@ FOLDER_HEAD = ("# docs-suit 폴더 설정. 이 폴더와 아래 폴더에 적용
                "# defaults 와 audiences 는 슬롯의 값보다 앞선다. 저장소에 올라갈 수 있어 페르소나는 넣지 않는다.")
 PERSONA_IN_PROMPT = ("call", "affiliation", "goal", "facts", "dislikes")  # docs 는 싣지 않는다
 EXPORT_MARK = "<!-- docs-suit export 가 만든 파일이다."
-# 에이전트마다 SKILL.md 를 놓는 자리. checked 가 False 인 자리는 2차 자료 기준이라 쓰기 전에 안내한다.
+# 에이전트마다 SKILL.md 를 놓는 자리. 스킬은 글을 쓰는 폴더 안에만 깔아서 그 폴더에서 연 에이전트만 부른다.
+# Antigravity 는 작업 폴더의 .agents/skills 를 읽는다. checked 가 False 인 자리는 2차 자료 기준이라 쓰기 전에 안내한다.
+# 웹 지침은 붙여 넣는 파일이라 어느 에이전트도 스스로 읽지 않아서 설정 폴더에 둔다.
 AGENT_TARGETS = {
-    "claude": {"label": "Claude Code", "path": "~/.claude/skills/docs-suit/SKILL.md", "checked": True},
-    "agents": {"label": "Agent Skills 공용 자리 (Codex 등)", "path": "~/.agents/skills/docs-suit/SKILL.md", "checked": True},
-    "antigravity": {"label": "Antigravity CLI", "path": "~/.gemini/config/skills/docs-suit/SKILL.md", "checked": False},
-    "cursor": {"label": "Cursor", "path": "~/.cursor/skills/docs-suit/SKILL.md", "checked": False},
+    "claude": {"label": "Claude Code", "path": ".claude/skills/docs-suit/SKILL.md", "checked": True},
+    "agents": {"label": "Agent Skills 공용 자리 (Codex, Antigravity)", "path": ".agents/skills/docs-suit/SKILL.md", "checked": True},
+    "cursor": {"label": "Cursor", "path": ".cursor/skills/docs-suit/SKILL.md", "checked": False},
     "web": {"label": "웹 채팅에 붙여 넣을 지침", "path": "~/.config/docs-suit/prompt.md", "checked": True},
 }
-AGENT_ALIASES = {"grok": ["claude", "agents"], "codex": ["agents"], "gemini": ["antigravity"], "all": list(AGENT_TARGETS)}
+AGENT_ALIASES = {"grok": ["claude", "agents"], "codex": ["agents"], "antigravity": ["agents"], "gemini": ["agents"],
+                 "all": list(AGENT_TARGETS)}
+# 예전 판이 홈 폴더에 깔던 자리. 홈 폴더의 스킬은 모든 폴더에서 불려 다른 프로젝트의 문체 체계를 덮을 수 있다.
+# 그래서 이제 깔지 않고, export --remove --global 로 거두기만 한다.
+OLD_HOME_SKILLS = ("~/.claude/skills/docs-suit/SKILL.md", "~/.agents/skills/docs-suit/SKILL.md",
+                   "~/.gemini/config/skills/docs-suit/SKILL.md", "~/.cursor/skills/docs-suit/SKILL.md")
 # 승급 키를 확인하는 공개 키. 개인 키는 저장소 관리자만 갖고 저장소 밖에 둔다. tools/issue-key.py 가 키를 만든다.
 # 키를 바꿔도 지난 키가 계속 먹도록 kid 마다 남겨 둔다.
 PROMOTE_KEYS = {
@@ -1942,7 +1950,7 @@ def skill_text(th):
 name: docs-suit
 description: 문서를 쓰거나 다듬거나 검토할 때 docs-suit 테마를 입힌다. 보고서, 발표 자료, 발표 원고, 회의록, 메일, 공지, 이력서, 자기소개서, 포트폴리오, 논문 초록, 설계 문서, PR 설명, 기획서, 업무 보고, 사업 계획·실적 보고서, 가이드와 README, 블로그, 뉴스레터, SNS 글, 환자 안내문, 의견서와 자문 답변을 써 달라거나 다듬어 달라는 요청을 받으면 쓰기 전에 이 스킬로 규칙을 조립해 따른다. 이 목록에 없는 글을 써 달라는 요청도 이 스킬로 공통 규칙을 조립하고, 말투와 모양은 요청과 대화에서 맞춘다. 다 쓴 글을 검토해 달라는 요청도 이 스킬로 검토 지침을 만든다. 이 폴더에서는 평어체로, 팀장님께는 해요체로 써 달라는 식으로 문서의 말투나 모양을 앞으로 정해 달라는 요청도 이 스킬로 프로필이나 폴더 파일에 남긴다.
 ---
-{EXPORT_MARK} 다시 만들려면 `{run} export` 를 돌린다. -->
+{EXPORT_MARK} 다시 만들려면 이 폴더에서 `{run} export --agent …` 를, 거두려면 `{run} export --remove` 를 돌린다. -->
 
 # docs-suit
 
@@ -1961,7 +1969,10 @@ description: 문서를 쓰거나 다듬거나 검토할 때 docs-suit 테마를 
    - 저장한 뒤 답의 끝에 "<호칭>만의 글쓰기 스타일을 원하시면 예전에 작성하셨던 글 몇 개를 알려 주세요" 처럼 권한다. 호칭이 없으면 빼고 쓰고, 건너뛰어도 된다고 함께 말한다. 글을 받으면 10번대로 배운다.
 2. 요청에서 문서 종류를 정한다. 종류는 {kinds} 이다. 맞는 것이 없으면 종류 없이 조립한다. 종류 없는 글은 문체 축을 프로필과 클래스에서 물려받지 않고, 지침의 "대화로 정하기" 절대로 요청과 대화에서 읽어 맞춘다. 독자가 분명하면 `--audience <키>` 로 넘긴다. 독자 키는 {auds} 이다. 독자가 여럿이면 키를 쉼표로 잇는다.
 3. 사용자가 문체, 어법, 분량, 글자수, 공개 범위를 말했으면 `--set 축=값` 과 `--chars` 로 넘긴다. 축과 값은 아래 영어 키로 쓴다. {axes}. 공개 범위는 안전 축이라 `--set exposure` 는 `team`, `submit`, `public` 순서로 더 조심하는 쪽으로만 먹는다. 사내나 팀 안에서만 볼 글이면 `--set` 대신 `--audience` 를 `teammate` 나 `peer-dev` 로 넘긴다. 붙여 넣을 곳이 메일 본문이나 메신저, 지원서 입력 칸처럼 마크다운이 먹지 않는 곳이면 `--set markup=plain` 을 넘긴다.
-4. `{run} compose --kind <종류> [--audience …] [--set …] [--chars N] [--revise]` 의 출력 전체를 이번 문서의 규칙으로 따른다. 사용자가 원문을 주고 다듬어 달라고 하면 `--revise` 를 붙이고, 문서 종류는 원문을 보고 정한다. 다른 문체 지침이나 스킬과 겹치면 어법, 분량, 공개 범위 같은 축의 값은 이 출력을 따른다. 지침의 공통 바닥이 시키는 대로, 문서 종류의 "쓰기 전에 받을 것" 가운데 요청과 자료에 없는 것만 두세 개 묻는다.
+4. `{run} compose --kind <종류> [--audience …] [--set …] [--chars N] [--revise]` 의 출력 전체를 이번 문서의 규칙으로 따른다. 사용자가 원문을 주고 다듬어 달라고 하면 `--revise` 를 붙이고, 문서 종류는 원문을 보고 정한다. 지침의 공통 바닥이 시키는 대로, 문서 종류의 "쓰기 전에 받을 것" 가운데 요청과 자료에 없는 것만 두세 개 묻는다.
+   - 작업 폴더의 AGENTS.md 나 CLAUDE.md 같은 지침 파일, 팀 문체 체계, 다른 문체 스킬이 어법, 분량, 공개 범위 같은 축에 이 출력과 다른 값을 정해 두었으면, 쓰기 전에 어느 쪽을 따를지 사용자에게 고르게 한다. 그 값은 사용자가 이번 요청에서 말한 것이 아니라서 3번처럼 처음부터 `--set` 으로 넘기지 않고, 넘기지 않은 채 조립해 다른 축을 찾는다. 겹치는 축마다 두 값을 나란히 보이고 위의 질문과 같은 메시지에서 묻는다. 답을 받기 전에는 어느 쪽으로도 쓰지 않는다. 같은 대화에서 한 번 고른 것은 다시 묻지 않는다.
+   - 사용자가 그 지침의 값을 고르면 `--set 축=값` 으로 compose 와 5번의 check 에 함께 넘긴다. 앞으로도 이 폴더에서 그렇게 쓰겠다고 하면 `{run} set <축> <값> --here` 로 남긴다. 그러면 다음부터는 두 값이 같아서 묻지 않는다.
+   - 고르지 않고 그냥 쓰라고 하면 그 지침의 값을 `--set` 으로 넘겨 쓰고, 답 끝에 어느 축을 어느 쪽 값으로 썼는지 한 줄 알린다.
 5. 답을 끝내기 전에 본문을 검사한다. 검사하지 않은 답은 끝난 답이 아니다. compose 에 넘긴 `--kind`, `--audience`, `--set`, `--chars`, `--revise` 를 그대로 붙인다. 본문을 파일로 썼으면 `{run} check <본문 파일> --kind <종류> …` 로 부른다. docx, pptx, hwpx, pdf 같은 문서 파일을 만들었으면 원고가 따로 있어도 마지막에 만든 그 파일을 넘긴다. 엔진이 파일에서 글을 뽑아 잰다. 답에만 썼으면 임시 파일을 만들지 말고 본문 전체를 heredoc 으로 넘긴다. check 는 다른 명령과 `&&` 나 `;`, `|` 로 잇지 않고, `echo` 나 셸 변수 없이 아래 꼴 그대로 따로 부른다. 이어 붙인 명령은 도구의 권한 확인에 막혀 검사가 돌지 않을 수 있다.
    ```sh
    {run} check - --kind <종류> [--audience …] <<'EOF'
@@ -2010,17 +2021,85 @@ def expand_agents(names):
     return out
 
 
-def export(th, agents, dest=None, dry_run=False, profile=None, say=print, voice=None):
-    """에이전트마다 SKILL.md 나 붙여 넣을 지침을 쓴다. 손으로 만든 파일은 덮어쓰지 않는다."""
+def export_folder(folder=None):
+    """스킬을 깔 폴더. 기본은 지금 폴더다. 홈 폴더에 깔면 모든 폴더에서 불리고, 엔진 저장소는 글을 쓰는 폴더가 아니라서 막는다."""
+    f = (Path(os.path.expanduser(str(folder))) if folder else Path.cwd()).resolve()
+    if not f.is_dir():
+        raise Missing(f"폴더가 없다: {f}")
+    if f == Path.home().resolve():
+        raise Missing("홈 폴더에는 스킬을 깔지 않는다. 홈 폴더의 스킬은 모든 폴더에서 불린다. 글을 쓰는 폴더로 옮겨 부른다")
+    if f == HERE or HERE in f.parents:
+        raise Missing(f"docs-suit 저장소 안에는 스킬을 깔지 않는다. 글을 쓰는 폴더로 옮겨 `python3 {HERE / 'suit.py'} …` 로 다시 부른다")
+    return f
+
+
+def made_by_export(path):
+    try:
+        return EXPORT_MARK in Path(path).read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError):
+        return False
+
+
+def old_home_skills(home=None):
+    """예전 판이 홈 폴더에 깐 스킬 가운데 아직 남은 것. CLAUDE_CONFIG_DIR 로 Claude Code 설정 폴더를 옮겼으면 그 자리도 본다.
+    링크로 같은 파일을 가리키는 자리는 한 번만 센다."""
+    base = Path(home) if home else Path.home()
+    places = [base / p[2:] for p in OLD_HOME_SKILLS]
+    if not home and os.environ.get("CLAUDE_CONFIG_DIR"):
+        places.append(Path(os.path.expanduser(os.environ["CLAUDE_CONFIG_DIR"])) / "skills" / "docs-suit" / "SKILL.md")
+    out, seen = [], set()
+    for p in places:
+        real = os.path.realpath(p)
+        if real not in seen and p.is_file():
+            seen.add(real)
+            out.append(p)
+    return out
+
+
+def git_exclude(folder, dirs, remove=False):
+    """폴더가 git 작업 트리 안이면 스킬 폴더를 .git/info/exclude 에 더하거나 뺀다. 스킬에는 이 컴퓨터의 엔진 경로가 들어 있어
+    팀 저장소에 커밋되면 다른 사람에게 번진다. exclude 는 저장소에 올라가지 않는다. git 이 없거나 작업 트리가 아니면 None 이다."""
+    try:
+        r = subprocess.run(["git", "-C", str(folder), "rev-parse", "--show-toplevel", "--git-path", "info/exclude"],
+                           capture_output=True, text=True, timeout=5)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    out = r.stdout.splitlines()
+    if r.returncode or len(out) < 2:
+        return None
+    top = Path(out[0]).resolve()
+    ex = Path(out[1]) if os.path.isabs(out[1]) else Path(folder) / out[1]
+    lines = ex.read_text(encoding="utf-8").splitlines() if ex.exists() else []
+    want = []
+    for d in dirs:
+        try:
+            want.append("/" + Path(d).resolve().relative_to(top).as_posix() + "/")
+        except ValueError:
+            continue
+    new = [x for x in lines if x not in want] if remove else lines + [w for w in want if w not in lines]
+    if new != lines:
+        ex.parent.mkdir(parents=True, exist_ok=True)
+        ex.write_text("\n".join(new) + ("\n" if new else ""), encoding="utf-8")
+    return ex
+
+
+def export(th, agents, dest=None, dry_run=False, profile=None, say=print, voice=None, folder=None):
+    """에이전트마다 SKILL.md 나 붙여 넣을 지침을 쓴다. 스킬은 folder(기본은 지금 폴더) 안에 깔고, 손으로 만든 파일은 덮어쓰지 않는다.
+    dest 는 시험용이라 에이전트별 하위 폴더에 쓴다."""
+    names = expand_agents(agents)
+    base = export_folder(folder) if not dest and any(a != "web" for a in names) else None
     written = []
-    for a in expand_agents(agents):
+    for a in names:
         t = AGENT_TARGETS[a]
-        path = Path(os.path.expanduser(t["path"]))
         if dest:
-            path = Path(dest) / a / path.name
+            path = Path(dest) / a / Path(t["path"]).name
+        elif a == "web":
+            path = Path(os.path.expanduser(t["path"]))
+        else:
+            path = base / t["path"]
         text = compose(th, profile=profile, voice=voice)[0] if a == "web" else skill_text(th)
         note = "" if t["checked"] else " (이 자리는 2차 자료 기준이다. 도구 문서로 확인한다)"
-        if path.exists() and a != "web" and EXPORT_MARK not in path.read_text(encoding="utf-8"):
+        if path.exists() and a != "web" and not made_by_export(path):
             say(f"건너뜀: {t['label']} → {path} 에 docs-suit 가 만들지 않은 파일이 있다")
             continue
         if dry_run:
@@ -2030,7 +2109,52 @@ def export(th, agents, dest=None, dry_run=False, profile=None, say=print, voice=
         path.write_text(text, encoding="utf-8")
         written.append(path)
         say(f"썼다: {t['label']} → {path}{note}")
+    skills = [p.parent for p in written if p.name == "SKILL.md"]
+    if base and skills:
+        say(f"스킬은 {base} 에서 연 에이전트만 부른다. 다른 폴더에서도 쓰려면 그 폴더에서 다시 깐다")
+        ex = git_exclude(base, skills)
+        if ex:
+            say(f"스킬에는 이 컴퓨터의 엔진 경로가 들어 있어 git 에 올라가지 않게 {ex} 에 적었다")
+        left = [p for p in old_home_skills() if made_by_export(p)]
+        if left:
+            say(f"예전 판이 홈 폴더에 깐 스킬이 남아 있다: {', '.join(map(str, left))}. 이 스킬은 모든 폴더에서 불리니 "
+                f"`python3 {HERE / 'suit.py'} export --remove --global` 로 거둔다")
     return written
+
+
+def unexport(agents=None, folder=None, home=False, dry_run=False, say=print, home_dir=None):
+    """깐 스킬을 거둔다. docs-suit 가 만든 SKILL.md 만 지우고 비게 된 폴더를 치운다. home 이면 예전 판이 홈 폴더에 깐 스킬을 거둔다."""
+    if home:
+        stop, paths = None, old_home_skills(home_dir)
+    else:
+        stop = export_folder(folder)
+        paths = [stop / AGENT_TARGETS[a]["path"] for a in expand_agents(agents or ["all"]) if a != "web"]
+    removed, found = [], False
+    for path in paths:
+        if not path.is_file():
+            continue
+        found = True
+        if not made_by_export(path):
+            say(f"건너뜀: {path} 는 docs-suit 가 만들지 않은 파일이다")
+            continue
+        if dry_run:
+            say(f"지울 예정: {path}")
+            continue
+        path.unlink()
+        removed.append(path)
+        say(f"지웠다: {path}")
+        # 홈 폴더에서는 docs-suit 폴더만 치우고, 작업 폴더에서는 비게 된 폴더를 그 작업 폴더 바로 아래까지 치운다
+        d = path.parent
+        while d != stop and d.is_dir() and not any(d.iterdir()):
+            d.rmdir()
+            if stop is None:
+                break
+            d = d.parent
+    if stop and removed:
+        git_exclude(stop, [p.parent for p in removed], remove=True)
+    if not found:
+        say("거둘 스킬이 없다")
+    return removed
 
 
 # ---------------------------------------------------------------- bootstrap
@@ -2101,7 +2225,7 @@ def bootstrap_interactive(th):
         ans = _ask(f"\n{q.get('ask')}\n  {q.get('hint', '')}\n> ")
         if ans:
             persona[key] = clean_text(ans)
-    print("\n3단계. 쓰는 AI 도구. 고른 도구에 docs-suit 스킬을 설치한다. Enter 면 건너뛴다.\n")
+    print("\n3단계. 쓰는 AI 도구. 글을 쓰는 폴더에 고른 도구의 docs-suit 스킬을 깐다. Enter 면 건너뛴다.\n")
     names = ["claude", "codex", "antigravity", "cursor", "grok", "web"]
     labels = {"claude": "Claude Code", "codex": "Codex CLI", "antigravity": "Antigravity CLI", "cursor": "Cursor",
               "grok": "Grok Build", "web": "웹 채팅 (ChatGPT, Claude, Gemini, Grok 에 붙여 넣기)"}
@@ -2165,9 +2289,12 @@ def cmd_bootstrap(a, th):
             raise Missing("대화형 입력을 받을 수 없다. --class 와 --yes 로 진행한다")
         cls, persona, agents, hair, preset = bootstrap_interactive(th)
         a.talk = True
-    expand_agents(agents)
+    skills = [x for x in expand_agents(agents) if x != "web"]
     if hair and hair not in (th.look.get("hair") or {}):
         raise Missing(f"모르는 머리 모양: {hair}. 고를 수 있는 것은 {', '.join(th.look.get('hair') or {})}")
+    # 스킬은 글을 쓰는 폴더에 깐다. 지금 폴더에 깔 수 없으면 묻고, 답하지 않으면 웹 지침만 만든다
+    where = install_folder(not (a.cls or a.yes)) if skills else None
+    install = agents if where or not skills else [x for x in agents if x == "web"]
     data = {"profile": {"class": cls, "lang": DEFAULT_LANG}, "persona": persona}
     if hair:
         data["look"] = {"hair": hair}
@@ -2183,37 +2310,62 @@ def cmd_bootstrap(a, th):
     if a.here:
         print(f"폴더 파일 {bind_folder(a.profile)} 이 슬롯 {a.profile} 을 쓴다. 이 폴더와 아래 폴더에서 이 캐릭터가 자란다")
     written = []
-    if agents:
-        if not a.yes and _ask("고른 도구에 스킬을 설치할까? [Y/n] ", "y").lower() not in ("y", "yes", "ㅛ"):
-            print("설치를 건너뛰었다. 나중에 `suit.py export --agent …` 로 설치한다.")
+    if install:
+        place = f" 스킬은 {where} 에서 연 에이전트만 부른다." if where else ""
+        if not a.yes and _ask(f"고른 도구에 스킬을 깔까?{place} [Y/n] ", "y").lower() not in ("y", "yes", "ㅛ"):
+            print(f"설치를 건너뛰었다. 나중에 글을 쓰는 폴더에서 `python3 {HERE / 'suit.py'} export --agent …` 로 깐다.")
         else:
-            written = export(th, agents, profile=load_profile(name=a.profile))
+            written = export(th, install, profile=load_profile(name=a.profile), folder=where)
     if not getattr(a, "talk", False):
-        print("\n이제 `python3 suit.py compose --kind <종류>` 로 지침을 조립한다. 종류는 `python3 suit.py list` 로 본다.")
+        print(f"\n이제 `python3 {HERE / 'suit.py'} compose --kind <종류>` 로 지침을 조립한다. "
+              f"종류는 `python3 {HERE / 'suit.py'} list` 로 본다.")
         return 0
     print()
     cmd_card(argparse.Namespace(profile=a.profile, json=False, color="auto"), th)
-    print("\n" + "\n".join(bootstrap_next(th, cls, agents, written)))
+    print("\n" + "\n".join(bootstrap_next(th, cls, agents, written, where)))
     return 0
 
 
-def bootstrap_next(th, cls, agents, written):
+def install_folder(interactive):
+    """bootstrap 이 스킬을 깔 폴더. 지금 폴더가 홈 폴더나 엔진 저장소면 글을 쓰는 폴더를 묻고, Enter 면 깔지 않는다."""
+    try:
+        return export_folder()
+    except Missing as e:
+        if not interactive:
+            raise
+        print(f"\n{e}")
+    while True:
+        ans = _ask("스킬을 깔 폴더, 곧 글을 쓰는 폴더의 경로를 적는다. Enter 면 깔지 않는다: ")
+        if not ans:
+            return None
+        try:
+            return export_folder(ans)
+        except Missing as e:
+            print(e)
+
+
+def bootstrap_next(th, cls, agents, written, where=None):
     """터미널에서 캐릭터를 만든 사람에게 다음에 할 일을 고른 도구에 맞춰 알린다."""
+    run = f"python3 {HERE / 'suit.py'}"
     ask = f"\"{th.kinds[th.classes[cls]['kinds'][0]]['label']} 써 줘\""
     tools = {"claude": "Claude Code", "codex": "Codex", "antigravity": "Antigravity", "cursor": "Cursor", "grok": "Grok Build"}
     picked = [tools[x] for x in agents if x in tools]
+    skills = [p for p in written if p.name == "SKILL.md"]
     web = next((p for p in written if p.name == "prompt.md"), None)
     out = ["다음에 할 일"]
-    if picked and written:
-        out.append(f"- {', '.join(picked)} 를 새로 열고 {ask} 처럼 평소대로 부탁한다. 스킬이 규칙을 조립하고, 다 쓴 글을 재서 캐릭터를 키운다.")
+    if picked and skills:
+        out.append(f"- {where} 에서 {', '.join(picked)} 를 새로 열고 {ask} 처럼 평소대로 부탁한다. "
+                   "스킬이 규칙을 조립하고, 다 쓴 글을 재서 캐릭터를 키운다.")
+        out.append(f"- 스킬은 이 폴더에서만 불린다. 다른 폴더에서도 쓰려면 그 폴더에서 "
+                   f"`{run} export --agent {','.join(x for x in agents if x != 'web')}` 를 돌린다.")
     if web:
         out.append(f"- 웹 채팅에는 {web} 의 내용을 대화 맨 앞에 붙여 넣고 {ask} 처럼 부탁한다.")
     if not written:
-        out.append(f"- 스킬을 깔지 않았다. `python3 suit.py export --agent claude` 처럼 쓰는 도구에 깔거나, "
-                   f"`python3 suit.py compose --kind {th.classes[cls]['kinds'][0]}` 로 지침을 뽑아 AI 에 붙여 넣는다.")
-    out.append("- 캐릭터는 `python3 suit.py card` 로 다시 본다.")
-    if picked and written:
-        out.append("- 이 저장소 폴더는 옮기거나 지우지 않는다. 깐 스킬이 이 폴더의 suit.py 를 부른다.")
+        out.append(f"- 스킬을 깔지 않았다. 글을 쓰는 폴더에서 `{run} export --agent claude` 처럼 쓰는 도구에 깔거나, "
+                   f"`{run} compose --kind {th.classes[cls]['kinds'][0]}` 로 지침을 뽑아 AI 에 붙여 넣는다.")
+    out.append(f"- 캐릭터는 `{run} card` 로 다시 본다.")
+    if picked and skills:
+        out.append(f"- docs-suit 저장소 폴더 {HERE} 는 옮기거나 지우지 않는다. 깐 스킬이 이 폴더의 suit.py 를 부른다.")
     return out
 
 
@@ -2426,7 +2578,14 @@ def cmd_word(a, th):
 
 
 def cmd_export(a, th):
-    agents = [x.strip() for x in a.agent.split(",") if x.strip()]
+    agents = [x.strip() for x in (a.agent or "").split(",") if x.strip()]
+    if a.glob and not a.remove:
+        raise Missing("홈 폴더에는 스킬을 깔지 않는다. --global 은 예전 판이 홈 폴더에 깐 스킬을 --remove 로 거둘 때만 쓴다")
+    if a.remove:
+        unexport(agents or None, home=a.glob, dry_run=a.dry_run)
+        return 0
+    if not agents:
+        raise Missing("--agent 로 깔 도구를 고른다. claude, agents, codex, antigravity, cursor, grok, web, all")
     export(th, agents, a.dest, a.dry_run, load_profile(warn_stderr, a.profile), voice=voice_text(a.profile))
     return 0
 
@@ -3239,8 +3398,11 @@ def make_server(th, cwd, port=0, context=None):
                 if body.get("useHere") and name != "default":
                     notes.append(f"이 폴더가 슬롯 {name} 을 쓴다: {bind_folder(name, cwd)}")
                 if body.get("install") and data["profile"].get("agents"):
-                    written = export(th, data["profile"]["agents"], say=lambda m: None)
-                    notes.append("스킬을 깔았다: " + ", ".join(str(w) for w in written) if written else "깔 스킬이 없다")
+                    try:
+                        written = export(th, data["profile"]["agents"], say=lambda m: None, folder=cwd)
+                        notes.append("스킬을 깔았다: " + ", ".join(str(w) for w in written) if written else "깔 스킬이 없다")
+                    except Missing as e:
+                        notes.append(str(e))
                 return {"ok": True, "message": " · ".join(notes), "state": serve_state(th, cwd, name)}
             if path == "/api/pick":
                 # 테마 설정 탭의 "이번 문서에만". 슬롯에는 쓰지 않고, 에이전트가 suit.py picked 로 읽어 다시 조립한다
@@ -3857,10 +4019,55 @@ def selftest(th):
                   "SKILL.md 에 빠진 문서 종류나 독자, 축 키가 있다")
             web = (out / "web" / "prompt.md").read_text(encoding="utf-8")
             check("- 클래스: 개발자" in web, "웹 지침에 쓰는 사람 절이 없다")
-            (out / "antigravity" / "SKILL.md").write_text("내가 만든 스킬", encoding="utf-8")
+            (out / "agents" / "SKILL.md").write_text("내가 만든 스킬", encoding="utf-8")
             quiet(export, th, ["gemini"], str(out), False, None)
-            check((out / "antigravity" / "SKILL.md").read_text(encoding="utf-8") == "내가 만든 스킬",
+            check((out / "agents" / "SKILL.md").read_text(encoding="utf-8") == "내가 만든 스킬",
                   "export 가 손으로 만든 SKILL.md 를 덮어썼다")
+            # 스킬은 글을 쓰는 폴더에만 깐다. 홈 폴더와 엔진 저장소에는 깔지 않고, git 에 올라가지 않게 exclude 에 적는다
+            proj = Path(td) / "proj"
+            proj.mkdir()
+            proj = proj.resolve()
+            git = shutil.which("git") and subprocess.run(["git", "init", "-q", str(proj)], capture_output=True).returncode == 0
+            paths = quiet(lambda: export(th, ["claude", "codex", "antigravity", "cursor"], folder=proj))
+            check(sorted(p.relative_to(proj).as_posix() for p in paths)
+                  == [".agents/skills/docs-suit/SKILL.md", ".claude/skills/docs-suit/SKILL.md", ".cursor/skills/docs-suit/SKILL.md"],
+                  f"export 가 작업 폴더의 스킬 자리에 쓰지 않았다: {paths}")
+            for bad in (Path.home(), HERE, HERE / "themes"):
+                try:
+                    quiet(lambda: export(th, ["claude"], folder=bad, dry_run=True))
+                    check(False, f"export 가 {bad} 에 깔려고 했다")
+                except Missing:
+                    pass
+            try:
+                quiet(cmd_export, argparse.Namespace(agent="claude", glob=True, remove=False, dest=None, dry_run=True,
+                                                     profile=None), th)
+                check(False, "export --global 이 홈 폴더에 깔려고 했다")
+            except Missing:
+                pass
+            exclude = proj / ".git" / "info" / "exclude"
+            if git:
+                lines = exclude.read_text(encoding="utf-8").splitlines()
+                check("/.claude/skills/docs-suit/" in lines and "/.agents/skills/docs-suit/" in lines,
+                      "export 가 깐 스킬을 .git/info/exclude 에 적지 않았다")
+            (proj / ".cursor" / "skills" / "docs-suit" / "SKILL.md").write_text("내가 만든 스킬", encoding="utf-8")
+            gone = quiet(lambda: unexport(folder=proj))
+            check(len(gone) == 2 and not (proj / ".claude").exists() and not (proj / ".agents").exists(),
+                  "export --remove 가 스킬과 빈 폴더를 치우지 않았다")
+            check((proj / ".cursor" / "skills" / "docs-suit" / "SKILL.md").exists(), "export --remove 가 손으로 만든 스킬을 지웠다")
+            if git:
+                lines = exclude.read_text(encoding="utf-8").splitlines()
+                check("/.claude/skills/docs-suit/" not in lines and "/.agents/skills/docs-suit/" not in lines,
+                      "export --remove 가 .git/info/exclude 의 줄을 거두지 않았다")
+            home = Path(td) / "home"
+            for rel in OLD_HOME_SKILLS[:2]:
+                (home / rel[2:]).parent.mkdir(parents=True)
+                (home / rel[2:]).write_text(skill, encoding="utf-8")
+            (home / OLD_HOME_SKILLS[2][2:]).parent.mkdir(parents=True)
+            (home / OLD_HOME_SKILLS[2][2:]).write_text("내가 만든 스킬", encoding="utf-8")
+            gone = quiet(lambda: unexport(home=True, home_dir=home))
+            check(len(gone) == 2 and not (home / ".claude" / "skills" / "docs-suit").exists()
+                  and (home / ".claude" / "skills").is_dir() and (home / OLD_HOME_SKILLS[2][2:]).exists(),
+                  "export --remove --global 이 예전 판의 스킬만 골라 거두지 않았다")
             check("check - --kind" in skill and "<<'EOF'" in skill and "growth off" in skill,
                   "SKILL.md 에 검사 단계나 캐릭터 끄기가 없다")
             check("--preset <조합>" in skill and "--hair <머리>" in skill and "promote <키>" in skill,
@@ -4304,7 +4511,9 @@ def main(argv=None):
     w.add_argument("right", nargs="?")
     w.add_argument("--unset", action="store_true")
     e = sub.add_parser("export", parents=[slot])
-    e.add_argument("--agent", required=True, help="claude, agents, codex, antigravity, cursor, grok, web, all")
+    e.add_argument("--agent", help="claude, agents, codex, antigravity, cursor, grok, web, all. 스킬은 지금 폴더에 깐다")
+    e.add_argument("--remove", action="store_true", help="지금 폴더에 깐 스킬을 거둔다. --agent 를 빼면 모두 거둔다")
+    e.add_argument("--global", dest="glob", action="store_true", help="--remove 와 함께 예전 판이 홈 폴더에 깐 스킬을 거둔다")
     e.add_argument("--dest", help="에이전트별 하위 폴더로 이 폴더 아래에 쓴다. 시험용")
     e.add_argument("--dry-run", action="store_true")
     c = sub.add_parser("check", parents=[slot])

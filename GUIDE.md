@@ -8,15 +8,18 @@ docs-suit 를 설치하고 쓰는 법을 기능마다 적은 문서입니다. �
 
 파이썬 3.9 이상만 있으면 되고, 따로 설치할 패키지는 없습니다.
 
-1. 저장소를 받고 bootstrap 을 돌립니다.
+1. 저장소를 받아 두고, 글을 쓰는 폴더에서 bootstrap 을 돌립니다.
    ```sh
-   git clone https://github.com/dodokim-lab/docs-suit.git && cd docs-suit
-   python3 suit.py bootstrap
+   git clone https://github.com/dodokim-lab/docs-suit.git ~/docs-suit
+   cd <글을 쓰는 폴더>
+   python3 ~/docs-suit/suit.py bootstrap
    ```
 2. 묻는 대로 클래스와 페르소나, 쓰는 AI 도구, 캐릭터의 머리 모양을 고릅니다. 답하기 싫은 질문은 넘어가도 됩니다.
-3. 끝나면 만든 캐릭터와 다음에 할 일이 나옵니다. 고른 도구를 새로 열고 "보고서 써 줘" 처럼 평소대로 글을 부탁합니다. 설치된 스킬이 규칙을 조립해 따르고, 다 쓴 뒤 본문이 규칙을 지켰는지 잽니다.
+3. 끝나면 만든 캐릭터와 다음에 할 일이 나옵니다. 이 폴더에서 고른 도구를 새로 열고 "보고서 써 줘" 처럼 평소대로 글을 부탁합니다. 설치된 스킬이 규칙을 조립해 따르고, 다 쓴 뒤 본문이 규칙을 지켰는지 잽니다.
 
-설치된 스킬은 받은 폴더의 `suit.py` 를 부르므로, 받은 폴더를 옮기거나 지우면 스킬이 멈춥니다. 옮겼다면 새 자리에서 `python3 suit.py export --agent <도구>` 로 다시 깝니다.
+스킬은 bootstrap 을 돌린 폴더에만 깔리고, 그 폴더에서 연 에이전트만 부릅니다. docs-suit 저장소 폴더나 홈 폴더에서 돌리면 스킬을 깔 폴더를 묻습니다. 다른 폴더에서도 쓰려면 그 폴더에서 `export` 로 한 번 더 깝니다. 자세한 자리는 "도구마다 스킬이 깔리는 곳" 절에 있습니다.
+
+설치된 스킬은 받은 폴더의 `suit.py` 를 부르므로, 받은 폴더를 옮기거나 지우면 스킬이 멈춥니다. 옮겼다면 스킬을 깐 폴더마다 `python3 <새 자리>/suit.py export --agent <도구>` 로 다시 깝니다.
 
 답은 저장소 밖의 `~/.config/docs-suit/profile.yaml` 에 남아서 실수로 커밋되지 않습니다. 에이전트에게 "docs-suit 세팅해 줘" 라고 해도 스킬이 같은 질문을 대신 묻고, 그 폴더 이름으로 프로필 슬롯을 만들어 폴더에 잇습니다.
 
@@ -161,6 +164,12 @@ cd ~/작업폴더
 python3 <docs-suit 경로>/suit.py profile use work --here   # 이 폴더에서만 work 슬롯
 python3 <docs-suit 경로>/suit.py set register plain --here # 이 폴더에서만 평어체
 ```
+
+### 다른 문체 지침과 겹치면 고르게 합니다
+
+작업 폴더의 AGENTS.md 나 CLAUDE.md, 팀의 문체 체계, 다른 문체 스킬이 말투나 분량을 docs-suit 와 다르게 정해 두었으면, 에이전트는 쓰기 전에 어느 쪽을 따를지 묻습니다. 겹치는 것마다 두 값을 나란히 보여 주고, 문서 종류가 받을 것을 묻는 메시지에서 함께 묻습니다. 그 지침 쪽을 고르면 그 값으로 조립하고 검사도 그 값으로 잽니다. 고르지 않고 그냥 쓰라고 하면 그 지침 쪽을 따르고, 어느 쪽으로 썼는지 답 끝에 알립니다.
+
+앞으로도 이 폴더에서는 그 지침을 따르겠다고 하면 에이전트가 `set … --here` 로 폴더 파일에 남깁니다. 그러면 두 값이 같아져서 다음부터는 묻지 않습니다.
 
 ### 팀이 정한 표기는 용어집으로
 
@@ -349,23 +358,30 @@ https://dodokim-lab.github.io/docs-suit/ 에서는 설치 없이 써 보기 화�
 
 ## 도구마다 스킬이 깔리는 곳
 
-| 도구 | 자리 |
+스킬은 글을 쓰는 폴더 안에 깔고, 그 폴더에서 연 에이전트만 부릅니다. 홈 폴더에는 깔지 않습니다. 홈 폴더의 스킬은 모든 프로젝트에서 불려서, 팀이 정한 문체 지침이 있는 프로젝트에도 끼어들기 때문입니다.
+
+| 도구 | 폴더 안의 자리 |
 |---|---|
-| Claude Code | `~/.claude/skills/docs-suit/SKILL.md` |
-| Codex CLI | `~/.agents/skills/docs-suit/SKILL.md` |
-| Antigravity CLI | `~/.gemini/config/skills/docs-suit/SKILL.md`. suit.py 실행을 물으면 항상 허용을 고릅니다 |
-| Cursor | `~/.cursor/skills/docs-suit/SKILL.md` |
+| Claude Code | `.claude/skills/docs-suit/SKILL.md` |
+| Codex CLI, Antigravity CLI | `.agents/skills/docs-suit/SKILL.md`. Antigravity 는 suit.py 실행을 물으면 항상 허용을 고릅니다 |
+| Cursor | `.cursor/skills/docs-suit/SKILL.md` |
 | Grok Build | Claude 자리와 공용 자리에 함께 설치합니다 |
-| 웹 채팅 | `export --agent web` 이 만든 지침을 맞춤 지침이나 프로젝트, Gem 에 붙여 넣습니다 |
+| 웹 채팅 | `export --agent web` 이 만든 `~/.config/docs-suit/prompt.md` 를 맞춤 지침이나 프로젝트, Gem 에 붙여 넣습니다 |
 
-스킬은 이 저장소의 `suit.py` 를 절대 경로로 불러서 `git pull` 하면 모든 도구에 바로 반영됩니다. 저장소를 옮겼다면 `python3 suit.py export` 를 다시 돌립니다.
+깐 폴더가 git 저장소 안이면 스킬 폴더를 `.git/info/exclude` 에 적어 커밋되지 않게 합니다. 스킬에는 이 컴퓨터의 엔진 경로가 들어 있어서, 팀 저장소에 올라가면 다른 사람에게도 번지기 때문입니다. exclude 파일은 저장소에 올라가지 않습니다.
 
-Claude Code, Antigravity CLI, Codex CLI 는 실제 요청을 넣어 스킬이 불리는 것을 확인했고, 결과는 `tests/agent/results/` 에 있습니다. Codex 는 홈 폴더의 `~/.agents/skills/` 까지 확인했고, ChatGPT 무료 요금제로도 됩니다. Antigravity 는 작업 폴더의 `.agents/skills/` 로 확인했습니다. Antigravity 의 전역 자리와 나머지 도구의 자리는 2차 자료 기준이라 각 도구 문서로 확인해야 합니다.
+스킬은 이 저장소의 `suit.py` 를 절대 경로로 불러서 `git pull` 하면 스킬을 깐 모든 폴더에 바로 반영됩니다. 저장소를 옮겼다면 스킬을 깐 폴더마다 `export` 를 다시 돌립니다.
+
+Claude Code, Antigravity CLI, Codex CLI 는 실제 요청을 넣어 작업 폴더의 스킬이 불리는 것을 확인했고, 결과는 `tests/agent/results/` 에 있습니다. Codex 는 ChatGPT 무료 요금제로도 됩니다. Cursor 의 자리는 2차 자료 기준이라 Cursor 문서로 확인해야 합니다.
 
 ```sh
-python3 suit.py export --agent claude,codex   # 고른 도구에 스킬을 다시 설치
-python3 suit.py export --agent web            # 웹 채팅용 지침을 파일로
+cd <글을 쓰는 폴더>
+python3 <docs-suit 경로>/suit.py export --agent claude,codex   # 이 폴더에 스킬을 깔거나 다시 깐다
+python3 <docs-suit 경로>/suit.py export --remove               # 이 폴더에 깐 스킬을 거둔다
+python3 <docs-suit 경로>/suit.py export --agent web            # 웹 채팅용 지침을 파일로
 ```
+
+예전 판은 홈 폴더에 스킬을 깔았습니다. 그때 깐 스킬이 남아 있으면 `export` 가 알려 주고, `python3 <docs-suit 경로>/suit.py export --remove --global` 로 거둡니다. docs-suit 가 만든 파일만 지우고, 손으로 만든 스킬은 남깁니다.
 
 Claude Code 에서 스킬 대신 output style 로 쓰려면 `compose --format output-style -o ~/.claude/output-styles/<이름>.md` 로 뽑습니다.
 

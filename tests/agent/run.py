@@ -5,7 +5,6 @@
   python3 tests/agent/run.py --agent claude                 # 케이스와 여러 턴 흐름 전체
   python3 tests/agent/run.py --agent antigravity --only sns,pr --model gemini-3.8-flash-high
   python3 tests/agent/run.py --agent claude --record        # tests/agent/results/claude.md 에 남긴다
-  python3 tests/agent/run.py --agent codex --global --only sns   # 홈 폴더에 깐 스킬이 불리는지
 홈 폴더의 스킬과 프로필은 건드리지 않는다. 케이스마다 임시 폴더에 프로젝트 단위 스킬과 시험 프로필을 두고,
 DOCS_SUIT_LOG 로 suit.py 호출 인자를 모은다. Claude Code 는 사용자 설정과 개인 스킬을 끄고 돌린다.
 """
@@ -129,6 +128,8 @@ def codex_meta(out):
             continue
         if item.get("type") == "agent_message":
             meta["reply"] = item.get("text", "")
+            # 질문을 중간 메시지로 보내고 마지막에는 "질문을 보냈습니다" 로 끝내기도 해서 한 턴의 메시지를 모두 모은다
+            meta["said"] = (meta.get("said", "") + "\n" + meta["reply"]).strip()
         elif item.get("type") == "command_execution":
             for part in item.get("command", "").split():
                 if part.endswith("/SKILL.md"):
@@ -183,8 +184,9 @@ def case_profile(case):
     return suit.merge_folder(PROFILE if case.get("profile", True) else {}, case.get("folder", {}))
 
 
-def grade(case, calls, reply=""):
-    """(맞았나, 에이전트가 부른 것, 어긋난 까닭, 조립된 값, 글자수) 를 돌려준다. reply 는 첫 턴의 답이다."""
+def grade(case, calls, reply="", first=None):
+    """(맞았나, 에이전트가 부른 것, 어긋난 까닭, 조립된 값, 글자수) 를 돌려준다. reply 는 첫 턴에 에이전트가 한 말 전부이고,
+    first 는 calls 에 재촉한 턴의 호출이 섞였을 때 첫 턴의 호출만 따로 준 것이다."""
     expect = case.get("expect", "compose")
     composes = [c for c in calls if c[:1] == ["compose"] and not {"--help", "-h"} & set(c)]
     shown = "; ".join(describe(c) for c in composes) or ", ".join(sorted({c[0] for c in calls if c})) or "부르지 않음"
@@ -221,6 +223,10 @@ def grade(case, calls, reply=""):
         return False, shown, "compose 를 부르지 않았다", None, None
     a = compose_args(composes[-1])
     why = []
+    if expect == "conflict" and reply and (wrote_first(first or calls) or not any(m in reply for m in case["mention"])):
+        # 작업 폴더의 지침 파일이 docs-suit 와 다른 값을 정한 케이스. 첫 턴에서는 본문을 끝내 check 를 부르기 전에 겹친 값을
+        # 들어 어느 쪽을 따를지 물어야 하고, 재촉받은 뒤에는 그 지침의 값으로 조립해야 한다.
+        why.append("쓰기 전에 지침 파일과 겹치는 값을 묻지 않았다")
     kinds = case["kind"] if isinstance(case["kind"], list) else [case["kind"]]
     if (a.kind or "") not in kinds:
         why.append(f"종류가 {a.kind or '없음'} 이다")
@@ -275,12 +281,28 @@ def checked_body(transcripts):
     return found[-1] if found else ""
 
 
+def wrote_first(calls):
+    """본문을 다 써서 check 까지 부른 턴인가."""
+    return any(c[:1] == ["check"] for c in calls)
+
+
+def only_asks(reply):
+    """질문만 하고 멈춘 답인가. 질문이 여럿이고 본문의 [확인 필요] 표시가 없으면 질문만 하고 멈춘 것이다.
+    요청 표현이 한 번뿐이어도 답이 짧으면 자료를 달라고 하고 멈춘 것이다. "보내 주시면 쓰겠습니다" 같은 꼴이다."""
+    asks = len(re.findall(r"\?|주세요|여쭤|여쭙|주시면", reply))
+    return not suit.UNRESOLVED.search(reply) and (asks >= 2 or (asks and len(reply) < 400))
+
+
+# 케이스가 작업 폴더에 두는 에이전트 지침 파일. 에이전트가 쓴 본문이 아니다.
+GUIDE_FILES = {"AGENTS.md", "CLAUDE.md", "GEMINI.md"}
+
+
 def doc_text(reply, proj):
     """에이전트가 쓴 본문. 작업 폴더에 만든 .md 가 있으면 그것을, 없으면 답의 코드 블록이나 --- 사이, 메일 꼴,
     답 전체 순으로 쓴다. 질문만 하고 멈췄으면 빈 문자열을 돌려준다."""
     # 답 끝의 `성장:` 줄은 check 가 만든 줄이라 본문이 아니다. 남겨 두면 분량을 잴 때 함께 센다.
     reply = re.sub(r"^성장:.*$", "", reply, flags=re.M).rstrip()
-    made = [f for f in proj.rglob("*.md") if not {".agents", ".claude"} & set(f.parts)]
+    made = [f for f in proj.rglob("*.md") if not {".agents", ".claude"} & set(f.parts) and f.name not in GUIDE_FILES]
     if made:
         return max(made, key=lambda f: f.stat().st_size).read_text(encoding="utf-8")
     blocks = [b for b in re.findall(r"```[a-z]*\n(.*?)```", reply, re.S) if len(b) > 200]
@@ -290,10 +312,7 @@ def doc_text(reply, proj):
     mail = re.search(r"^제목\s*[:：].*?(?:올림|드림|배상)\s*$", reply, re.M | re.S)
     if mail:
         return mail.group(0)
-    # 질문이 여럿이고 본문의 [확인 필요] 표시가 없으면 질문만 하고 멈춘 것이다. 백틱 안의 표시는 표시 방식을 설명한 말이다.
-    # 요청 표현이 한 번뿐이어도 답이 짧으면 자료를 달라고 하고 멈춘 것이다. "보내 주시면 쓰겠습니다" 같은 꼴이다.
-    asks = len(re.findall(r"\?|주세요|여쭤|여쭙|주시면", reply))
-    if not suit.UNRESOLVED.search(reply) and (asks >= 2 or (asks and len(reply) < 400)):
+    if only_asks(reply):
         return ""
     # --- 로 나뉜 답은 본문과 덧붙인 안내가 섞여 있다. [확인 필요] 표시가 가장 많은 조각을 본문으로 본다.
     parts = re.split(r"^---\s*$", reply, flags=re.M)
@@ -348,15 +367,16 @@ def invoke(agent, ask, tmp, proj, env, model, session=None, keep=False, files=Fa
         return (out.decode() if isinstance(out, bytes) else out), "시간 초과"
 
 
-def prepare(agent, item, base, glob):
-    """케이스 하나의 임시 폴더. 스킬, 시험 프로필, 폴더 파일을 두고 suit.py 에 넘길 환경 변수를 돌려준다."""
+def prepare(agent, item, base):
+    """케이스 하나의 임시 폴더. 스킬, 시험 프로필, 폴더 파일, 지침 파일을 두고 suit.py 에 넘길 환경 변수를 돌려준다."""
     tmp = base / item["id"]
     proj = tmp / "proj"
     proj.mkdir(parents=True)
-    if not glob:
-        skill = proj / AGENTS[agent]["skill"]
-        skill.parent.mkdir(parents=True)
-        skill.write_text(suit.skill_text(th), encoding="utf-8")
+    skill = proj / AGENTS[agent]["skill"]
+    skill.parent.mkdir(parents=True)
+    skill.write_text(suit.skill_text(th), encoding="utf-8")
+    for name, text in item.get("files", {}).items():
+        (proj / name).write_text(text, encoding="utf-8")
     prof = tmp / "profile.yaml"
     if item.get("profile", True):
         prof.write_text(suit.dump_yaml(PROFILE), encoding="utf-8")
@@ -393,7 +413,7 @@ def finish_meta(agent, tmp, transcripts, ok):
     seen = err + "".join(transcripts).replace('": "', '":"')
     meta["unmeasured"] = "" if ok else next((why for why, signs in UNMEASURED if any(k in seen for k in signs)), "")
     skill = tmp / "proj" / AGENTS[agent]["skill"]
-    meta["skill"] = hashlib.sha1(skill.read_bytes()).hexdigest()[:8] if skill.exists() else "전역"
+    meta["skill"] = hashlib.sha1(skill.read_bytes()).hexdigest()[:8] if skill.exists() else "없음"
     return meta
 
 
@@ -402,8 +422,10 @@ def load_case(agent, case, base):
     tmp = base / case["id"]
     transcripts = [(tmp / name).read_text(encoding="utf-8") for name in ("transcript.jsonl", "transcript-2.jsonl")
                    if (tmp / name).exists()]
-    reply = AGENTS[agent]["meta"](transcripts[0])["reply"] if transcripts else ""
-    ok, shown, why, vals, chars = grade(case, read_calls(tmp), reply)
+    said = AGENTS[agent]["meta"](transcripts[0]) if transcripts else {}
+    reply = said.get("said") or said.get("reply", "")
+    graded = read_calls(tmp) + (read_calls(tmp, "calls-2.jsonl") if case.get("expect") == "conflict" else [])
+    ok, shown, why, vals, chars = grade(case, graded, reply, read_calls(tmp))
     meta = finish_meta(agent, tmp, transcripts, ok)
     meta["followup"] = len(transcripts) > 1
     # check 에 넘긴 본문이 있으면 그것을 잰다. 없으면 답에서 뽑되, 재촉했으면 두 답 가운데 본문이 더 긴 쪽을 쓴다.
@@ -424,8 +446,8 @@ def load_case(agent, case, base):
     return case, ok, shown, why, meta
 
 
-def run_case(agent, case, base, model, glob=False):
-    tmp, proj, env = prepare(agent, case, base, glob)
+def run_case(agent, case, base, model):
+    tmp, proj, env = prepare(agent, case, base)
     t0 = time.time()
     out, err = invoke(agent, case["ask"], tmp, proj, env, model, keep=True, files=bool(case.get("file")))
     stop_servers(proj)
@@ -434,7 +456,9 @@ def run_case(agent, case, base, model, glob=False):
     first = AGENTS[agent]["meta"](out)
     vals = grade(case, read_calls(tmp))[3]
     made = case.get("file") and any(f for f in proj.rglob(f"*{case['file']}") if ".agents" not in f.parts)
-    if vals and first["session"] and not made and not doc_text(first["reply"], proj):
+    # 겹침 케이스는 질문을 마친 뒤 "답을 받으면 쓰겠다" 로 끝내기도 해서, 첫 턴에 check 를 부르지 않았으면 재촉한다
+    asked = not doc_text(first["reply"], proj) or (case.get("expect") == "conflict" and not wrote_first(read_calls(tmp)))
+    if vals and first["session"] and not made and asked:
         env2 = dict(env, DOCS_SUIT_LOG=str(tmp / "calls-2.jsonl"))
         out2, err2 = invoke(agent, FOLLOWUP, tmp, proj, env2, model, first["session"], keep=True,
                             files=bool(case.get("file")))
@@ -500,8 +524,8 @@ def load_flow(agent, flow, base):
     return flow, ok, shown, why, finish_meta(agent, tmp, transcripts, ok)
 
 
-def run_flow(agent, flow, base, model, glob=False):
-    tmp, proj, env = prepare(agent, flow, base, glob)
+def run_flow(agent, flow, base, model):
+    tmp, proj, env = prepare(agent, flow, base)
     session, errs, t0 = None, [], time.time()
     for i, ask in enumerate(flow["turns"], 1):
         out, err = invoke(agent, ask, tmp, proj, env, model, session, keep=True)
@@ -537,6 +561,8 @@ def expected(case):
         parts.append("다듬기")
     if case.get("file"):
         parts.append(f"{case['file']} 파일")
+    if expect == "conflict":
+        parts.append("쓰기 전에 고르게 함")
     return ", ".join(parts)
 
 
@@ -554,7 +580,7 @@ def verdict(ok, why, m):
     return "맞음" if ok else f"재지 못함: {m['unmeasured']}" if m["unmeasured"] else f"틀림: {why}"
 
 
-def report(agent, results, flows, version, model=None, glob=False):
+def report(agent, results, flows, version, model=None):
     every = results + flows
     models = sorted({m["model"] for *_, m in every if m["model"]}) or ([model] if model else [])
     unmeasured = sum(1 for *_, m in results if m["unmeasured"])
@@ -566,7 +592,7 @@ def report(agent, results, flows, version, model=None, glob=False):
     lines = [f"# 동작 테스트: {agent}", "",
              f"- 날짜: {date.today().isoformat()}",
              f"- 에이전트: {version}",
-             f"- 스킬 자리: {'홈 폴더 (전역)' if glob else '임시 작업 폴더'}",
+             "- 스킬 자리: 임시 작업 폴더",
              f"- SKILL.md 지문: {', '.join(sorted({m['skill'] for *_, m in every if m['skill']})) or '알 수 없음'}",
              f"- 모델: {', '.join(models) or '알 수 없음'}",
              *([f"- 요금제: {AGENTS[agent]['plan']() or '알 수 없음'}"] if AGENTS[agent].get("plan") else []),
@@ -586,7 +612,7 @@ def report(agent, results, flows, version, model=None, glob=False):
                   "|---|---|---|---|---|---|---|"]
         for case, ok, shown, why, m in results:
             lines.append(f"| {case['id']} | {expected(case)} | `{shown}` | {verdict(ok, why, m)} | "
-                         f"{doc_summary(m['doc']) if ok and case.get('expect', 'compose') == 'compose' else '-'} | {note(m)} | {m['sec']} |")
+                         f"{doc_summary(m['doc']) if ok and case.get('expect', 'compose') in ('compose', 'conflict') else '-'} | {note(m)} | {m['sec']} |")
     if flows:
         lines += ["", "## 여러 턴 흐름", "", "| 흐름 | 기대 | 에이전트가 부른 것 | 판정 | 비고 | 초 |", "|---|---|---|---|---|---|"]
         for flow, ok, shown, why, m in flows:
@@ -609,8 +635,6 @@ def main():
     ap.add_argument("--only", help="케이스나 흐름 id 를 쉼표로 잇는다")
     ap.add_argument("--jobs", type=int, default=4)
     ap.add_argument("--model", help="에이전트에 넘길 모델. 주지 않으면 에이전트 기본값")
-    ap.add_argument("--global", dest="glob", action="store_true",
-                    help="임시 폴더에 스킬을 두지 않고 홈 폴더에 깐 스킬이 불리는지 본다")
     ap.add_argument("--record", action="store_true", help="tests/agent/results/<agent>.md 에 남긴다")
     ap.add_argument("--regrade", metavar="기록 폴더", help="에이전트를 부르지 않고 지난 실행의 기록으로 다시 채점한다")
     ap.add_argument("--into", metavar="기록 폴더", help="고른 케이스만 지난 실행의 기록 폴더에 다시 돌려 넣는다. 뒤이어 --regrade 로 채점한다")
@@ -620,10 +644,8 @@ def main():
     flows = [f for f in FLOWS if not only or f["id"] in only]
     if a.into and not only:
         ap.error("--into 는 --only 로 고른 케이스만 다시 돌릴 때 쓴다")
-    if a.record and (only or a.glob or a.into):
-        ap.error("--record 는 임시 작업 폴더로 케이스 전체를 돌릴 때만 쓴다")
-    if a.glob and a.agent == "claude":
-        ap.error("Claude Code 의 홈 폴더 스킬은 사용자 설정을 켜야 읽혀서 이 실행기로는 재지 않는다")
+    if a.record and (only or a.into):
+        ap.error("--record 는 케이스 전체를 돌릴 때만 쓴다")
     version = subprocess.run(AGENTS[a.agent]["version"], capture_output=True, text=True).stdout.strip()
     if a.regrade:
         base = Path(a.regrade)
@@ -635,12 +657,12 @@ def main():
             shutil.rmtree(base / item["id"], ignore_errors=True)
         print(f"{a.agent} {version}, 케이스 {len(cases)}건, 흐름 {len(flows)}건, 기록은 {base}", file=sys.stderr)
         with ThreadPoolExecutor(a.jobs) as ex:
-            flow_jobs = [ex.submit(run_flow, a.agent, f, base, a.model, a.glob) for f in flows]
-            results = list(ex.map(lambda c: run_case(a.agent, c, base, a.model, a.glob), cases))
+            flow_jobs = [ex.submit(run_flow, a.agent, f, base, a.model) for f in flows]
+            results = list(ex.map(lambda c: run_case(a.agent, c, base, a.model), cases))
             flow_results = [j.result() for j in flow_jobs]
     for item, ok, shown, why, m in results + flow_results:
         print(f"{'맞음' if ok else '틀림'} {item['id']}: {shown}" + (f" ({why})" if why else ""), file=sys.stderr)
-    text = report(a.agent, results, flow_results, version, a.model, a.glob)
+    text = report(a.agent, results, flow_results, version, a.model)
     print(text)
     if a.record:
         out = HERE / "results" / f"{a.agent}.md"

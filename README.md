@@ -144,12 +144,14 @@ docs-suit 는 쓰기 전에 문서 종류와 읽는 사람, 말투에 맞춰 규
 조립한 지침은 마크다운 한 장입니다. Claude Code, Codex, Cursor 같은 에이전트에는 스킬로 깔고, 웹 채팅에는 붙여 넣어 씁니다. 파이썬 3.9 이상만 있으면 됩니다.
 
 ```sh
-git clone https://github.com/dodokim-lab/docs-suit.git && cd docs-suit && python3 suit.py bootstrap
+git clone https://github.com/dodokim-lab/docs-suit.git ~/docs-suit
+cd <글을 쓰는 폴더>
+python3 ~/docs-suit/suit.py bootstrap
 ```
 
-`bootstrap` 이 클래스와 쓰는 AI 도구, 캐릭터의 머리 모양을 묻고 고른 도구에 스킬을 깝니다. 끝나면 그 도구를 새로 열고 "업무 보고 써 줘" 처럼 평소대로 부탁하면 됩니다. 스킬이 규칙을 조립해 따르고, 다 쓴 글을 재서 캐릭터를 키웁니다.
+`bootstrap` 이 클래스와 쓰는 AI 도구, 캐릭터의 머리 모양을 묻고 지금 폴더에 스킬을 깝니다. 끝나면 이 폴더에서 그 도구를 새로 열고 "업무 보고 써 줘" 처럼 평소대로 부탁하면 됩니다. 스킬이 규칙을 조립해 따르고, 다 쓴 글을 재서 캐릭터를 키웁니다.
 
-깐 스킬은 받은 폴더의 `suit.py` 를 부르니, 받은 폴더는 옮기거나 지우지 마세요.
+스킬은 깐 폴더에서만 불려서 다른 프로젝트의 글에는 끼어들지 않습니다. 다른 폴더에서도 쓰려면 그 폴더에서 `python3 ~/docs-suit/suit.py export --agent claude` 처럼 한 번 더 깝니다. 깐 스킬은 받은 폴더의 `suit.py` 를 부르니, 받은 폴더는 옮기거나 지우지 마세요.
 
 ## 쓰는 법
 
